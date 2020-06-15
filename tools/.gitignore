@@ -1,0 +1,11 @@
+/ai_dump
+/fisheye_calibrate
+/sample_af_bk
+/vi_bayerdump
+/vi_chn_dump
+/vi_pipe_yuvdump
+/vo_chn_dump
+/vo_screen_dump
+/vpss_chn_dump
+/vpss_src_dump
+/vo_layer0*.yuv
