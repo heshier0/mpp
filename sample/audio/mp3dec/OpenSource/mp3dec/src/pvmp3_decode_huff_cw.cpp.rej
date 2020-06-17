@@ -1,0 +1,11 @@
+--- mp3dec/src/pvmp3_decode_huff_cw.cpp	2018-10-29 16:40:02.941796200 +0800
++++ mp3dec_new/src/pvmp3_decode_huff_cw.cpp	2018-12-04 16:32:02.795537000 +0800
+@@ -139,7 +139,7 @@
+ 
+ uint16 pvmp3_decode_huff_cw_tab0(tmp3Bits *pMainData)
+ {
+-    OSCL_UNUSED_ARG(pMainData);
++    //OSCL_UNUSED_ARG(pMainData);
+     return(0);
+ 
+ }
