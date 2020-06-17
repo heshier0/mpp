@@ -403,7 +403,7 @@ HI_S32 SAMPLE_INNER_CODEC_CfgAudio(AUDIO_SAMPLE_RATE_E enSample)
         printf("%s: select acodec input_mode failed\n", __FUNCTION__);
         ret = HI_FAILURE;
     }
-    if (0) /* should be 1 when micin */
+    if (1) /* should be 1 when micin */
     {
         /******************************************************************************************
         The input volume range is [-87, +86]. Both the analog gain and digital gain are adjusted.
@@ -415,7 +415,7 @@ HI_S32 SAMPLE_INNER_CODEC_CfgAudio(AUDIO_SAMPLE_RATE_E enSample)
         Within this range, the noises are lowest because only the analog gain is adjusted,
         and the voice quality can be guaranteed.
         *******************************************************************************************/
-        iAcodecInputVol = 30;
+        iAcodecInputVol = 50;
         if (ioctl(fdAcodec, ACODEC_SET_INPUT_VOL, &iAcodecInputVol))
         {
             printf("%s: set acodec micin volume failed\n", __FUNCTION__);
@@ -696,8 +696,11 @@ void* SAMPLE_COMM_AUDIO_AdecProc(void* parg)
             {
                 printf("%s: HI_MPI_ADEC_SendEndOfStream failed!\n", __FUNCTION__);
             }
-            (HI_VOID)fseek(pfd, 0, SEEK_SET);/*read file again*/
-            continue;
+            //modified bye hekai
+            //(HI_VOID)fseek(pfd, 0, SEEK_SET);/*read file again*/
+            //continue;
+            //end modified
+            break;
         }
 
         /* here only demo adec streaming sending mode, but pack sending mode is commended */
@@ -853,7 +856,7 @@ HI_S32 SAMPLE_COMM_AUDIO_CreatTrdAencAdec(AENC_CHN AeChn, ADEC_CHN AdChn, FILE* 
     pstAenc = &gs_stSampleAenc[AeChn];
     pstAenc->AeChn = AeChn;
     pstAenc->AdChn = AdChn;
-    pstAenc->bSendAdChn = HI_TRUE;
+    pstAenc->bSendAdChn = HI_FALSE;
     pstAenc->pfd = pAecFd;
     pstAenc->bStart = HI_TRUE;
     pthread_create(&pstAenc->stAencPid, 0, SAMPLE_COMM_AUDIO_AencProc, pstAenc);

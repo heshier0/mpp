@@ -2,7 +2,7 @@
 
 include ../Makefile.param
 
-HI_SUPPORT_MP3DEC := NO
+HI_SUPPORT_MP3DEC := YES
 
 SMP_SRCS := $(wildcard *.c)
 
