@@ -11,6 +11,11 @@
 #include <errno.h>
 #include <signal.h>
 
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+
 #include "sample_comm.h"
 #include "acodec.h"
 #include "audio_mp3_adp.h"
@@ -332,7 +337,7 @@ static void usage()
     return;
 }
 
-void handle_signal(HI_S32 signo)
+static void handle_signal(HI_S32 signo)
 {
     signal(SIGINT, SIG_IGN);
     signal(SIGTERM, SIG_IGN);

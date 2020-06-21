@@ -13,6 +13,10 @@
 #include <signal.h>
 #include <sys/select.h>
 
+ #include<sys/socket.h>
+ #include<arpa/inet.h>
+ #include<netinet/in.h>
+
 #include "sample_comm.h"
 #include "acodec.h"
 #include "audio_aac_adp.h"
@@ -641,9 +645,27 @@ void* SAMPLE_COMM_AUDIO_AencProc(void* parg)
             }
 
             /* save audio stream to file */
-            (HI_VOID)fwrite(stStream.pStream, 1, stStream.u32Len, pstAencCtl->pfd);
-
-            fflush(pstAencCtl->pfd);
+            // (HI_VOID)fwrite(stStream.pStream, 1, stStream.u32Len, pstAencCtl->pfd);
+            // fflush(pstAencCtl->pfd);
+            //modified by hekai
+            int sockfd = -1;
+            struct sockaddr_in addr;
+            sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+            if (sockfd < 0)
+            {
+                printf("%s: socket failed\n", \
+                       __FUNCTION__);
+                return NULL;
+            }
+            addr.sin_family = AF_INET;
+            addr.sin_port = htons(18899);
+            addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+            int ret = sendto(sockfd, stStream.pStream, stStream.u32Len, 0, (struct sockaddr*)&addr, sizeof(addr));
+            if (ret < 0)
+            {
+                perror("fail to sendto");
+                return NULL;
+            }
 
             /* finally you must release the stream */
             s32Ret = HI_MPI_AENC_ReleaseStream(pstAencCtl->AeChn, &stStream);
@@ -688,20 +710,46 @@ void* SAMPLE_COMM_AUDIO_AdecProc(void* parg)
     {
         /* read from file */
         stAudioStream.pStream = pu8AudioStream;
-        u32ReadLen = fread(stAudioStream.pStream, 1, u32Len, pfd);
-        if (u32ReadLen <= 0)
+       
+        //modified by hekai
+        int sockfd;
+        struct sockaddr_in addr;
+        sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+        if(sockfd < 0)
         {
-            s32Ret = HI_MPI_ADEC_SendEndOfStream(s32AdecChn, HI_FALSE);
-            if (HI_SUCCESS != s32Ret)
-            {
-                printf("%s: HI_MPI_ADEC_SendEndOfStream failed!\n", __FUNCTION__);
-            }
-            //modified bye hekai
-            //(HI_VOID)fseek(pfd, 0, SEEK_SET);/*read file again*/
-            //continue;
-            //end modified
-            break;
+            printf("%s: fail to sockfd\n", __FUNCTION__);
+            return NULL;
         }
+        addr.sin_family = AF_INET;
+        addr.sin_port = htons(18899);
+        addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+        if(bind(sockfd, (struct sockaddr*)&addr, sizeof(addr)) < 0)
+        {
+            printf("%s: fail to bind\n", __FUNCTION__);
+            return -1;
+        }
+        int len = sizeof(struct sockaddr);
+        u32ReadLen = recvfrom(sockfd, stAudioStream.pStream, u32Len, 0, (struct sockaddr*)&addr, &len);
+        if(u32ReadLen < 0)
+        {
+           printf("%s: fail to recvfrom\n", __FUNCTION__);
+           return -1;
+        }
+
+        // u32ReadLen = fread(stAudioStream.pStream, 1, u32Len, pfd);
+        // if (u32ReadLen <= 0)
+        // {
+        //     s32Ret = HI_MPI_ADEC_SendEndOfStream(s32AdecChn, HI_FALSE);
+        //     if (HI_SUCCESS != s32Ret)
+        //     {
+        //         printf("%s: HI_MPI_ADEC_SendEndOfStream failed!\n", __FUNCTION__);
+        //     }
+        //     //modified bye hekai
+        //     //(HI_VOID)fseek(pfd, 0, SEEK_SET);/*read file again*/
+        //     //continue;
+        //     //end modified
+        //     break;
+        // }
 
         /* here only demo adec streaming sending mode, but pack sending mode is commended */
         stAudioStream.u32Len = u32ReadLen;
