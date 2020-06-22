@@ -47,7 +47,8 @@ typedef struct tagSAMPLE_AENC_S
     pthread_t stAencPid;
     HI_S32  AeChn;
     HI_S32  AdChn;
-    FILE*    pfd;
+    //FILE*    pfd;
+    int pfd;
     HI_BOOL bSendAdChn;
 } SAMPLE_AENC_S;
 
@@ -68,7 +69,8 @@ typedef struct tagSAMPLE_ADEC_S
 {
     HI_BOOL bStart;
     HI_S32 AdChn;
-    FILE* pfd;
+    // FILE* pfd;
+    int   pfd;
     pthread_t stAdPid;
 } SAMPLE_ADEC_S;
 
@@ -596,6 +598,25 @@ void* SAMPLE_COMM_AUDIO_AencProc(void* parg)
     fd_set read_fds;
     struct timeval TimeoutVal;
 
+    //added by hekai
+    const char* fifo_pcm = "/tmp/my_pcm_fifo";
+    if (access(fifo_pcm, F_OK) == -1)
+    {
+    int res = mkfifo(fifo_pcm, 0777);
+    if(res != 0)
+    {
+        printf("could not create fifo %s\n", fifo_pcm);
+        return NULL;
+    }
+    }
+    int fd = open(fifo_pcm, O_WRONLY);
+    if (fd == -1)
+    {
+        printf("open pcm fifo failed\n");
+        return NULL;
+    }
+    //end added
+
     FD_ZERO(&read_fds);
     AencFd = HI_MPI_AENC_GetFd(pstAencCtl->AeChn);
     FD_SET(AencFd, &read_fds);
@@ -648,25 +669,10 @@ void* SAMPLE_COMM_AUDIO_AencProc(void* parg)
             // (HI_VOID)fwrite(stStream.pStream, 1, stStream.u32Len, pstAencCtl->pfd);
             // fflush(pstAencCtl->pfd);
             //modified by hekai
-            int sockfd = -1;
-            struct sockaddr_in addr;
-            sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-            if (sockfd < 0)
-            {
-                printf("%s: socket failed\n", \
-                       __FUNCTION__);
-                return NULL;
-            }
-            addr.sin_family = AF_INET;
-            addr.sin_port = htons(18899);
-            addr.sin_addr.s_addr = inet_addr("127.0.0.1");
-            int ret = sendto(sockfd, stStream.pStream, stStream.u32Len, 0, (struct sockaddr*)&addr, sizeof(addr));
-            if (ret < 0)
-            {
-                perror("fail to sendto");
-                return NULL;
-            }
+            write(fd, stStream.pStream, stStream.u32Len);
+            //end modified 
 
+RELEASE_STREAM:
             /* finally you must release the stream */
             s32Ret = HI_MPI_AENC_ReleaseStream(pstAencCtl->AeChn, &stStream);
             if (HI_SUCCESS != s32Ret )
@@ -679,7 +685,7 @@ void* SAMPLE_COMM_AUDIO_AencProc(void* parg)
         }
     }
 
-    fclose(pstAencCtl->pfd);
+    close(fd);
     pstAencCtl->bStart = HI_FALSE;
     return NULL;
 }
@@ -696,7 +702,8 @@ void* SAMPLE_COMM_AUDIO_AdecProc(void* parg)
     HI_S32 s32AdecChn;
     HI_U8* pu8AudioStream = NULL;
     SAMPLE_ADEC_S* pstAdecCtl = (SAMPLE_ADEC_S*)parg;
-    FILE* pfd = pstAdecCtl->pfd;
+    //FILE* pfd = pstAdecCtl->pfd;
+    int pfd = pstAdecCtl->pfd;
     s32AdecChn = pstAdecCtl->AdChn;
 
     pu8AudioStream = (HI_U8*)malloc(sizeof(HI_U8) * MAX_AUDIO_STREAM_LEN);
@@ -706,65 +713,44 @@ void* SAMPLE_COMM_AUDIO_AdecProc(void* parg)
         return NULL;
     }
 
+    HI_BOOL bPlayed = HI_FALSE;
     while (HI_TRUE == pstAdecCtl->bStart)
     {
         /* read from file */
         stAudioStream.pStream = pu8AudioStream;
        
         //modified by hekai
-        int sockfd;
-        struct sockaddr_in addr;
-        sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-        if(sockfd < 0)
+        ssize_t read_count = read(pfd, stAudioStream.pStream, u32Len);
+        if (read_count > 0)
         {
-            printf("%s: fail to sockfd\n", __FUNCTION__);
-            return NULL;
+            stAudioStream.u32Len = (HI_U32)read_count;
+            s32Ret = HI_MPI_ADEC_SendStream(s32AdecChn, &stAudioStream, HI_TRUE);
+            if (HI_SUCCESS != s32Ret)
+            {
+                printf("%s: HI_MPI_ADEC_SendStream(%d) failed with %#x!\n", \
+                    __FUNCTION__, s32AdecChn, s32Ret);
+                break;
+            }
+            bPlayed = HI_TRUE;
         }
-        addr.sin_family = AF_INET;
-        addr.sin_port = htons(18899);
-        addr.sin_addr.s_addr = inet_addr("127.0.0.1");
-        if(bind(sockfd, (struct sockaddr*)&addr, sizeof(addr)) < 0)
+        else
         {
-            printf("%s: fail to bind\n", __FUNCTION__);
-            return -1;
-        }
-        int len = sizeof(struct sockaddr);
-        u32ReadLen = recvfrom(sockfd, stAudioStream.pStream, u32Len, 0, (struct sockaddr*)&addr, &len);
-        if(u32ReadLen < 0)
-        {
-           printf("%s: fail to recvfrom\n", __FUNCTION__);
-           return -1;
-        }
-
-        // u32ReadLen = fread(stAudioStream.pStream, 1, u32Len, pfd);
-        // if (u32ReadLen <= 0)
-        // {
-        //     s32Ret = HI_MPI_ADEC_SendEndOfStream(s32AdecChn, HI_FALSE);
-        //     if (HI_SUCCESS != s32Ret)
-        //     {
-        //         printf("%s: HI_MPI_ADEC_SendEndOfStream failed!\n", __FUNCTION__);
-        //     }
-        //     //modified bye hekai
-        //     //(HI_VOID)fseek(pfd, 0, SEEK_SET);/*read file again*/
-        //     //continue;
-        //     //end modified
-        //     break;
-        // }
-
-        /* here only demo adec streaming sending mode, but pack sending mode is commended */
-        stAudioStream.u32Len = u32ReadLen;
-        s32Ret = HI_MPI_ADEC_SendStream(s32AdecChn, &stAudioStream, HI_TRUE);
-        if (HI_SUCCESS != s32Ret)
-        {
-            printf("%s: HI_MPI_ADEC_SendStream(%d) failed with %#x!\n", \
-                   __FUNCTION__, s32AdecChn, s32Ret);
-            break;
+            if (bPlayed)
+            {
+                s32Ret = HI_MPI_ADEC_SendEndOfStream(s32AdecChn, HI_FALSE);
+                if (HI_SUCCESS != s32Ret)
+                {
+                    printf("%s: HI_MPI_ADEC_SendEndOfStream failed!\n", __FUNCTION__);
+                }
+                bPlayed = HI_FALSE;
+            }
         }
     }
 
+    
     free(pu8AudioStream);
     pu8AudioStream = NULL;
-    fclose(pfd);
+    close(pfd);
     pstAdecCtl->bStart = HI_FALSE;
     return NULL;
 }
@@ -892,14 +878,14 @@ HI_S32 SAMPLE_COMM_AUDIO_CreatTrdAiAenc(AUDIO_DEV AiDev, AI_CHN AiChn, AENC_CHN 
 /******************************************************************************
 * function : Create the thread to get stream from aenc and send to adec
 ******************************************************************************/
-HI_S32 SAMPLE_COMM_AUDIO_CreatTrdAencAdec(AENC_CHN AeChn, ADEC_CHN AdChn, FILE* pAecFd)
+HI_S32 SAMPLE_COMM_AUDIO_CreatTrdAencAdec(AENC_CHN AeChn, ADEC_CHN AdChn, int pAecFd)
 {
     SAMPLE_AENC_S* pstAenc = NULL;
 
-    if (NULL == pAecFd)
-    {
-        return HI_FAILURE;
-    }
+    // if (-1 == pAecFd)
+    // {
+    //     return HI_FAILURE;
+    // }
 
     pstAenc = &gs_stSampleAenc[AeChn];
     pstAenc->AeChn = AeChn;
@@ -915,13 +901,13 @@ HI_S32 SAMPLE_COMM_AUDIO_CreatTrdAencAdec(AENC_CHN AeChn, ADEC_CHN AdChn, FILE* 
 /******************************************************************************
 * function : Create the thread to get stream from file and send to adec
 ******************************************************************************/
-HI_S32 SAMPLE_COMM_AUDIO_CreatTrdFileAdec(ADEC_CHN AdChn, FILE* pAdcFd)
+HI_S32 SAMPLE_COMM_AUDIO_CreatTrdFileAdec(ADEC_CHN AdChn, int pAdcFd)
 {
     SAMPLE_ADEC_S* pstAdec = NULL;
 
-    if (NULL == pAdcFd)
+    if (-1 == pAdcFd)
     {
-        return HI_FAILURE;
+       return HI_FAILURE;
     }
 
     pstAdec = &gs_stSampleAdec[AdChn];

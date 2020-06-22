@@ -11,11 +11,6 @@
 #include <errno.h>
 #include <signal.h>
 
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
-
 #include "sample_comm.h"
 #include "acodec.h"
 #include "audio_mp3_adp.h"
@@ -35,42 +30,44 @@
         }\
     }while(0)
 
-static FILE* open_audio_file(HI_CHAR* aszFileName)
+static int open_mp3_fifo()
 {
-    FILE* pfd;
-    
-    if(aszFileName == NULL)
-        return NULL;
-
-    /* create file for save stream
-    snprintf(aszFileName, FILE_NAME_LEN, "audio_chn%d.%s", AdChn, SAMPLE_AUDIO_Pt2Str(enType));
-    */
-    pfd = fopen(aszFileName, "rb");
-    if (NULL == pfd)
+    int fd = -1;
+    const char* fifo_mp3 = "/tmp/my_mp3_fifo";
+    if (access(fifo_mp3, F_OK) == -1)
     {
-        printf("%s: open file %s failed\n", __FUNCTION__, aszFileName);
-        return NULL;
+        int res = mkfifo(fifo_mp3, 0777);
+        if(res != 0)
+        {
+            printf("could not create fifo %s\n", fifo_mp3);
+            return -1;
+        }
     }
-    printf("open stream file:\"%s\" for adec ok\n", aszFileName);
-    return pfd;
+    fd = open(fifo_mp3, O_RDONLY | O_NONBLOCK);
+
+    return fd; 
 }
 
-static FILE* open_sample_file(AENC_CHN AeChn, PAYLOAD_TYPE_E enType)
+static int open_pcm_fifo()
 {
-    FILE* pfd;
-    HI_CHAR aszFileName[FILE_NAME_LEN] = {0};
-
-    /* create file for save stream*/
-    snprintf(aszFileName, FILE_NAME_LEN, "audio_chn%d.%s", AeChn, "pcm");
-
-    pfd = fopen(aszFileName, "w+");
-    if (NULL == pfd)
+    int fd = -1;
+    const char* fifo_pcm = "/tmp/my_pcm_fifo";
+    if (access(fifo_pcm, F_OK) == -1)
     {
-        printf("%s: open file %s failed\n", __FUNCTION__, aszFileName);
-        return NULL;
+        int res = mkfifo(fifo_pcm, 0777);
+        if(res != 0)
+        {
+            printf("could not create fifo %s\n", fifo_pcm);
+            return -1;
+        }
     }
-    printf("open stream file:\"%s\" for aenc ok\n", aszFileName);
-    return pfd;
+    fd = open(fifo_pcm, O_WRONLY);
+    if (fd == -1)
+    {
+        printf("open pcm fifo failed\n");
+        return -1;
+    }
+    return fd; 
 }
 
 static HI_S32 sample_pcm(HI_VOID)
@@ -145,23 +142,12 @@ static HI_S32 sample_pcm(HI_VOID)
     }
 
     //编码存成文件
-    pfd = open_sample_file(AdChn, PT_LPCM);
-    if (!pfd)
-    {
-        SAMPLE_DBG(HI_FAILURE);
-        goto AIAENC_ERR1;
-    }
-    
-    s32Ret = SAMPLE_COMM_AUDIO_CreatTrdAencAdec(AeChn, AdChn, pfd);
+    s32Ret = SAMPLE_COMM_AUDIO_CreatTrdAencAdec(AeChn, AdChn, -1);
     if (s32Ret != HI_SUCCESS)
     {
         SAMPLE_DBG(s32Ret);
         goto AIAENC_ERR1;
     }
-
-    printf("\nplease press twice ENTER to exit this sample\n");
-    getchar();
-    getchar();
 
  AIAENC_ERR0:
         s32Ret = SAMPLE_COMM_AUDIO_DestoryTrdAencAdec(AdChn);
@@ -202,13 +188,14 @@ AIAENC_ERR6:
     return s32Ret;
 }
 
-static HI_S32 play_mp3(HI_CHAR* aszFileName, HI_S32 volume)
+//static HI_S32 play_mp3(HI_S32 volume)
+static HI_S32 play_mp3()
+
 {
     HI_S32      s32Ret;
     AO_CHN      AoChn = 0;
     ADEC_CHN    AdChn = 0;
     HI_S32      s32AoChnCnt;
-    FILE*        pfd = NULL;
     AIO_ATTR_S stAioAttr;
 
     AUDIO_DEV   AoDev        = SAMPLE_AUDIO_INNER_AO_DEV;
@@ -261,30 +248,17 @@ static HI_S32 play_mp3(HI_CHAR* aszFileName, HI_S32 volume)
         SAMPLE_DBG(s32Ret);
         goto ADECAO_ERR1;
     }
-    printf("Now volume is %d\n", volume);
+    //printf("Now volume is %d\n", volume);
 
-    s32Ret = HI_MPI_AO_SetVolume(AoDev, volume);
+    s32Ret = HI_MPI_AO_SetVolume(AoDev, -40);
     if (s32Ret != HI_SUCCESS)
     {
         SAMPLE_DBG(s32Ret);
         goto ADECAO_ERR1;
     }
-
-    s32Ret = HI_MPI_AO_SetVolume(AoDev, volume);
-    if (s32Ret != HI_SUCCESS)
-    {
-        SAMPLE_DBG(s32Ret);
-        goto ADECAO_ERR1;
-    }
-
-    pfd = open_audio_file(aszFileName);
-    if (!pfd)
-    {
-        SAMPLE_DBG(HI_FAILURE);
-        goto ADECAO_ERR0;
-    }
-
-    s32Ret = SAMPLE_COMM_AUDIO_CreatTrdFileAdec(AdChn, pfd);
+ 
+    int fd =  open_mp3_fifo();
+    s32Ret = SAMPLE_COMM_AUDIO_CreatTrdFileAdec(AdChn, fd);
     if (s32Ret != HI_SUCCESS)
     {
         SAMPLE_DBG(s32Ret);
@@ -361,29 +335,29 @@ int main(int argc, char* argv[])
     HI_S32 s32Vol = 0;
 
 
-    if (argc == 2)
-    {
-        if (HI_SUCCESS == strcmp(argv[1], "-h"))
-        {
-            usage();
-            return HI_FAILURE;
-        }
-        snprintf(aszFileName, FILE_NAME_LEN, "%s", argv[1]);
-    }
-    else if (argc == 3)
-    {
-        snprintf(aszFileName, FILE_NAME_LEN, "%s", argv[1]);
-        s32Vol = atoi(argv[2]);
-    }
-    else if (argc == 1)
-    {
-        printf("Recording...\n");
-    }
-    else 
-    {
-        usage();
-        return HI_FAILURE;
-    }
+    // if (argc == 2)
+    // {
+    //     if (HI_SUCCESS == strcmp(argv[1], "-h"))
+    //     {
+    //         usage();
+    //         return HI_FAILURE;
+    //     }
+    //     snprintf(aszFileName, FILE_NAME_LEN, "%s", argv[1]);
+    // }
+    // else if (argc == 3)
+    // {
+    //     snprintf(aszFileName, FILE_NAME_LEN, "%s", argv[1]);
+    //     s32Vol = atoi(argv[2]);
+    // }
+    // else if (argc == 1)
+    // {
+    //     printf("Recording...\n");
+    // }
+    // else 
+    // {
+    //     usage();
+    //     return HI_FAILURE;
+    // }
     
     signal(SIGINT, handle_signal);
     signal(SIGTERM, handle_signal); 
@@ -400,15 +374,9 @@ int main(int argc, char* argv[])
     HI_MPI_ADEC_AacInit();
     HI_MPI_ADEC_Mp3Init();
 
-    if (argc == 1)
-    {
-        sample_pcm();
-    }
-    else
-    {
-        play_mp3(aszFileName, s32Vol);    
-    }
-    
+
+    play_mp3();
+    sample_pcm();
 
     HI_MPI_AENC_AacDeInit();
 
