@@ -149,12 +149,17 @@ static HI_S32 sample_pcm(HI_VOID)
         goto AIAENC_ERR1;
     }
 
- AIAENC_ERR0:
-        s32Ret = SAMPLE_COMM_AUDIO_DestoryTrdAencAdec(AdChn);
-        if (s32Ret != HI_SUCCESS)
-        {
-            SAMPLE_DBG(s32Ret);
-        }   
+    while(1) 
+    {
+        sleep(5);
+    }
+
+
+    s32Ret = SAMPLE_COMM_AUDIO_DestoryTrdAencAdec(AdChn);
+    if (s32Ret != HI_SUCCESS)
+    {
+        SAMPLE_DBG(s32Ret);
+    }   
 
 AIAENC_ERR1:
     for (i = 0; i < s32AencChnCnt; i++)
@@ -241,16 +246,7 @@ static HI_S32 play_mp3()
         goto ADECAO_ERR1;
     }
 
-    HI_S32 vol_now = 0;
-    s32Ret = HI_MPI_AO_GetVolume(AoDev, &vol_now);
-    if (s32Ret != HI_SUCCESS)
-    {
-        SAMPLE_DBG(s32Ret);
-        goto ADECAO_ERR1;
-    }
-    //printf("Now volume is %d\n", volume);
-
-    s32Ret = HI_MPI_AO_SetVolume(AoDev, -40);
+    s32Ret = HI_MPI_AO_SetVolume(AoDev, -30);
     if (s32Ret != HI_SUCCESS)
     {
         SAMPLE_DBG(s32Ret);
@@ -266,10 +262,11 @@ static HI_S32 play_mp3()
     }
 
     printf("bind adec:%d to ao(%d,%d) ok \n", AdChn, AoDev, AoChn);
-
-    printf("\nplease press twice ENTER to exit this sample\n");
-    getchar();
-    getchar();
+   
+    while(1)
+    {
+        sleep(5);
+    }
 
     s32Ret = SAMPLE_COMM_AUDIO_DestoryTrdFileAdec(AdChn);
     if (s32Ret != HI_SUCCESS)
@@ -334,31 +331,6 @@ int main(int argc, char* argv[])
     HI_CHAR aszFileName[FILE_NAME_LEN] = {0};
     HI_S32 s32Vol = 0;
 
-
-    // if (argc == 2)
-    // {
-    //     if (HI_SUCCESS == strcmp(argv[1], "-h"))
-    //     {
-    //         usage();
-    //         return HI_FAILURE;
-    //     }
-    //     snprintf(aszFileName, FILE_NAME_LEN, "%s", argv[1]);
-    // }
-    // else if (argc == 3)
-    // {
-    //     snprintf(aszFileName, FILE_NAME_LEN, "%s", argv[1]);
-    //     s32Vol = atoi(argv[2]);
-    // }
-    // else if (argc == 1)
-    // {
-    //     printf("Recording...\n");
-    // }
-    // else 
-    // {
-    //     usage();
-    //     return HI_FAILURE;
-    // }
-    
     signal(SIGINT, handle_signal);
     signal(SIGTERM, handle_signal); 
 
@@ -374,9 +346,17 @@ int main(int argc, char* argv[])
     HI_MPI_ADEC_AacInit();
     HI_MPI_ADEC_Mp3Init();
 
+    pthread_t play_tid, sample_tid;
+    pthread_create(&play_tid, NULL, play_mp3, NULL);
+    pthread_create(&sample_tid, NULL, sample_pcm, NULL);
+    // play_mp3();
+    // sample_pcm();
 
-    play_mp3();
-    sample_pcm();
+    HI_BOOL bStop = HI_FALSE;
+    while(!bStop)
+    {
+        sleep(1);
+    }
 
     HI_MPI_AENC_AacDeInit();
 

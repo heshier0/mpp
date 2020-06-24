@@ -669,7 +669,8 @@ void* SAMPLE_COMM_AUDIO_AencProc(void* parg)
             // (HI_VOID)fwrite(stStream.pStream, 1, stStream.u32Len, pstAencCtl->pfd);
             // fflush(pstAencCtl->pfd);
             //modified by hekai
-            write(fd, stStream.pStream, stStream.u32Len);
+            int write_count = write(fd, stStream.pStream, stStream.u32Len);
+            printf("write %d bytes to fifo\n", write_count);
             //end modified 
 
 RELEASE_STREAM:
