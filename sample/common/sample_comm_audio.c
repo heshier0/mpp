@@ -724,6 +724,7 @@ void* SAMPLE_COMM_AUDIO_AdecProc(void* parg)
         ssize_t read_count = read(pfd, stAudioStream.pStream, u32Len);
         if (read_count > 0)
         {
+            printf("read %d bytes from my_mp3_fifo\n", (HI_U32)read_count);
             stAudioStream.u32Len = (HI_U32)read_count;
             s32Ret = HI_MPI_ADEC_SendStream(s32AdecChn, &stAudioStream, HI_TRUE);
             if (HI_SUCCESS != s32Ret)
@@ -748,7 +749,6 @@ void* SAMPLE_COMM_AUDIO_AdecProc(void* parg)
         }
     }
 
-    
     free(pu8AudioStream);
     pu8AudioStream = NULL;
     close(pfd);

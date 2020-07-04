@@ -348,9 +348,9 @@ int main(int argc, char* argv[])
 
     pthread_t play_tid, sample_tid;
     pthread_create(&play_tid, NULL, play_mp3, NULL);
-    pthread_create(&sample_tid, NULL, sample_pcm, NULL);
-    // play_mp3();
-    // sample_pcm();
+    pthread_detach(play_tid);
+    // pthread_create(&sample_tid, NULL, sample_pcm, NULL);
+    // pthread_detach(sample_tid);
 
     HI_BOOL bStop = HI_FALSE;
     while(!bStop)
