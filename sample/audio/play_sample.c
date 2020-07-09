@@ -30,6 +30,10 @@
         }\
     }while(0)
 
+
+static HI_BOOL bPlayed = HI_TRUE;
+static HI_BOOL bSampled = HI_TRUE;
+
 static int open_mp3_fifo()
 {
     int fd = -1;
@@ -149,7 +153,8 @@ static HI_S32 sample_pcm(HI_VOID)
         goto AIAENC_ERR1;
     }
 
-    while(1) 
+    bSampled = HI_TRUE;
+    while(bSampled) 
     {
         sleep(5);
     }
@@ -263,7 +268,8 @@ static HI_S32 play_mp3()
 
     printf("bind adec:%d to ao(%d,%d) ok \n", AdChn, AoDev, AoChn);
    
-    while(1)
+    bPlayed = HI_TRUE;
+    while(bPlayed)
     {
         sleep(5);
     }
@@ -300,21 +306,16 @@ ADECAO_ERR3:
 
 }
 
-static void usage()
-{
-    printf("\tVersion:1.0.0  \n");
-    printf("\n\n/Usage:./play_mp3 mp3_file_name\n");
-
-    return;
-}
-
 static void handle_signal(HI_S32 signo)
 {
-    signal(SIGINT, SIG_IGN);
-    signal(SIGTERM, SIG_IGN);
+    // signal(SIGINT, SIG_IGN);
+    // signal(SIGTERM, SIG_IGN);
 
     if (SIGINT == signo || SIGTERM == signo)
     {
+        bSampled = HI_FALSE;
+        bSampled = HI_FALSE;
+
         SAMPLE_COMM_AUDIO_DestoryAllTrd();
         SAMPLE_COMM_SYS_Exit();
         printf("\033[0;31mprogram exit abnormally!\033[0;39m\n");
@@ -343,14 +344,15 @@ int main(int argc, char* argv[])
     }       
 
     HI_MPI_AENC_AacInit();
+
     HI_MPI_ADEC_AacInit();
     HI_MPI_ADEC_Mp3Init();
 
     pthread_t play_tid, sample_tid;
     pthread_create(&play_tid, NULL, play_mp3, NULL);
     pthread_detach(play_tid);
-    // pthread_create(&sample_tid, NULL, sample_pcm, NULL);
-    // pthread_detach(sample_tid);
+    pthread_create(&sample_tid, NULL, sample_pcm, NULL);
+    pthread_detach(sample_tid);
 
     HI_BOOL bStop = HI_FALSE;
     while(!bStop)
