@@ -63,7 +63,7 @@ HI_S32 SAMPLE_SNAP_DoublePipeOffline(HI_VOID)
     VPSS_CHN_ATTR_S         stVpssChnAttr[VPSS_MAX_PHY_CHN_NUM] = {0};
     HI_BOOL                 abChnEnable[VPSS_MAX_PHY_CHN_NUM] = {0};
     VO_CHN                  VoChn               = 0;
-    PIC_SIZE_E              enPicSize           = PIC_3840x2160;
+    PIC_SIZE_E              enPicSize           = PIC_360P; //PIC_3840x2160;
     WDR_MODE_E              enWDRMode           = WDR_MODE_NONE;
     DYNAMIC_RANGE_E         enDynamicRange      = DYNAMIC_RANGE_SDR8;
     PIXEL_FORMAT_E          enPixFormat         = PIXEL_FORMAT_YVU_SEMIPLANAR_420;

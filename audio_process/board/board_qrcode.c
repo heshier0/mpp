@@ -268,7 +268,7 @@ BOOL get_qrcode_yuv_buffer()
     {
         return FALSE;
     }
-    QRcode_Detection(qrcode_buffer, &stFrame.stVFrame.u32Stride[0], &stFrame.stVFrame.u32Height, output);
+    QRcode_Detection(qrcode_buffer, &stFrame.stVFrame.u32Stride[0], &stFrame.stVFrame.u32Height, &qrcode_buffer);
 
     return TRUE;
 }
