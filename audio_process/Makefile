@@ -22,16 +22,16 @@ INCS            = -I$(ROOT_DIR)/. \
                   -I/mnt/g/workspace/plugins/hisi/include
                   
 
-LIBS            = -L/opt/hisi-linux/x86-arm/arm-himix200-linux/target/usr/lib -lm -ldl -pthread \
+LIBS            = -L/opt/hisi-linux/x86-arm/arm-himix200-linux/target/usr/lib -lm -ldl -pthread -lstdc++ \
                   -L/mnt/g/workspace/plugins/libev/lib -lev \
                   -L/mnt/g/workspace/plugins/cjson/lib -lcjson \
                   -L/mnt/g/workspace/plugins/libuwsc/lib -luwsc \
                   -L/mnt/g/workspace/plugins/libmbedtls/lib -lmbedx509 \
                   -L/mnt/g/workspace/plugins/libmbedtls/lib -lmbedtls \
                   -L/mnt/g/workspace/plugins/libmbedtls/lib -lmbedcrypto \
-                  -L/mnt/g/workspace/plugins/libqrcode/lib -lQRCodeDetec \
+                  -L/mnt/g/workspace/plugins/libqrcode/lib -lqrcode \
                   -L/mnt/g/workspace/plugins/libqrcode/lib -lzbar \
-                  -L/mnt/g/workspace/plugins/hisi/lib 
+                  -L/mnt/g/workspace/plugins/hisi/lib -lmpi -ldnvqe -lupvqe -lVoiceEngine -lsecurec
 		    
 
 CFLAGS          = -DLINUX -DDEBUG -g -Wno-multichar -Wimplicit-function-declaration \
