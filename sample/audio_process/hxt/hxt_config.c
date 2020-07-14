@@ -13,6 +13,9 @@ static cJSON* g_cfg_root  = NULL;     //指向配置文件的Object
 static int g_children_unid = 0;
 static char g_desk_sn_code[64] = {0};
 
+static int g_video_width = 0;
+static int g_video_height = 0;
+
 void hxt_load_cfg()
 {
     g_cfg_root = utils_load_cfg(HXT_CFG);
@@ -89,6 +92,30 @@ void hxt_init_cfg(void* data)
 
     item = cJSON_GetObjectItem(returnObject, "videoRecordRatio");
     utils_set_cfg_number_value(g_cfg_root, HXT_CFG, "device", "vidoeRatio", item->valueint);
+   
+    switch(item->valueint)
+    {
+    //1080x720    
+    case 3:
+        g_video_width = 1280;
+        g_video_height =720;
+    break;
+    //704x576
+    case 2:
+        g_video_width = 704;
+        g_video_height = 576;
+    break;
+    //
+    case 1:
+        g_video_width = 352;
+        g_video_height = 288;  
+    break;
+    //704x576
+    default:
+        g_video_width = 704;
+        g_video_height = 576;        
+    break;
+    }
 
     item = cJSON_GetObjectItem(returnObject, "videoRecordCount");
     utils_set_cfg_number_value(g_cfg_root, HXT_CFG, "device", "videoCount", item->valueint);
@@ -191,6 +218,16 @@ int hxt_get_video_length_cfg()
 int hxt_get_video_ratio_cfg()
 {
     return utils_get_cfg_number_value(g_cfg_root, "device", "vidoeRatio");
+}
+
+int hxt_get_video_width_cfg()
+{
+    return g_video_width;
+}
+
+int hxt_get_video_height_cfg()
+{
+    return g_video_height;
 }
 
 int hxt_get_video_count_cfg()

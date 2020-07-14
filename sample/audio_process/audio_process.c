@@ -8,15 +8,23 @@
 
 #include "utils.h"
 
+
 int main(int argc, char **argv)
 {
+    utils_print("HXT V1.0.0\n");
+   
+    /* init hisi board */
+    board_init_sys();
+    board_init_audio_out();
+
+    /* connect to hxt server */
     hxt_load_cfg();
     if (hxt_get_token_cfg() == NULL)
     {
         utils_print("send request to get token\n");
         hxt_get_token_request();
     }
- 
+
     pid_t hxt_pid = fork();
     if (hxt_pid == 0)
     {
@@ -30,13 +38,26 @@ int main(int argc, char **argv)
         iflyos_websocket_start();
         return 0;
     }
-    
-    int st1, st2;
+
+    pid_t play_pid = fork();
+    if (play_pid == 0)
+    {
+        board_play_mp3_fifo();
+        return 0;
+    }
+
+    int st1, st2, st3;
     waitpid(hxt_pid, &st1, 0);
     waitpid(iflyos_pid, &st2, 0);
+    waitpid(play_pid, &st3, 0);
 
     utils_print("~~~~EXIT~~~~\n");
+    
+    board_deinit_audio_out();
+    board_deinit_sys();
+
     hxt_unload_cfg();
+    
     
     return 0;
 }

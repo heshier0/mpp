@@ -1,83 +1,61 @@
-#!/bin/sh
-
-BIN             = AudioProcess
-PROJ_DIR_NAME   = audio_process
-
-PROJ_PATH         = $(shell pwd)
-DEBUG = no
-
-DIRS    := $(shell find . -maxdepth 1 -type d)
-
-
 CC              = arm-himix200-linux-gcc
 CPP             = arm-himix200-linux-g++
 AR              = arm-himix200-linux-ar
 STRIP           = arm-himix200-linux-strip
 
-INCS            = -I$(PROJ_PATH)/. \
-                  -I$(DIRS)/ \
+SUBDIRS         = $(shell ls -l | grep ^d | awk '{if($$9 != "output") print $$9}')
+ROOT_DIR        = $(shell pwd)
+BIN             = AudioProcess
+OBJS_DIR        = output/obj
+BIN_DIR         = output/bin
+CUR_SOURCE      = ${wildcard *.c}
+CUR_OBJS        = ${patsubst %.c, %.o, $(CUR_SOURCE)}
+
+INCS            = -I$(ROOT_DIR)/. \
+		  $(foreach tmp,$(SUBDIRS),-I$(ROOT_DIR)/$(tmp)/.) \
                   -I/opt/hisi-linux/x86-arm/arm-himix200-linux/target/usr/include \
                   -I/mnt/g/workspace/plugins/libev/include \
-                  -I/mnt/g/workspace/plugins/libuwsc/include \
                   -I/mnt/g/workspace/plugins/cjson/include    \
-                  -I/mnt/g/workspace/plugins/libcurl/include \
-                  -I/mnt/g/workspace/plugins/openssl/include 
-                               
-
-LIBS            = -L/opt/hisi-linux/x86-arm/arm-himix200-linux/target/usr/lib -lm -ldl -pthread \
-                  -L/mnt/g/workspace/plugins/libev/lib -lev \
-                  -L/mnt/g/workspace/plugins/libuwsc/lib -luwsc \
-                  -L/mnt/g/workspace/plugins/cjson/lib -lcjson \
-                  -L/mnt/g/workspace/plugins/libcurl/lib -lcurl \
-                  -L/mnt/g/workspace/plugins/openssl/lib -lssl \
-                  -L/mnt/g/workspace/plugins/openssl/lib -lcrypto
+                  -I/mnt/g/workspace/plugins/libuwsc/include \
+		          -I/mnt/g/workspace/plugins/libmbedtls/include \
+                  -I/mnt/g/workspace/plugins/libqrcode/include \
+                  -I/mnt/g/workspace/plugins/hisi/include \
+                  -I/mnt/g/workspace/plugins/libmp3dec/include 
                   
+LIBS           = -L/opt/hisi-linux/x86-arm/arm-himix200-linux/target/usr/lib -lm -ldl -pthread -lstdc++ \
+                  -L/mnt/g/workspace/plugins/libev/lib -lev \
+                  -L/mnt/g/workspace/plugins/cjson/lib -lcjson \
+                  -L/mnt/g/workspace/plugins/libuwsc/lib -luwsc \
+                  -L/mnt/g/workspace/plugins/libmbedtls/lib -lmbedx509 \
+                  -L/mnt/g/workspace/plugins/libmbedtls/lib -lmbedtls \
+                  -L/mnt/g/workspace/plugins/libmbedtls/lib -lmbedcrypto \
+                  -L/mnt/g/workspace/plugins/libqrcode/lib -lqrcode \
+                  -L/mnt/g/workspace/plugins/libqrcode/lib -lzbar \
+                  -L/mnt/g/workspace/plugins/libmp3dec/lib -lmp3dec \
+                  -L/mnt/g/workspace/plugins/hisi/lib -lmpi -ldnvqe -lupvqe \
+                    -lVoiceEngine -lsecurec -lisp -lhdmi -l_hiawb -l_hiae
+		    
 
-CFLAGS          = -DLINUX -Wno-multichar -Wimplicit-function-declaration \
+CFLAGS          = -DLINUX -DDEBUG -g -Wno-multichar -Wimplicit-function-declaration \
                   -fPIC -O2 -fexpensive-optimizations -frename-registers -fomit-frame-pointer 
-CPPFLAGS        = -DLINUX -Wno-multichar -Wimplicit-function-declaration \
-                  -fPIC -std=c++11 -fexceptions -fpermissive -w -O2 -fexpensive-optimizations -frename-registers -fomit-frame-pointer
+
+CPPFLAGS        = -DLINUX -DEBUG -g -Wno-multichar -Wimplicit-function-declaration \
+                  -fPIC -std=c++11 -fexceptions -fpermissive -w -O2 -fexpensive-optimizations -frename-registers -fomit-frame-pointer                              
+
+export CC BIN OBJS_DIR BIN_DIR ROOT_DIR CFLAGS CPPFLAGS INCS LIBS
 
 
-DEBUG_FLAGS     = -fexceptions -finstrument-functions -funwind-tables -g -rdynamic -O0
-RELEASE_FLAGS   = -O3 #-Wl, -gc-sections
+all:$(SUBDIRS) $(CUR_OBJS) DEBUG
 
-ifeq ($(DEBUG), no)
-    CFLAGS      += $(RELEASE_FLAGS)
-    CPPFLAGS    += $(RELEASE_FLAGS)
-else
-    CFLAGS      += $(DEBUG_FLAGS)
-    CPPFLAGS    += $(DEBUG_FLAGS)
-endif
+$(SUBDIRS):ECHO
+	make -C $@
+DEBUG:ECHO
+	make -C output
+ECHO:
+	@echo $(SUBDIRS)
+$(CUR_OBJS):%.o:%.c
+	$(CC) -c $^ -o $(ROOT_DIR)/$(OBJS_DIR)/$@ $(CFLAGS) $(INCS) 
 
-BIN_SUFFIX      = $(suffix $(BIN))
-
-SRCS            = $(foreach dir,$(DIRS),$(wildcard $(dir)/*.c))
-OBJS            = $(patsubst %.c,%.o,$(SRCS))
-BULID_CMD       = $(CC) -o $(BIN) $(OBJS) $(LIBS)
-INSTALL_CMD     = $(STRIP) $(BIN)
-CLEAN_CMD       = rm -f $(BIN) $(OBJS) 
-
-all : $(BIN)
-
-$(OBJS) : $(SRCS) 
-	@echo $(SRCS)
-	@$(CC) -c $(SRCS) $(INCS) $(CFLAGS) $(LIBS)
-
-
-
-$(BIN) : $(OBJS) $(CPPOBJS)
-	@echo $(BULID_CMD)
-	@$(BULID_CMD)
-	@echo $(INSTALL_CMD)
-	@$(INSTALL_CMD)
-	@echo "-rm $(OBJS)"
-	@-rm $(OBJS)
-	@echo "$(BIN) build success!"
-	
 clean:
-	@echo $(CLEAN_CMD)
-	@$(CLEAN_CMD)
-	@echo "$(BIN) clean success!"
-
-
+	@rm $(OBJS_DIR)/*.o
+	@rm -rf $(BIN_DIR)/*

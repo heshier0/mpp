@@ -62,7 +62,7 @@ static void thread_send_pcm_cb(void *data)
 
 static void uwsc_onopen(struct uwsc_client *cl)
 {
-    uwsc_log_info("onopen\n");
+    uwsc_log_info("iflyos onopen\n");
 
     // added by hekai
     pthread_t tid;
@@ -74,7 +74,7 @@ static void uwsc_onopen(struct uwsc_client *cl)
 static void uwsc_onmessage(struct uwsc_client *cl,
 	void *data, size_t len, bool binary)
 {
-    printf("Recv:\n");
+    printf("iflyos recv:\n");
 
     if (binary) {
         //文件
@@ -102,13 +102,13 @@ static void uwsc_onmessage(struct uwsc_client *cl,
 
 static void uwsc_onerror(struct uwsc_client *cl, int err, const char *msg)
 {
-    utils_print("onerror:%d: %s\n", err, msg);
+    utils_print("iflyos onerror:%d: %s\n", err, msg);
     ev_break(cl->loop, EVBREAK_ALL);
 }
 
 static void uwsc_onclose(struct uwsc_client *cl, int code, const char *reason)
 {
-    utils_print("onclose:%d: %s\n", code, reason);
+    utils_print("iflyos onclose:%d: %s\n", code, reason);
     //added by hekai
     iflyos_deinit_request();
     g_sampling = 0;
@@ -144,7 +144,7 @@ int iflyos_websocket_start()
     if (!cl)
         return -1;
 
-	utils_print("Start connect...\n");
+	utils_print("iflyos connect...\n");
 
     cl->onopen = uwsc_onopen;
     cl->onmessage = uwsc_onmessage;

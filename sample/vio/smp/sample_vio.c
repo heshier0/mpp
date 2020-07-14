@@ -2845,58 +2845,58 @@ HI_S32 SAMPLE_VIO_VPSS_VO_MIPI_TX_DOUBLE_VI(HI_U32 u32VoIntfType, HI_U32 saturat
 	stVoConfig.enVoMode			 =1;
 
     /*start vo*/
-    s32Ret = SAMPLE_COMM_VO_StartVO(&stVoConfig);
-    if (HI_SUCCESS != s32Ret)
-    {
-        SAMPLE_PRT("start vo failed. s32Ret: 0x%x !\n", s32Ret);
-        goto EXIT4;
-    }
+    // s32Ret = SAMPLE_COMM_VO_StartVO(&stVoConfig);
+    // if (HI_SUCCESS != s32Ret)
+    // {
+    //     SAMPLE_PRT("start vo failed. s32Ret: 0x%x !\n", s32Ret);
+    //     goto EXIT4;
+    // }
 
 #if 1   /* added by rpdzkj ivy to rotate sensor display degrees */  
         /* Rotate 90 degrees to the channel */    
-	if(sns0_rotat == 1 || sns0_rotat == 2 || sns0_rotat == 3 )
-	{
-        s32Ret = HI_MPI_VO_SetChnRotation(stVoConfig.VoDev, 0, sns0_rotat);
-        if (s32Ret != HI_SUCCESS)                                             
-        {                                                            
-            printf("Set channel rotation failed with errno %#x!\n", s32Ret);  
-            return HI_FAILURE;                                                
-        }          
-	}
+	// if(sns0_rotat == 1 || sns0_rotat == 2 || sns0_rotat == 3 )
+	// {
+    //     s32Ret = HI_MPI_VO_SetChnRotation(stVoConfig.VoDev, 0, sns0_rotat);
+    //     if (s32Ret != HI_SUCCESS)                                             
+    //     {                                                            
+    //         printf("Set channel rotation failed with errno %#x!\n", s32Ret);  
+    //         return HI_FAILURE;                                                
+    //     }          
+	// }
 	
-	if(sns1_rotat == 1 || sns1_rotat == 2 || sns1_rotat == 3 )
-	{
-        s32Ret = HI_MPI_VO_SetChnRotation(stVoConfig.VoDev, 1, sns1_rotat);
-        if (s32Ret != HI_SUCCESS)                                             
-        {                                                            
-            printf("Set channel rotation failed with errno %#x!\n", s32Ret);  
-            return HI_FAILURE;                                                
-        }          
-	}
+	// if(sns1_rotat == 1 || sns1_rotat == 2 || sns1_rotat == 3 )
+	// {
+    //     s32Ret = HI_MPI_VO_SetChnRotation(stVoConfig.VoDev, 1, sns1_rotat);
+    //     if (s32Ret != HI_SUCCESS)                                             
+    //     {                                                            
+    //         printf("Set channel rotation failed with errno %#x!\n", s32Ret);  
+    //         return HI_FAILURE;                                                
+    //     }          
+	// }
 #endif 
 
     /*vpss bind vo*/
-    s32Ret = SAMPLE_COMM_VPSS_Bind_VO(VpssGrp[0], VpssChn, stVoConfig.VoDev, VoChn);
-    if (HI_SUCCESS != s32Ret)
-    {
-        SAMPLE_PRT("vo bind vpss failed. s32Ret: 0x%x !\n", s32Ret);
-        goto EXIT5;
-    }
+    // s32Ret = SAMPLE_COMM_VPSS_Bind_VO(VpssGrp[0], VpssChn, stVoConfig.VoDev, VoChn);
+    // if (HI_SUCCESS != s32Ret)
+    // {
+    //     SAMPLE_PRT("vo bind vpss failed. s32Ret: 0x%x !\n", s32Ret);
+    //     goto EXIT5;
+    // }
 
-    s32Ret = SAMPLE_COMM_VPSS_Bind_VO(VpssGrp[1], 1, stVoConfig.VoDev, 1);
-    if (HI_SUCCESS != s32Ret)
-    {
-        SAMPLE_PRT("vo bind vpss failed. s32Ret: 0x%x !\n", s32Ret);
-        goto EXIT6;
-    }
+    // s32Ret = SAMPLE_COMM_VPSS_Bind_VO(VpssGrp[1], 1, stVoConfig.VoDev, 1);
+    // if (HI_SUCCESS != s32Ret)
+    // {
+    //     SAMPLE_PRT("vo bind vpss failed. s32Ret: 0x%x !\n", s32Ret);
+    //     goto EXIT6;
+    // }
 
     PAUSE();
 
-    SAMPLE_COMM_VPSS_UnBind_VO(VpssGrp[0], VpssChn, stVoConfig.VoDev, VoChn);
-    SAMPLE_COMM_VPSS_UnBind_VO(VpssGrp[1], 1, stVoConfig.VoDev, 1);
+    // SAMPLE_COMM_VPSS_UnBind_VO(VpssGrp[0], VpssChn, stVoConfig.VoDev, VoChn);
+    // SAMPLE_COMM_VPSS_UnBind_VO(VpssGrp[1], 1, stVoConfig.VoDev, 1);
 
 EXIT6:
-    SAMPLE_COMM_VO_StopVO(&stVoConfig);
+    // SAMPLE_COMM_VO_StopVO(&stVoConfig);
 EXIT5:
     SAMPLE_COMM_VI_UnBind_VPSS(ViPipe[2], ViChn, VpssGrp[1]);
 EXIT4:

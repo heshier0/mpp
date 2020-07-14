@@ -23,7 +23,7 @@ static char* separate_filename(const char *url)
     char *end = NULL;
     int with_token= 0;
 
-    if ((start = strrchr(url, '\/')) == NULL)
+    if ((start = strrchr(url, '/')) == NULL)
     {
         return NULL;
     }

@@ -1,57 +1,76 @@
-CC              = arm-himix200-linux-gcc
-CPP             = arm-himix200-linux-g++
-AR              = arm-himix200-linux-ar
-STRIP           = arm-himix200-linux-strip
+# Hisilicon Hi35xx sample Makefile
 
-SUBDIRS         = $(shell ls -l | grep ^d | awk '{if($$9 != "output") print $$9}')
-ROOT_DIR        = $(shell pwd)
-BIN             = AudioProcess
-OBJS_DIR        = output/obj
-BIN_DIR         = output/bin
-CUR_SOURCE      = ${wildcard *.c}
-CUR_OBJS        = ${patsubst %.c, %.o, $(CUR_SOURCE)}
+include ../Makefile.param
 
-INCS            = -I$(ROOT_DIR)/. \
-		  $(foreach tmp,$(SUBDIRS),-I$(ROOT_DIR)/$(tmp)/.) \
-                  -I/opt/hisi-linux/x86-arm/arm-himix200-linux/target/usr/include \
-                  -I/mnt/g/workspace/plugins/libev/include \
-                  -I/mnt/g/workspace/plugins/cjson/include    \
-                  -I/mnt/g/workspace/plugins/libuwsc/include \
-		          -I/mnt/g/workspace/plugins/libmbedtls/include \
-                  -I/mnt/g/workspace/plugins/libqrcode/include \
-                  -I/mnt/g/workspace/plugins/hisi/include
-                  
+HI_SUPPORT_MP3DEC := YES
 
-LIBS            = -L/opt/hisi-linux/x86-arm/arm-himix200-linux/target/usr/lib -lm -ldl -pthread -lstdc++ \
-                  -L/mnt/g/workspace/plugins/libev/lib -lev \
-                  -L/mnt/g/workspace/plugins/cjson/lib -lcjson \
-                  -L/mnt/g/workspace/plugins/libuwsc/lib -luwsc \
-                  -L/mnt/g/workspace/plugins/libmbedtls/lib -lmbedx509 \
-                  -L/mnt/g/workspace/plugins/libmbedtls/lib -lmbedtls \
-                  -L/mnt/g/workspace/plugins/libmbedtls/lib -lmbedcrypto \
-                  -L/mnt/g/workspace/plugins/libqrcode/lib -lqrcode \
-                  -L/mnt/g/workspace/plugins/libqrcode/lib -lzbar \
-                  -L/mnt/g/workspace/plugins/hisi/lib -lmpi -ldnvqe -lupvqe -lVoiceEngine -lsecurec
-		    
+SMP_SRCS := $(wildcard *.c)
 
-CFLAGS          = -DLINUX -DDEBUG -g -Wno-multichar -Wimplicit-function-declaration \
-                  -fPIC -O2 -fexpensive-optimizations -frename-registers -fomit-frame-pointer 
+SMP_SRCS += $(wildcard $(PWD)/hxt/*.c)
+SMP_SRCS += $(wildcard $(PWD)/iflyos/*.c)
+SMP_SRCS += $(wildcard $(PWD)/board/*.c)
+SMP_SRCS += $(wildcard $(PWD)/utils/*.c)
 
-CPPFLAGS        = -DLINUX -DEBUG -g -Wno-multichar -Wimplicit-function-declaration \
-                  -fPIC -std=c++11 -fexceptions -fpermissive -w -O2 -fexpensive-optimizations -frename-registers -fomit-frame-pointer                              
+ROOT_DIR = $(shell pwd)
+SUBDIRS  = $(shell ls -l | grep ^d | awk '{if($$9 != "output") print $$9}')
 
-export CC BIN OBJS_DIR BIN_DIR ROOT_DIR CFLAGS CPPFLAGS INCS LIBS
+INCS = -I$(ROOT_DIR)/. \
+       $(foreach tmp,$(SUBDIRS),-I$(ROOT_DIR)/$(tmp)/.) \
+       -I/mnt/g/workspace/plugins/libev/include \
+       -I/mnt/g/workspace/plugins/cjson/include    \
+       -I/mnt/g/workspace/plugins/libuwsc/include \
+       -I/mnt/g/workspace/plugins/libmbedtls/include \
+       -I/mnt/g/workspace/plugins/libqrcode/include 
 
-all:$(SUBDIRS) $(CUR_OBJS) DEBUG
+LIBS = -L/mnt/g/workspace/plugins/libev/lib -lev \
+             -L/mnt/g/workspace/plugins/cjson/lib -lcjson \
+             -L/mnt/g/workspace/plugins/libuwsc/lib -luwsc \
+             -L/mnt/g/workspace/plugins/libmbedtls/lib -lmbedx509 \
+             -L/mnt/g/workspace/plugins/libmbedtls/lib -lmbedtls \
+             -L/mnt/g/workspace/plugins/libmbedtls/lib -lmbedcrypto \
+             -L/mnt/g/workspace/plugins/libqrcode/lib -lqrcode \
+             -L/mnt/g/workspace/plugins/libqrcode/lib -lzbar
 
-$(SUBDIRS):ECHO
-	make -C $@
-DEBUG:ECHO
-	make -C output
-ECHO:
-	@echo $(SUBDIRS)
-$(CUR_OBJS):%.o:%.c
-	$(CC) -c $^ -o $(ROOT_DIR)/$(OBJS_DIR)/$@ $(CFLAGS) $(INCS) 
+#TARGET := $(SMP_SRCS:%.c=%)
+
+CFLAGS += $(INCS) 
+CFLAGS += -L$(REL_LIB) -lsecurec -Wl,-rpath=/usr/lib
+
+
+TARGET := AudioProcess 
+
+SMP_SRCS += $(wildcard $(PWD)/../audio/adp/audio_aac_adp.c)
+SMP_SRCS += $(wildcard $(PWD)/../audio/adp/audio_dl_adp.c)
+
+# if need mp3dec
+ifeq ($(HI_SUPPORT_MP3DEC), YES)
+	MP3_DEC_LIB_DIR := $(PWD)/../audio/mp3dec/lib
+	CFLAGS += -D__Mp3decSupport__ -L$(MP3_DEC_LIB_DIR) -lmp3dec
+	SMP_SRCS += $(wildcard $(PWD)/../audio/adp/audio_mp3_adp.c)
+endif
+
+TARGET_PATH := $(PWD)
+
+# compile linux or HuaweiLite
+#include $(PWD)/../$(ARM_ARCH)_$(OSTYPE).mak
+
+
+# target source
+OBJS  := $(SMP_SRCS:%.c=%.o)
+
+CFLAGS += $(COMM_INC)
+
+MPI_LIBS += $(REL_LIB)/libhdmi.a
+
+.PHONY : clean all
+
+all: $(TARGET)
+
+$(TARGET):$(COMM_OBJ) $(OBJS)
+	@$(CC) $(CFLAGS) -DEBUG -lpthread -lm -o $(TARGET_PATH)/$@ $^ -Wl,--start-group $(MPI_LIBS) $(SENSOR_LIBS) $(AUDIO_LIBA) $(REL_LIB)/libsecurec.a $(REL_LIB)/libsns_imx335.a -Wl,--end-group $(LIBS)
+
 clean:
-	@rm $(OBJS_DIR)/*.o
-	@rm -rf $(BIN_DIR)/*
+	@rm -f $(TARGET_PATH)/$(TARGET)
+	@rm -f $(OBJS)
+
+

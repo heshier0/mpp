@@ -107,7 +107,7 @@ static void parse_server_config_data(void *data)
 
 static void uwsc_onopen(struct uwsc_client *cl)
 {
-    uwsc_log_info("onopen\n");
+    utils_print("hxt onopen\n");
 
     //added by hekai
     //end added
@@ -116,7 +116,7 @@ static void uwsc_onopen(struct uwsc_client *cl)
 static void uwsc_onmessage(struct uwsc_client *cl,
 	void *data, size_t len, bool binary)
 {
-    printf("Recv:\n");
+    utils_print("hxt recv:\n");
 
     if (binary) {
         //文件
@@ -131,13 +131,13 @@ static void uwsc_onmessage(struct uwsc_client *cl,
 
 static void uwsc_onerror(struct uwsc_client *cl, int err, const char *msg)
 {
-    utils_print("onerror:%d: %s\n", err, msg);
+    utils_print("hxt onerror:%d: %s\n", err, msg);
     ev_break(cl->loop, EVBREAK_ALL);
 }
 
 static void uwsc_onclose(struct uwsc_client *cl, int code, const char *reason)
 {
-    utils_print("onclose:%d: %s\n", code, reason);
+    utils_print("hxt onclose:%d: %s\n", code, reason);
     ev_break(cl->loop, EVBREAK_ALL);
 }
 
@@ -164,16 +164,15 @@ int hxt_websocket_start()
     strcat(extra_header, "Bearer ");
     strcat(extra_header, token);
     strcat(extra_header, "\r\n");
-    utils_print("extra_header:[%s]\n", extra_header);
 
     cl = uwsc_new(loop, hxt_url, ping_interval, extra_header);
     if (!cl)
     {
-        utils_print("hxt webosocket init failed\n");
+        utils_print("hxt init failed\n");
         return -1;
     }
         
-	utils_print("Hxt webosocket start connect...\n");
+	utils_print("Hxt start connect...\n");
 
     cl->onopen = uwsc_onopen;
     cl->onmessage = uwsc_onmessage;

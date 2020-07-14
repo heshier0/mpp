@@ -3,6 +3,8 @@
 
 #include <cJSON.h>
 
+#define DEBUG 
+
 #ifdef DEBUG
 #define utils_print(format, ...) printf("%d >>> %s " format "\n", __LINE__, __FUNCTION__, ##__VA_ARGS__)
 #define malloc_print(__ptr__,size) printf("[ALLOC] %32s:%4d | addr= %p, size= %lu, expr= `%s`\n", __FUNCTION__, __LINE__ , __ptr__, size, #size)

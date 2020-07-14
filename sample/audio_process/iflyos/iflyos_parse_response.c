@@ -116,8 +116,8 @@ void iflyos_play_response_audio(void *data)
         return;
     }
     
-    utils_send_mp3_voice(url); 
-
+    utils_send_mp3_voice(url);
+    
     iflyos_free(url);
 
     return;

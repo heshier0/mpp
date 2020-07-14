@@ -78,10 +78,8 @@ static HI_S32 sample_pcm(HI_VOID)
 {
     HI_S32 i, j, s32Ret;
     AI_CHN      AiChn;
-    AO_CHN      AoChn = 0;
     ADEC_CHN    AdChn = 0;
     HI_S32      s32AiChnCnt;
-    HI_S32      s32AoChnCnt;
     HI_S32      s32AencChnCnt;
     AENC_CHN    AeChn = 0;
     FILE*       pfd = NULL;
@@ -344,7 +342,6 @@ int main(int argc, char* argv[])
     }       
 
     HI_MPI_AENC_AacInit();
-
     HI_MPI_ADEC_AacInit();
     HI_MPI_ADEC_Mp3Init();
 
