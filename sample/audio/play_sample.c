@@ -93,7 +93,7 @@ static HI_S32 sample_pcm(HI_VOID)
     stAioAttr.u32EXFlag      = 0;
     stAioAttr.u32FrmNum      = 30;
     stAioAttr.u32PtNumPerFrm = 1024;
-    stAioAttr.u32ChnCnt      = 2;
+    stAioAttr.u32ChnCnt      = 1;
     stAioAttr.u32ClkSel      = 0;
     stAioAttr.enI2sType      = AIO_I2STYPE_INNERCODEC;
 
@@ -143,8 +143,14 @@ static HI_S32 sample_pcm(HI_VOID)
         printf("Ai(%d,%d) bind to AencChn:%d ok!\n", AiDev , AiChn, AeChn);
     }
 
+    FILE *fp = fopen("/tmp/board_sample.pcm", "w");
+    if(fp == NULL)
+    {
+        goto AIAENC_ERR4;
+    }
+
     //编码存成文件
-    s32Ret = SAMPLE_COMM_AUDIO_CreatTrdAencAdec(AeChn, AdChn, -1);
+    s32Ret = SAMPLE_COMM_AUDIO_CreatTrdAencAdec(AeChn, AdChn, fp);
     if (s32Ret != HI_SUCCESS)
     {
         SAMPLE_DBG(s32Ret);

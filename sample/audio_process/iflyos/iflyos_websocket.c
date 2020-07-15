@@ -11,8 +11,28 @@
 #include "utils.h"
 #include "iflyos_defines.h"
 
-static int g_sampling = 1;
+static BOOL g_sampling = TRUE;
+static BOOL g_playing = TRUE;
 static int g_stop_capture = 0;
+
+
+
+#define PRINT(fmt, ...) printf("%s   "fmt, get_cur_time(), ##__VA_ARGS__)
+#define ERROR(fmt, ...) printf("%s   "fmt" :%s\n", get_cur_time(), ##__VA_ARGS__, strerror(errno))
+
+char *get_cur_time()
+{
+    static char s[20] = {0};
+    time_t t;
+    struct tm* ltime;
+    
+    time(&t);
+    ltime = localtime(&t);
+    strftime(s, 20, "%Y-%m-%d %H:%M:%S", ltime);
+    s[19] = '\0';
+
+    return s;
+}
 
 static void thread_send_pcm_cb(void *data)
 {
@@ -25,6 +45,13 @@ static void thread_send_pcm_cb(void *data)
     int read_count = 0; 
     char pcm_buf[640] = {0};
 
+    FILE *fp  = fopen("/tmp/test.pcm", "w");
+    if(fp == NULL)
+    {
+        utils_print("create or open test.pcm error\n");
+        return;
+    }
+
     int fd = iflyos_get_audio_data_handle();
     if(-1 == fd)
     {
@@ -32,7 +59,7 @@ static void thread_send_pcm_cb(void *data)
     }
     while(g_sampling)
     {
-        read_count = read(fd, pcm_buf, 640);
+        read_count = read(fd, pcm_buf, 2048);
         if (read_count >0)
         {   
             //send request 
@@ -42,22 +69,31 @@ static void thread_send_pcm_cb(void *data)
             free(req);
             //send data 
             usleep(100);
-            cl->send(cl, pcm_buf, 640, UWSC_OP_BINARY);
+            cl->send(cl, pcm_buf, 2048, UWSC_OP_BINARY);
             utils_print("To send pcm bin data....\n");
+            //write into test file
+            fwrite(pcm_buf, sizeof(char), 2048, fp);
+            fflush(fp);
+            //
 
             if (g_stop_capture)
             {
                 utils_print("To send END flag !!!!!\n");
-                cl->send(cl, "_END_", strlen("_END_"), UWSC_OP_TEXT);
-                g_stop_capture = 0;
 
-                sleep(5);
+                cl->send(cl, "__END__", strlen("__END__"), UWSC_OP_BINARY);
+                g_stop_capture = 0;
             }
         }
-        usleep(100);
+        usleep(200 * 1000);
     }
-
+    utils_print("sample thread exit...\n");
+    fclose(fp);
     close(fd);
+}
+
+static void thread_play_mp3_cb(void *data)
+{
+    board_play_mp3_fifo(g_playing);
 }
 
 static void uwsc_onopen(struct uwsc_client *cl)
@@ -65,9 +101,13 @@ static void uwsc_onopen(struct uwsc_client *cl)
     uwsc_log_info("iflyos onopen\n");
 
     // added by hekai
-    pthread_t tid;
-    pthread_create(&tid, NULL, thread_send_pcm_cb, (void*)cl);
-    pthread_detach(tid);
+    pthread_t tid1;
+    pthread_create(&tid1, NULL, thread_send_pcm_cb, (void*)cl);
+    pthread_detach(tid1);
+
+    // pthread_t tid2;
+    // pthread_create(&tid2, NULL, thread_play_mp3_cb, NULL);
+    // pthread_detach(tid2);
     // end added
 }
 
@@ -81,7 +121,7 @@ static void uwsc_onmessage(struct uwsc_client *cl,
     } 
     else 
     {
-        printf("[%.*s]\n", (int)len, (char *)data);
+        PRINT("[%.*s]\n", (int)len, (char *)data);
         char* name = iflyos_get_response_name(data);
         if (NULL == name)
         {
@@ -89,7 +129,7 @@ static void uwsc_onmessage(struct uwsc_client *cl,
         }
         if(strcmp(name, aplayer_audio_out) == 0)
         {
-            iflyos_play_response_audio(data);
+            //iflyos_play_response_audio(data);
         }
         else if (strcmp(name, recog_stop_capture) == 0)
         {
@@ -111,7 +151,7 @@ static void uwsc_onclose(struct uwsc_client *cl, int code, const char *reason)
     utils_print("iflyos onclose:%d: %s\n", code, reason);
     //added by hekai
     iflyos_deinit_request();
-    g_sampling = 0;
+    g_sampling = FALSE;
     //end added
     
     ev_break(cl->loop, EVBREAK_ALL);
@@ -120,6 +160,9 @@ static void uwsc_onclose(struct uwsc_client *cl, int code, const char *reason)
 static void signal_cb(struct ev_loop *loop, ev_signal *w, int revents)
 {
     if (w->signum == SIGINT) {
+
+        g_sampling = FALSE;
+        g_playing = FALSE;
         ev_break(loop, EVBREAK_ALL);
         utils_print("Normal quit\n");
     }

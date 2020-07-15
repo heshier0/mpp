@@ -20,28 +20,6 @@
 
 #include "utils.h"
 
-/* video */
-static int vi_count = 2;
-static VI_DEV vi_dev[2] = {0, 1};
-static VI_PIPE vi_pipe[4] = {0, 1, 2, 3};
-static VI_CHN vi_chn = 0;
-static VPSS_GRP vpss_grp[2] = {0, 1};
-static VPSS_CHN vpss_chn = VPSS_CHN0;
-static HI_BOOL chn_enable[VPSS_MAX_PHY_CHN_NUM] = {1, 1};
-static SAMPLE_VI_CONFIG_S vi_cfg = {0};
-
-/* audio in */
-static AUDIO_DEV ai_dev = SAMPLE_AUDIO_INNER_AI_DEV;
-static AI_CHN ai_chn = 0;
-static int ai_chn_count = 2;
-static AENC_CHN aenc_chn = 0;
-static int aenc_chn_count = 1;
-
-/* audio out */
-static AUDIO_DEV ao_dev = SAMPLE_AUDIO_INNER_AO_DEV;
-static AO_CHN ao_chn = 0;
-static int ao_chn_count = 0;
-static ADEC_CHN adec_chn = 0;
 
 unsigned int  board_get_chipId()
 {
@@ -56,6 +34,14 @@ int board_init_sys()
 {
     int ret = 0;
     int blk_size = 0;
+
+    int vi_count = 2;
+    VI_DEV vi_dev[2] = {0, 1};
+    VI_PIPE vi_pipe[4] = {0, 1, 2, 3};
+    VI_CHN vi_chn = 0;
+    VPSS_GRP vpss_grp[2] = {0, 1};
+    VPSS_CHN vpss_chn = VPSS_CHN0;
+    HI_BOOL chn_enable[VPSS_MAX_PHY_CHN_NUM] = {1, 1};
 
     SIZE_S video_size;
     video_size.u32Width = hxt_get_video_width_cfg();
@@ -111,6 +97,14 @@ void board_deinit_sys()
 
 int board_init_video()
 {
+    int vi_count = 2;
+    VI_DEV vi_dev[2] = {0, 1};
+    VI_PIPE vi_pipe[4] = {0, 1, 2, 3};
+    VI_CHN vi_chn = 0;
+    VPSS_GRP vpss_grp[2] = {0, 1};
+    VPSS_CHN vpss_chn = VPSS_CHN0;
+    HI_BOOL chn_enable[VPSS_MAX_PHY_CHN_NUM] = {1, 1};
+   
     int ret = HI_SUCCESS;
     
     SIZE_S             video_size;
@@ -119,6 +113,7 @@ int board_init_video()
     VPSS_GRP_ATTR_S    vpss_grp_attrs;
     VPSS_CHN_ATTR_S    vpss_chn_attrs[VPSS_MAX_PHY_CHN_NUM];
 
+    SAMPLE_VI_CONFIG_S vi_cfg = {0};
     SAMPLE_COMM_VI_GetSensorInfo(&vi_cfg);
     vi_cfg.s32WorkingViNum = vi_count;
 
@@ -259,10 +254,46 @@ int board_init_video()
 
 void board_deinit_video()
 {
+    VI_DEV vi_dev[2] = {0, 1};
     VI_PIPE vi_pipe[4] = {0, 1, 2, 3};
     VI_CHN vi_chn = 0;
     VPSS_GRP vpss_grp[2] = {0, 1};
     HI_BOOL chn_enable[VPSS_MAX_PHY_CHN_NUM] = {1, 1};
+    SAMPLE_VI_CONFIG_S vi_cfg = {0};
+    SAMPLE_COMM_VI_GetSensorInfo(&vi_cfg);
+    vi_cfg.s32WorkingViNum = 2;
+
+    vi_cfg.as32WorkingViId[0]                     = 0;
+    vi_cfg.astViInfo[0].stSnsInfo.MipiDev         = vi_dev[0];
+    vi_cfg.astViInfo[0].stSnsInfo.s32BusId        = 0;
+    vi_cfg.astViInfo[0].stDevInfo.ViDev           = vi_dev[0];
+    vi_cfg.astViInfo[0].stDevInfo.enWDRMode       = WDR_MODE_NONE;
+    vi_cfg.astViInfo[0].stPipeInfo.enMastPipeMode = VI_OFFLINE_VPSS_OFFLINE;
+    vi_cfg.astViInfo[0].stPipeInfo.aPipe[0]       = 0;
+    vi_cfg.astViInfo[0].stPipeInfo.aPipe[1]       = -1;
+    vi_cfg.astViInfo[0].stPipeInfo.aPipe[2]       = -1;
+    vi_cfg.astViInfo[0].stPipeInfo.aPipe[3]       = -1;
+    vi_cfg.astViInfo[0].stChnInfo.ViChn           = 0;
+    vi_cfg.astViInfo[0].stChnInfo.enPixFormat     = PIXEL_FORMAT_YVU_SEMIPLANAR_420;
+    vi_cfg.astViInfo[0].stChnInfo.enDynamicRange  = DYNAMIC_RANGE_SDR8;
+    vi_cfg.astViInfo[0].stChnInfo.enVideoFormat   = VIDEO_FORMAT_LINEAR;
+    vi_cfg.astViInfo[0].stChnInfo.enCompressMode  = COMPRESS_MODE_NONE;
+
+    vi_cfg.as32WorkingViId[1]                     = 1;
+    vi_cfg.astViInfo[1].stSnsInfo.MipiDev         = vi_dev[1];
+    vi_cfg.astViInfo[1].stSnsInfo.s32BusId        = 1;
+    vi_cfg.astViInfo[1].stDevInfo.ViDev           = vi_dev[1];
+    vi_cfg.astViInfo[1].stDevInfo.enWDRMode       = WDR_MODE_NONE;
+    vi_cfg.astViInfo[1].stPipeInfo.enMastPipeMode = VI_OFFLINE_VPSS_OFFLINE;
+    vi_cfg.astViInfo[1].stPipeInfo.aPipe[0]       = 2; 
+    vi_cfg.astViInfo[1].stPipeInfo.aPipe[1]       = -1;
+    vi_cfg.astViInfo[1].stPipeInfo.aPipe[2]       = -1;
+    vi_cfg.astViInfo[1].stPipeInfo.aPipe[3]       = -1;
+    vi_cfg.astViInfo[1].stChnInfo.ViChn           = 0;
+    vi_cfg.astViInfo[1].stChnInfo.enPixFormat     = PIXEL_FORMAT_YVU_SEMIPLANAR_420;
+    vi_cfg.astViInfo[1].stChnInfo.enDynamicRange  = DYNAMIC_RANGE_SDR8;
+    vi_cfg.astViInfo[1].stChnInfo.enVideoFormat   = VIDEO_FORMAT_LINEAR;
+    vi_cfg.astViInfo[1].stChnInfo.enCompressMode  = COMPRESS_MODE_NONE;
 
     SAMPLE_COMM_VI_UnBind_VPSS(vi_pipe[2], vi_chn, vpss_grp[1]);
     SAMPLE_COMM_VI_UnBind_VPSS(vi_pipe[0], vi_chn, vpss_grp[0]);
@@ -274,6 +305,13 @@ void board_deinit_video()
 int board_init_audio_in()
 {
     int ret = HI_SUCCESS;
+
+    AUDIO_DEV ai_dev = SAMPLE_AUDIO_INNER_AI_DEV;
+    AI_CHN ai_chn = 0;
+    int ai_chn_count = 2;
+    AENC_CHN aenc_chn = 0;
+    int aenc_chn_count = 1;
+
     /* init encoder for aac */
     HI_MPI_AENC_AacInit();
 
@@ -342,6 +380,12 @@ int board_init_audio_in()
 
 void board_deinit_audio_in()
 {
+    AUDIO_DEV ai_dev = SAMPLE_AUDIO_INNER_AI_DEV;
+    AI_CHN ai_chn = 0;
+    int ai_chn_count = 2;
+    AENC_CHN aenc_chn = 0;
+    int aenc_chn_count = 2;
+
     HI_MPI_AENC_AacDeInit();
 
     /* deinit board */
@@ -361,6 +405,10 @@ void board_deinit_audio_in()
 int board_init_audio_out()
 {
     int ret = HI_SUCCESS;
+    AUDIO_DEV ao_dev = SAMPLE_AUDIO_INNER_AO_DEV;
+    AO_CHN ao_chn = 0;
+    int ao_chn_count = 0;
+    ADEC_CHN adec_chn = 0;
 
     HI_MPI_ADEC_AacInit();
     HI_MPI_ADEC_Mp3Init();
@@ -392,7 +440,7 @@ int board_init_audio_out()
     if (ret != HI_SUCCESS)
     {
         utils_print("start ao failed. ret:0x%x !\n", ret);
-        SAMPLE_COMM_AUDIO_AoUnbindAdec(ao_dev, ao_chn, adec_chn);
+        SAMPLE_COMM_AUDIO_StopAdec(adec_chn);
         return ret;
     }
 
@@ -400,8 +448,8 @@ int board_init_audio_out()
     if (ret != HI_SUCCESS)
     {
         utils_print("config audio codec failed. ret:0x%x !\n", ret);
-        SAMPLE_COMM_AUDIO_AoUnbindAdec(ao_dev, ao_chn, adec_chn);
         SAMPLE_COMM_AUDIO_StopAo(ao_dev, ao_chn_count, HI_FALSE);
+        SAMPLE_COMM_AUDIO_StopAdec(adec_chn);
         return ret;
     }
 
@@ -409,8 +457,8 @@ int board_init_audio_out()
     if (ret != HI_SUCCESS)
     {
         utils_print("config audio codec failed. ret:0x%x !\n", ret);
-        SAMPLE_COMM_AUDIO_AoUnbindAdec(ao_dev, ao_chn, adec_chn);
         SAMPLE_COMM_AUDIO_StopAo(ao_dev, ao_chn_count, HI_FALSE);
+        SAMPLE_COMM_AUDIO_StopAdec(adec_chn);
         return ret;
     }
 
@@ -429,6 +477,11 @@ int board_init_audio_out()
 
 void board_deinit_audio_out()
 {
+    AUDIO_DEV ao_dev = SAMPLE_AUDIO_INNER_AO_DEV;
+    AO_CHN ao_chn = 0;
+    int ao_chn_count = 2;
+    ADEC_CHN adec_chn = 0;
+
     SAMPLE_COMM_AUDIO_AoUnbindAdec(ao_dev, ao_chn, adec_chn);
     SAMPLE_COMM_AUDIO_StopAo(ao_dev, ao_chn_count, HI_FALSE);
     SAMPLE_COMM_AUDIO_StopAdec(adec_chn);

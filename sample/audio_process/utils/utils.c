@@ -303,11 +303,11 @@ BOOL utils_set_cfg_number_value(cJSON* root, const char* cfg, const char* params
     return TRUE;
 }
 
-BOOL utils_send_mp3_voice(const char *url)
+BOOL utils_send_mp3_voice(const char *url, const char* file)
 {
     char cmd[256] = {0};
 #ifdef DEBUG    
-    sprintf(cmd, "curl --insecure -o %s %s", MP3_FIFO, url);
+    sprintf(cmd, "curl --insecure -o %s %s", file, url);
 #else
     sprintf(cmd, "curl --insecure -s -o %s %s", MP3_FIFO, url);
 #endif   

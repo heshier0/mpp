@@ -7,29 +7,26 @@
 
 #ifdef DEBUG
 #define utils_print(format, ...) printf("%d >>> %s " format "\n", __LINE__, __FUNCTION__, ##__VA_ARGS__)
-#define malloc_print(__ptr__,size) printf("[ALLOC] %32s:%4d | addr= %p, size= %lu, expr= `%s`\n", __FUNCTION__, __LINE__ , __ptr__, size, #size)
-#define free_print(ptr)	printf("[ FREE] %32s:%4d | addr= %p, expr= `%s`\n", __FUNCTION__, __LINE__, ptr, #ptr)
+// #define malloc_print(__ptr__,size) printf("[ALLOC] %32s:%4d | addr= %p, size= %lu, expr= `%s`\n", __FUNCTION__, __LINE__ , __ptr__, size, #size)
+// #define free_print(ptr)	printf("[ FREE] %32s:%4d | addr= %p, expr= `%s`\n", __FUNCTION__, __LINE__, ptr, #ptr)
 #else
+// #define malloc_print(__ptr__,size)
+// #define free_print(ptr)
 #define utils_print(format, ...)
-#define malloc_print(__ptr__,size)
-#define free_print(ptr)
 #endif 
 
 #define utils_malloc(size) ({ \
 	void *__ptr__ = malloc(size); \
 	memset(__ptr__, 0, size); \
-	malloc_print(__ptr__,size); \
 	__ptr__; \
 	})
 
 #define utils_calloc(size) ({ \
 	void *__ptr__ = calloc(size, 1); \
-	malloc_print(__ptr__, size); \
 	__ptr__; \
 	})
 
 #define utils_free(ptr) ({ \
-	free_print(ptr); \
 	free(ptr); \
 	})
 
@@ -57,7 +54,8 @@ double utils_get_cfg_number_value(cJSON* root, const char* params_item, const ch
 BOOL utils_set_cfg_str_value(cJSON* root, const char* cfg, const char* params_item, const char* prop_item, const char* value);
 BOOL utils_set_cfg_number_value(cJSON* root, const char* cfg, const char* params_item, const char* prop_item, const double value);
 
-BOOL utils_send_mp3_voice(const char *url);
+// BOOL utils_send_mp3_voice(const char *url);
+BOOL utils_send_mp3_voice(const char *url, const char* file);
 BOOL utils_download_file(const char *url, char *out_buffer, int buffer_length);
 BOOL utils_upload_file(const char* url, const char* header, const char* local_file_path, char* out_buffer, int buffer_length);
 BOOL utils_post_json_data(const char *url, const char* header_content, const char* json_data, char* out, int out_length);

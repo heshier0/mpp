@@ -47,8 +47,8 @@ typedef struct tagSAMPLE_AENC_S
     pthread_t stAencPid;
     HI_S32  AeChn;
     HI_S32  AdChn;
-    //FILE*    pfd;
-    int pfd;
+    FILE*    pfd;
+    //int pfd;
     HI_BOOL bSendAdChn;
 } SAMPLE_AENC_S;
 
@@ -653,7 +653,7 @@ void* SAMPLE_COMM_AUDIO_AencProc(void* parg)
             }
 
             /* send stream to decoder and play for testing */
-            if (HI_TRUE == pstAencCtl->bSendAdChn)
+            //if (HI_TRUE == pstAencCtl->bSendAdChn)
             {
                 s32Ret = HI_MPI_ADEC_SendStream(pstAencCtl->AdChn, &stStream, HI_TRUE);
                 if (HI_SUCCESS != s32Ret )
@@ -666,8 +666,8 @@ void* SAMPLE_COMM_AUDIO_AencProc(void* parg)
             }
 
             /* save audio stream to file */
-            // (HI_VOID)fwrite(stStream.pStream, 1, stStream.u32Len, pstAencCtl->pfd);
-            // fflush(pstAencCtl->pfd);
+            (HI_VOID)fwrite(stStream.pStream, 1, stStream.u32Len, pstAencCtl->pfd);
+            fflush(pstAencCtl->pfd);
             //modified by hekai
             int write_count = write(fd, stStream.pStream, stStream.u32Len);
             printf("write %d bytes to fifo\n", write_count);
@@ -879,20 +879,20 @@ HI_S32 SAMPLE_COMM_AUDIO_CreatTrdAiAenc(AUDIO_DEV AiDev, AI_CHN AiChn, AENC_CHN 
 /******************************************************************************
 * function : Create the thread to get stream from aenc and send to adec
 ******************************************************************************/
-HI_S32 SAMPLE_COMM_AUDIO_CreatTrdAencAdec(AENC_CHN AeChn, ADEC_CHN AdChn, int pAecFd)
+HI_S32 SAMPLE_COMM_AUDIO_CreatTrdAencAdec(AENC_CHN AeChn, ADEC_CHN AdChn, FILE* pfd)
 {
     SAMPLE_AENC_S* pstAenc = NULL;
 
-    // if (-1 == pAecFd)
-    // {
-    //     return HI_FAILURE;
-    // }
+    if (NULL == pfd)
+    {
+        return HI_FAILURE;
+    }
 
     pstAenc = &gs_stSampleAenc[AeChn];
     pstAenc->AeChn = AeChn;
     pstAenc->AdChn = AdChn;
     pstAenc->bSendAdChn = HI_FALSE;
-    pstAenc->pfd = pAecFd;
+    pstAenc->pfd = pfd;
     pstAenc->bStart = HI_TRUE;
     pthread_create(&pstAenc->stAencPid, 0, SAMPLE_COMM_AUDIO_AencProc, pstAenc);
 

@@ -109,14 +109,13 @@ char* iflyos_get_payload_metadata_text(const char* json_data)
 
 void iflyos_play_response_audio(void *data)
 {
-    // char* url = iflyos_get_audio_url(data);
     char* url = iflyos_get_audio_secure_url(data);
     if(NULL == url)
     {
         return;
     }
     
-    utils_send_mp3_voice(url);
+    utils_send_mp3_voice(url, "/tmp/my_mp3_fifo");
     
     iflyos_free(url);
 
