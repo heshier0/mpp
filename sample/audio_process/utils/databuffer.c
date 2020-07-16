@@ -7,10 +7,9 @@
 
 #include <pthread.h>
 
-#include "util.h"
 #include "databuffer.h"
 
-#define RESERVED_BUF_SIZE 	(16*1024*1024)
+#define RESERVED_BUF_SIZE 	(8*1024*1024)
 
 enum
 {

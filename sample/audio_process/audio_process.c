@@ -7,7 +7,9 @@
 #include <sys/stat.h>
 
 #include "utils.h"
+#include "databuffer.h"
 
+#define BUFFER_SIZE     (8*1024*1024)
 
 int main(int argc, char **argv)
 {
@@ -15,7 +17,9 @@ int main(int argc, char **argv)
    
     /* init hisi board */
     // board_init_sys();
-   
+    
+    init_buffer(BUFFER_SIZE);
+
     /* connect to hxt server */
     hxt_load_cfg();
     if (hxt_get_token_cfg() == NULL)
@@ -48,6 +52,7 @@ int main(int argc, char **argv)
 
     hxt_unload_cfg();
     
+    destroy_buffer();
     
     return 0;
 }

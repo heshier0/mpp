@@ -284,7 +284,7 @@ int iflyos_get_audio_data_handle()
             return -1;
         }
     }
-    fd = open(fifo_pcm, O_RDONLY | O_NONBLOCK);
+    fd = open(fifo_pcm, O_RDONLY);
     if (fd == -1)
     {
         utils_print("pcm fifo open error\n");

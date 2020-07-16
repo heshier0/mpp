@@ -9,7 +9,11 @@
 #include <uwsc/uwsc.h>
 
 #include "utils.h"
+#include "databuffer.h"
+
 #include "iflyos_defines.h"
+
+#define PCM_LENGTH      640
 
 static BOOL g_sampling = TRUE;
 static BOOL g_playing = TRUE;
@@ -17,12 +21,11 @@ static int g_stop_capture = 0;
 
 
 
-#define PRINT(fmt, ...) printf("%s   "fmt, get_cur_time(), ##__VA_ARGS__)
-#define ERROR(fmt, ...) printf("%s   "fmt" :%s\n", get_cur_time(), ##__VA_ARGS__, strerror(errno))
 
 char *get_cur_time()
 {
     static char s[20] = {0};
+    memset(s, 0, 20);
     time_t t;
     struct tm* ltime;
     
@@ -34,6 +37,36 @@ char *get_cur_time()
     return s;
 }
 
+static void thread_read_pcm_cb(void *data)
+{
+    char pcm_buf[PCM_LENGTH] = {0};
+    memset(pcm_buf, 0, PCM_LENGTH);
+        
+    int fd = iflyos_get_audio_data_handle();
+    while(g_sampling)
+    {
+        int read_count = read(fd, pcm_buf, PCM_LENGTH);
+        if( read_count <= 0)
+        {
+            continue;
+        }
+        char *ptr = get_free_buffer(read_count);
+        if(NULL == ptr)
+        {
+            memset(pcm_buf, 0, PCM_LENGTH);
+            continue;
+        }
+        memcpy(ptr, pcm_buf, read_count);
+        memset(pcm_buf, 0, PCM_LENGTH);
+
+        use_free_buffer(read_count);
+    }
+
+    close(fd);
+
+    return;
+}
+
 static void thread_send_pcm_cb(void *data)
 {
     if (NULL == data)
@@ -41,55 +74,59 @@ static void thread_send_pcm_cb(void *data)
         return;
     }    
 
+    BOOL proceed = FALSE;
     struct uwsc_client *cl = (struct uwsc_client *)data;
-    int read_count = 0; 
-    char pcm_buf[640] = {0};
 
-    FILE *fp  = fopen("/tmp/test.pcm", "w");
-    if(fp == NULL)
-    {
-        utils_print("create or open test.pcm error\n");
-        return;
-    }
-
-    int fd = iflyos_get_audio_data_handle();
-    if(-1 == fd)
-    {
-        return;
-    }
+    /* for test */
+    // FILE *fp  = fopen("/tmp/test.pcm", "w");
+    // if(fp == NULL)
+    // {
+    //     utils_print("create or open test.pcm error\n");
+    //     return;
+    // }
     while(g_sampling)
     {
-        read_count = read(fd, pcm_buf, 1024);
-        if (read_count >0)
-        {   
-            //send request 
+        if (g_stop_capture)
+        {
+            utils_print("To send END flag !!!!!\n");
+            cl->send(cl, "__END__", strlen("__END__"), UWSC_OP_BINARY);
+            g_stop_capture = 0;
+            proceed = FALSE;
+        }
+
+        char* ptr = get_buffer(PCM_LENGTH);
+        if(NULL == ptr)
+        {
+            continue;
+        }
+        //send request
+        if(!proceed)
+        {
             char *req = iflyos_create_audio_in_request();
-            utils_print("To send request....\n");
+            // utils_print("To send request....\n");
             cl->send(cl, req, strlen(req), UWSC_OP_TEXT);
             free(req);
-            //send data 
-            // usleep(100);
-            // cl->send(cl, pcm_buf, 2048, UWSC_OP_BINARY);
-            // utils_print("To send pcm bin data....\n");
-            //write into test file
-            fwrite(pcm_buf, sizeof(char), 1024, fp);
-            fflush(fp);
-            //
-
-            if (g_stop_capture)
-            {
-                utils_print("To send END flag !!!!!\n");
-
-                cl->send(cl, "__END__", strlen("__END__"), UWSC_OP_BINARY);
-                g_stop_capture = 0;
-            }
+            proceed = TRUE;
         }
-        usleep(200 * 1000);
+
+        // send data
+        cl->send(cl, ptr, PCM_LENGTH, UWSC_OP_BINARY);
+        // utils_print("To send pcm bin data....\n");
+
+        /* for test */
+        // int write_length = fwrite(ptr, sizeof(char), PCM_LENGTH, fp);
+        // fflush(fp);
+        // utils_print("write %d bytes to file\n", write_length);
+
+        release_buffer(PCM_LENGTH);
     }
     utils_print("sample thread exit...\n");
-    fclose(fp);
-    close(fd);
+    
+    // fclose(fp);
+
+    return;
 }
+
 
 static void thread_play_mp3_cb(void *data)
 {
@@ -102,8 +139,12 @@ static void uwsc_onopen(struct uwsc_client *cl)
 
     // added by hekai
     pthread_t tid1;
-    pthread_create(&tid1, NULL, thread_send_pcm_cb, (void*)cl);
+    pthread_create(&tid1, NULL, thread_read_pcm_cb, NULL);
     pthread_detach(tid1);
+
+    pthread_t tid2;
+    pthread_create(&tid2, NULL, thread_send_pcm_cb, (void*)cl);
+    pthread_detach(tid2);
 
     // pthread_t tid2;
     // pthread_create(&tid2, NULL, thread_play_mp3_cb, NULL);
@@ -121,7 +162,7 @@ static void uwsc_onmessage(struct uwsc_client *cl,
     } 
     else 
     {
-        PRINT("[%.*s]\n", (int)len, (char *)data);
+        printf("%s: [%.*s]\n", get_cur_time(), (int)len, (char *)data);
         char* name = iflyos_get_response_name(data);
         if (NULL == name)
         {
@@ -129,7 +170,7 @@ static void uwsc_onmessage(struct uwsc_client *cl,
         }
         if(strcmp(name, aplayer_audio_out) == 0)
         {
-            //iflyos_play_response_audio(data);
+            iflyos_play_response_audio(data);
         }
         else if (strcmp(name, recog_stop_capture) == 0)
         {
