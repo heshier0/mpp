@@ -59,7 +59,7 @@ static void thread_send_pcm_cb(void *data)
     }
     while(g_sampling)
     {
-        read_count = read(fd, pcm_buf, 2048);
+        read_count = read(fd, pcm_buf, 1024);
         if (read_count >0)
         {   
             //send request 
@@ -68,11 +68,11 @@ static void thread_send_pcm_cb(void *data)
             cl->send(cl, req, strlen(req), UWSC_OP_TEXT);
             free(req);
             //send data 
-            usleep(100);
-            cl->send(cl, pcm_buf, 2048, UWSC_OP_BINARY);
-            utils_print("To send pcm bin data....\n");
+            // usleep(100);
+            // cl->send(cl, pcm_buf, 2048, UWSC_OP_BINARY);
+            // utils_print("To send pcm bin data....\n");
             //write into test file
-            fwrite(pcm_buf, sizeof(char), 2048, fp);
+            fwrite(pcm_buf, sizeof(char), 1024, fp);
             fflush(fp);
             //
 

@@ -93,7 +93,7 @@ static HI_S32 sample_pcm(HI_VOID)
     stAioAttr.u32EXFlag      = 0;
     stAioAttr.u32FrmNum      = 30;
     stAioAttr.u32PtNumPerFrm = 1024;
-    stAioAttr.u32ChnCnt      = 1;
+    stAioAttr.u32ChnCnt      = 2;
     stAioAttr.u32ClkSel      = 0;
     stAioAttr.enI2sType      = AIO_I2STYPE_INNERCODEC;
 
@@ -115,7 +115,7 @@ static HI_S32 sample_pcm(HI_VOID)
     }
 
     //音频编码器属性设置
-    s32AencChnCnt = stAioAttr.u32ChnCnt >> stAioAttr.enSoundmode;
+    s32AencChnCnt = stAioAttr.u32ChnCnt >> 1; //stAioAttr.enSoundmode;
     s32Ret = SAMPLE_COMM_AUDIO_StartAenc(s32AencChnCnt, &stAioAttr, PT_LPCM);
     if (s32Ret != HI_SUCCESS)
     {
@@ -128,7 +128,6 @@ static HI_S32 sample_pcm(HI_VOID)
     {
         AeChn = i;
         AiChn = i;
-
         s32Ret = SAMPLE_COMM_AUDIO_AencBindAi(AiDev, AiChn, AeChn);
         if (s32Ret != HI_SUCCESS)
         {
@@ -317,7 +316,7 @@ static void handle_signal(HI_S32 signo)
 
     if (SIGINT == signo || SIGTERM == signo)
     {
-        bSampled = HI_FALSE;
+        bPlayed = HI_FALSE;
         bSampled = HI_FALSE;
 
         SAMPLE_COMM_AUDIO_DestoryAllTrd();

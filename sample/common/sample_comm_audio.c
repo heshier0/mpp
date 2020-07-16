@@ -653,7 +653,7 @@ void* SAMPLE_COMM_AUDIO_AencProc(void* parg)
             }
 
             /* send stream to decoder and play for testing */
-            //if (HI_TRUE == pstAencCtl->bSendAdChn)
+            if (HI_TRUE == pstAencCtl->bSendAdChn)
             {
                 s32Ret = HI_MPI_ADEC_SendStream(pstAencCtl->AdChn, &stStream, HI_TRUE);
                 if (HI_SUCCESS != s32Ret )
@@ -666,8 +666,9 @@ void* SAMPLE_COMM_AUDIO_AencProc(void* parg)
             }
 
             /* save audio stream to file */
-            (HI_VOID)fwrite(stStream.pStream, 1, stStream.u32Len, pstAencCtl->pfd);
-            fflush(pstAencCtl->pfd);
+            // (HI_VOID)fwrite(stStream.pStream, 1, stStream.u32Len, pstAencCtl->pfd);
+            // fflush(pstAencCtl->pfd);
+            // printf("write %d bytes to file\n", stStream.u32Len);
             //modified by hekai
             int write_count = write(fd, stStream.pStream, stStream.u32Len);
             printf("write %d bytes to fifo\n", write_count);
