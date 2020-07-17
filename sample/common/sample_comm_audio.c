@@ -48,7 +48,7 @@ typedef struct tagSAMPLE_AENC_S
     HI_S32  AeChn;
     HI_S32  AdChn;
     FILE*    pfd;
-    //int pfd;
+    int fd;
     HI_BOOL bSendAdChn;
 } SAMPLE_AENC_S;
 
@@ -597,24 +597,25 @@ void* SAMPLE_COMM_AUDIO_AencProc(void* parg)
     AUDIO_STREAM_S stStream;
     fd_set read_fds;
     struct timeval TimeoutVal;
+    int fd = pstAencCtl->fd;
 
     //added by hekai
-    const char* fifo_pcm = "/tmp/my_pcm_fifo";
-    if (access(fifo_pcm, F_OK) == -1)
-    {
-    int res = mkfifo(fifo_pcm, 0777);
-    if(res != 0)
-    {
-        printf("could not create fifo %s\n", fifo_pcm);
-        return NULL;
-    }
-    }
-    int fd = open(fifo_pcm, O_WRONLY);
-    if (fd == -1)
-    {
-        printf("open pcm fifo failed\n");
-        return NULL;
-    }
+    // const char* fifo_pcm = "/tmp/my_pcm_fifo";
+    // if (access(fifo_pcm, F_OK) == -1)
+    // {
+    // int res = mkfifo(fifo_pcm, 0777);
+    // if(res != 0)
+    // {
+    //     printf("could not create fifo %s\n", fifo_pcm);
+    //     return NULL;
+    // }
+    // }
+    // int fd = open(fifo_pcm, O_WRONLY);
+    // if (fd == -1)
+    // {
+    //     printf("open pcm fifo failed\n");
+    //     return NULL;
+    // }
     //end added
 
     FD_ZERO(&read_fds);
@@ -670,8 +671,7 @@ void* SAMPLE_COMM_AUDIO_AencProc(void* parg)
             // fflush(pstAencCtl->pfd);
             // printf("write %d bytes to file\n", stStream.u32Len);
             //modified by hekai
-            int write_count = write(fd, stStream.pStream, stStream.u32Len);
-            printf("write %d bytes to fifo\n", write_count);
+            int write_count = write(pstAencCtl->fd, stStream.pStream, stStream.u32Len);
             //end modified 
 
 RELEASE_STREAM:
