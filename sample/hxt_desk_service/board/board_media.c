@@ -27,7 +27,7 @@ static void* sample_pcm_cb(void *data)
     HI_S32      s32AencChnCnt;
     AENC_CHN    AeChn = 0;
     AIO_ATTR_S stAioAttr;
-    AI_VQE_CONFIG_S stAiVqeTalkAttr;
+    AI_TALKVQE_CONFIG_S stAiVqeTalkAttr;
     HI_VOID     *pAiVqeAttr = NULL;
 
 
@@ -46,6 +46,8 @@ static void* sample_pcm_cb(void *data)
     stAioAttr.enI2sType      = AIO_I2STYPE_INNERCODEC;
     
     //回声消除功能
+    HI_S16 s16ERLBand[6] = {4, 6, 36, 49, 50, 51};
+    HI_S16 s16ERL[7] = {7, 10, 16, 10, 18, 18, 18};
     memset(&stAiVqeTalkAttr, 0, sizeof(AI_TALKVQE_CONFIG_S));
     stAiVqeTalkAttr.enWorkstate = VQE_WORKSTATE_COMMON;
     stAiVqeTalkAttr.s32FrameSample = 1024;
@@ -55,10 +57,18 @@ static void* sample_pcm_cb(void *data)
     stAiVqeTalkAttr.stAecCfg.s16EchoBandLow2 = 25;
     stAiVqeTalkAttr.stAecCfg.s16EchoBandHigh = 28;
     stAiVqeTalkAttr.stAecCfg.s16EchoBandHigh2 = 35;
+    memcpy(stAiVqeTalkAttr.stAecCfg.s16ERLBand, &s16ERLBand, sizeof(s16ERLBand));
+    memcpy(stAiVqeTalkAttr.stAecCfg.s16ERL, &s16ERL, sizeof(s16ERL));
+    stAiVqeTalkAttr.stAecCfg.s16VioceProtectFreqL = 3;
+    stAiVqeTalkAttr.stAecCfg.s16VioceProtectFreqL1 = 6;
     stAiVqeTalkAttr.stAgcCfg.bUsrMode = HI_FALSE;
-    stAiVqeTalkAttr.stAnrCfg.bUsrMode = HI_FALSE;
-    stAiVqeTalkAttr.stHpfCfg.bUsrMode = HI_FALSE;
-    stAiVqeTalkAttr.u32OpenMask = AI_TALKVQE_MASK_AEC | AI_TALKVQE_MASK_AGC | AI_TALKVQE_MASK_ANR | AI_TALKVQE_MASK_HPF;
+    stAiVqeTalkAttr.stAnrCfg.bUsrMode = HI_TRUE;
+    stAiVqeTalkAttr.stAnrCfg.s16NrIntensity = 25;
+    stAiVqeTalkAttr.stAnrCfg.s16NoiseDbThr = 60;
+    stAiVqeTalkAttr.stAnrCfg.s8SpProSwitch = 0;
+    stAiVqeTalkAttr.stHpfCfg.bUsrMode = HI_TRUE;
+    stAiVqeTalkAttr.stHpfCfg.enHpfFreq = AUDIO_HPF_FREQ_150;
+    stAiVqeTalkAttr.u32OpenMask = AI_TALKVQE_MASK_AEC | AI_TALKVQE_MASK_ANR | AI_TALKVQE_MASK_HPF;
 
     //开启Audio In
     s32AiChnCnt = stAioAttr.u32ChnCnt;
