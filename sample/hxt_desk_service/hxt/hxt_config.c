@@ -6,7 +6,7 @@
 
 #include "utils.h"
 
-#define HXT_CFG          "/user/config/hxt_config.json"
+#define HXT_CFG          "/userdata/config/hxt_config.json"
 
 
 static cJSON* g_cfg_root  = NULL;     //指向配置文件的Object

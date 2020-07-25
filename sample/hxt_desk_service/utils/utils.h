@@ -6,7 +6,7 @@
 #define DEBUG 
 
 #ifdef DEBUG
-#define utils_print(format, ...) printf("%d >>> %s " format "\n", __LINE__, __FUNCTION__, ##__VA_ARGS__)
+#define utils_print(format, ...) printf("%s>>>%d: " format "\n", __FUNCTION__, __LINE__, ##__VA_ARGS__)
 // #define malloc_print(__ptr__,size) printf("[ALLOC] %32s:%4d | addr= %p, size= %lu, expr= `%s`\n", __FUNCTION__, __LINE__ , __ptr__, size, #size)
 // #define free_print(ptr)	printf("[ FREE] %32s:%4d | addr= %p, expr= `%s`\n", __FUNCTION__, __LINE__, ptr, #ptr)
 #else
@@ -35,12 +35,6 @@ typedef enum
     TRUE  = 1, 
     FALSE  = 0
 }BOOL;
-
-typedef struct post_memory_cb 
-{
-    char *memory;
-    size_t size;
-}PostMemCb;
 
 void init_plugins();
 void deinit_plugins();
@@ -72,5 +66,7 @@ char* utils_time_to_string();
 char* utils_get_file_md5sum(const char* file_name);
 int utils_split_file_to_chunk(const char* path);
 unsigned long utils_get_file_size(const char* path);
+
+void utils_link_wifi(const char* ssid, const char* pwd);
 
 #endif //__UTILS_H__

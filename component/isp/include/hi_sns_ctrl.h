@@ -97,6 +97,7 @@ extern ISP_SNS_OBJ_S stSnsOS08A10Obj;
 extern ISP_SNS_OBJ_S stSnsOs05a_2lObj;
 extern ISP_SNS_OBJ_S stSnsGc2053Obj;
 extern ISP_SNS_OBJ_S stSnsSharp8kObj;
+extern ISP_SNS_OBJ_S stSnsSoiSensorObj;
 
 #define CMOS_CHECK_POINTER(ptr)\
     do {\

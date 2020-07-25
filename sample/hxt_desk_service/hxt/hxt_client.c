@@ -40,7 +40,7 @@ static char* hxt_get_api_url(const char* api)
     }
     char* server_url = hxt_get_server_url_cfg();
     if(NULL == server_url)
-    {
+    {   
         return NULL;
     }
     char* ver = hxt_get_api_version_cfg();
@@ -54,7 +54,6 @@ static char* hxt_get_api_url(const char* api)
     strcat(request_url, "/api/");
     strcat(request_url, ver);
     strcat(request_url, api);
-    utils_print("%s\n", request_url);
 
     char* ret_value = (char*)utils_calloc(strlen(request_url) + 1);
     if(NULL == ret_value)
@@ -111,6 +110,7 @@ static int hxt_get_reponse_status_code(void* data)
     {
         return NULL;
     }
+    utils_print("Respnse:[%s]\n", (char*)data);
 
     cJSON* root = cJSON_Parse(data);
     cJSON *item = cJSON_GetObjectItem(root, "statusCode");
@@ -122,18 +122,15 @@ static int hxt_get_reponse_status_code(void* data)
     {
         status_code = NO_REGISTER;
     } 
-    else if (strcmp(item->valuestring, AUTH_FAIL))
+    else if (strcmp(item->valuestring, AUTH_FAIL) == 0)
     {
         status_code = AUTH_FAILED;
     }
-
 
     if(root != NULL)
     {
         cJSON_Delete(root);
     }
-
-
 
     return status_code; 
 }
@@ -152,10 +149,10 @@ static char* hxt_get_response_description(void *data)
     strcpy(desc, item->valuestring);
     desc[strlen(item->valuestring)] = '\0';
 
-    if(root != NULL)
-    {
-        cJSON_Delete(root);
-    }
+    // if(root != NULL)
+    // {
+    //     cJSON_Delete(root);
+    // }
 
     return desc; 
 }
@@ -180,30 +177,24 @@ static BOOL hxt_get_response_pass_status(void *data)
     }
     
 
-    if(root != NULL)
-    {
-        cJSON_Delete(root);
-    }
+    // if(root != NULL)
+    // {
+    //     cJSON_Delete(root);
+    // }
 
     return status; 
 }
 
 static void hxt_get_token_response(void* data)
 {
-    char* token = NULL;
     if(NULL == data)
     {
         utils_print("no response data in\n");
         return;
     }
 
-    PostMemCb* mem = (PostMemCb*)data;
-    if (NULL == mem->memory)
-    {
-        return;
-    }
-    utils_print("response:[%s]\n", mem->memory);
-    cJSON* root = cJSON_Parse(mem->memory);
+    utils_print("response:[%s]\n", data);
+    cJSON* root = cJSON_Parse(data);
 
     //check return status,if not OK, get error msg
     cJSON *item1 = cJSON_GetObjectItem(root, "status");
@@ -220,12 +211,12 @@ static void hxt_get_token_response(void* data)
     }
 
     //write response value into config file
-    hxt_init_cfg(mem->memory);
+    hxt_init_cfg(data);
 
-    if(root != NULL)
-    {
-        cJSON_Delete(root);
-    }
+    // if(root != NULL)
+    // {
+    //     cJSON_Delete(root);
+    // }
 
     return;
 }
@@ -245,6 +236,55 @@ static char* hxt_get_header_with_token()
     strcat(header, token);
     
     return header;
+}
+
+
+BOOL hxt_query_wifi_info(void *data)
+{
+    if (NULL == data)
+    {
+        return FALSE;
+    }
+
+    cJSON *root = cJSON_Parse(data);
+    if(NULL == root)
+    {
+        return FALSE;
+    }
+    
+    cJSON *ssid_node = cJSON_GetObjectItem(root, "ssid");
+    if (NULL == ssid_node)
+    {
+        return FALSE;
+    }
+    hxt_set_wifi_ssid_cfg(ssid_node->valuestring);
+
+    cJSON *bssid_node = cJSON_GetObjectItem(root, "bssid");
+    if(NULL == bssid_node)
+    {
+        return FALSE;
+    }
+    hxt_set_wifi_bssid_cfg(bssid_node->valuestring);
+
+    cJSON *pwd_node = cJSON_GetObjectItem(root, "pwd");
+    if(NULL == pwd_node)
+    {
+        return FALSE;
+    }
+    hxt_set_wifi_pwd_cfg(pwd_node->valuestring);
+
+    cJSON *checkCode_node = cJSON_GetObjectItem(root, "checkCode");
+    if(NULL == checkCode_node)
+    {
+        return FALSE;
+    }
+    hxt_set_wifi_check_code_cfg(checkCode_node->valuestring);
+
+    cJSON_Delete(root);
+
+    hxt_reload_cfg();
+    
+    return TRUE;
 }
 
 BOOL hxt_get_token_request()
@@ -274,21 +314,21 @@ BOOL hxt_get_token_request()
     {
         goto CLEANUP2;
     }
-    utils_print("%s\n", json_data);
     //save response data
     char *out = (char*)utils_malloc(1024*2);
-    if(!utils_post_json_data(api_url, json_data, NULL, out, 2048))
+    if(!utils_post_json_data(api_url, NULL, json_data, out, 2048))
     {
         utils_print("post data send failed\n");
         goto CLEANUP1;
     } 
+
     int status_code = hxt_get_reponse_status_code((void*)out);
     if (status_code == RESPONSE_OK)
     {
         hxt_get_token_response((void*)out);
         reported = TRUE;
     }
-    else if(status_code == NO_REG)
+    else if(status_code == NO_REGISTER)
     {
         //clear wifi info, to prevent user connect to server
 
@@ -296,11 +336,11 @@ BOOL hxt_get_token_request()
 
 CLEANUP1:    
     utils_free(out);
-    utils_free(json_data);
+    // utils_free(json_data);
 CLEANUP2:    
     cJSON_Delete(root);
 CLEANUP3:
-    utils_free(uuid);
+    // utils_free(uuid);
 CLEANUP4:
     utils_free(api_url);
 CLEANUP5:
@@ -353,14 +393,14 @@ BOOL hxt_report_info_request(int reportType, int cameraStatus)
 
 CLEANUP1:  
     utils_free(out);
-    utils_free(json_data);
+    //utils_free(json_data);
 CLEANUP3:   
     cJSON_Delete(root);
 CLEANUP4:
     utils_free(header);
 CLEANUP5: 
     utils_free(api_url);
-CLEANUP6:
+
     return reported;
 }
 
@@ -459,14 +499,13 @@ BOOL hxt_study_report_request(int unid, ReportType type, int duration, const cha
 
 CLEANUP1:  
     utils_free(out);
-    utils_free(json_data);
+    // utils_free(json_data);
 CLEANUP3:   
     cJSON_Delete(root);
 CLEANUP4:
     utils_free(header);
 CLEANUP5: 
     utils_free(api_url);
-CLEANUP6:
     return reported;
 }
 
@@ -513,7 +552,7 @@ int hxt_get_max_chunk_request(const char* file_md5, const ExtType type)
     if(!utils_post_json_data(api_url, NULL, header, out, 1024))
     {
         utils_print("post data send failed\n");
-        goto CLEANUP1;
+        goto EXIT;
     } 
     utils_print("response length is [%s]\n", out);
     int status_code = hxt_get_reponse_status_code(out);
@@ -534,9 +573,8 @@ int hxt_get_max_chunk_request(const char* file_md5, const ExtType type)
         hxt_get_token_request();
     }    
 
-CLEANUP1:  
+EXIT:  
     utils_free(out);
-CLEANUP3:   
     utils_free(api_url);
     utils_free(header);
 
@@ -625,11 +663,11 @@ BOOL hxt_merge_chunks_request(const char* file_path, ExtType type)
     if(!utils_post_json_data(api_url, "", header, out, 1024))
     {
         utils_print("post data send failed\n");
-        goto CLEANUP1;
+        goto EXIT;
     } 
     utils_print("response length is [%s]\n", out);
     int status_code = hxt_get_reponse_status_code(out);
-    BOOL passed = hxt_get_response_pass_status(out);
+    hxt_get_response_pass_status(out);
     if (status_code == RESPONSE_OK)
     {
         //
@@ -640,9 +678,8 @@ BOOL hxt_merge_chunks_request(const char* file_path, ExtType type)
         hxt_get_token_request();
     }    
 
-CLEANUP1:  
+EXIT:  
     utils_free(out);
-CLEANUP3:   
     utils_free(api_url);
     utils_free(header);
 

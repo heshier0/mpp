@@ -235,9 +235,16 @@ char*  iflyos_create_audio_in_request()
     return request;
 }
 
-char* iflyos_create_txt_in_request()
+char* iflyos_create_txt_in_request(const char* txt_buffer)
 {
+    if(NULL == txt_buffer)
+    {
+        return NULL;
+    }
+
     cJSON *root = NULL;
+
+    iflyos_init_request();
 
     cJSON* header_node = iflyos_create_header(inited_header);
     cJSON* context_node = iflyos_create_context(inited_context);
@@ -257,7 +264,7 @@ char* iflyos_create_txt_in_request()
     cJSON_AddStringToObject(request_header, "name", recog_text_in);
     cJSON_AddStringToObject(request_header, "request_id", "");
 
-    cJSON_AddStringToObject(request_payload, "query", "今天天气怎么样");
+    cJSON_AddStringToObject(request_payload, "query", txt_buffer);
     cJSON_AddBoolToObject(request_payload, "with_tts", TRUE);
     
     char* request = cJSON_Print(root);
@@ -269,27 +276,4 @@ char* iflyos_create_txt_in_request()
     //end test
 
     return request;
-}
-
-int iflyos_get_audio_data_handle()
-{
-    int fd = -1;
-    const char* fifo_pcm = "/tmp/my_pcm_fifo";
-    if (access(fifo_pcm, F_OK) == -1)
-    {
-        int res = mkfifo(fifo_pcm, 0777);
-        if(res != 0)
-        {
-            utils_print("could not create fifo %s\n", fifo_pcm);
-            return -1;
-        }
-    }
-    fd = open(fifo_pcm, O_RDONLY);
-    if (fd == -1)
-    {
-        utils_print("pcm fifo open error\n");
-        return -1;
-    }
-
-    return fd; 
 }

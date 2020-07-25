@@ -1170,9 +1170,10 @@ HI_S32 SAMPLE_COMM_AUDIO_StartAi(AUDIO_DEV AiDevId, HI_S32 s32AiChnCnt,
                 case 1:
                     s32Ret = HI_MPI_AI_SetRecordVqeAttr(AiDevId, i, (AI_RECORDVQE_CONFIG_S *)pstAiVqeAttr);
                     break;
+                case 2:
+                    s32Ret = HI_MPI_AI_SetTalkVqeAttr(AiDevId, i, 0, 0, (AI_TALKVQE_CONFIG_S *)pstAiVqeAttr);    
                 default:
-                    s32Ret = HI_FAILURE;
-                    break;
+                    s32Ret = HI_FAILURE;                    break;
             }
 
             if (s32Ret)

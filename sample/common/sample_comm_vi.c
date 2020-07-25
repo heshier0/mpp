@@ -39,6 +39,8 @@ SAMPLE_SNS_TYPE_E g_sns_type[MAX_SNS_NUM] =
 	SAMPLE_SNS_TYPE_BUTT	
 };
 
+
+
 combo_dev_attr_t MIPI_4lane_CHN0_SENSOR_IMX327_12BIT_2M_NOWDR_ATTR =
 {
     .devno = 0,
@@ -171,6 +173,38 @@ combo_dev_attr_t MIPI_4lane_CHN0_SENSOR_IMX307_12BIT_2M_WDR2to1_ATTR =
             DATA_TYPE_RAW_12BIT,
             HI_MIPI_WDR_MODE_DOL,
             {0, 1, 2, 3}
+        }
+    }
+};
+
+combo_dev_attr_t MIPI_2lane_CHN0_SENSOR_JXF23_10BIT_2M_NOWDR_ATTR = 
+{
+    .devno = 0,
+    .input_mode = INPUT_MODE_MIPI,
+    .data_rate = MIPI_DATA_RATE_X1,
+    .img_rect = {0, 0, 1920, 1080},
+    {
+        .mipi_attr = 
+        {
+            DATA_TYPE_RAW_10BIT,
+            HI_MIPI_WDR_MODE_NONE,
+            {0, 2, -1, -1}
+        }
+    }
+};
+
+combo_dev_attr_t MIPI_2lane_CHN1_SENSOR_JXF23_10BIT_2M_NOWDR_ATTR = 
+{
+    .devno = 1,
+    .input_mode = INPUT_MODE_MIPI,
+    .data_rate = MIPI_DATA_RATE_X1,
+    .img_rect = {0, 0, 1920, 1080},
+    {
+        .mipi_attr = 
+        {
+            DATA_TYPE_RAW_10BIT,
+            HI_MIPI_WDR_MODE_NONE,
+            {0, 1, -1, -1}
         }
     }
 };
@@ -453,6 +487,46 @@ VI_DEV_ATTR_S DEV_ATTR_IMX327_2M_BASE =
 };
 
 VI_DEV_ATTR_S DEV_ATTR_IMX307_2M_BASE =
+{
+    VI_MODE_MIPI,
+    VI_WORK_MODE_1Multiplex,
+    {0xFFF00000,    0x0},
+    VI_SCAN_PROGRESSIVE,
+    {-1, -1, -1, -1},
+    VI_DATA_SEQ_YUYV,
+
+    {
+    /*port_vsync   port_vsync_neg     port_hsync        port_hsync_neg        */
+    VI_VSYNC_PULSE, VI_VSYNC_NEG_LOW, VI_HSYNC_VALID_SINGNAL,VI_HSYNC_NEG_HIGH,VI_VSYNC_VALID_SINGAL,VI_VSYNC_VALID_NEG_HIGH,
+
+    /*hsync_hfb    hsync_act    hsync_hhb*/
+    {0,            1280,        0,
+    /*vsync0_vhb vsync0_act vsync0_hhb*/
+     0,            720,        0,
+    /*vsync1_vhb vsync1_act vsync1_hhb*/
+     0,            0,            0}
+    },
+    VI_DATA_TYPE_RGB,
+    HI_FALSE,
+    {1920, 1080},
+    {
+        {
+            {1920 , 1080},
+
+        },
+        {
+            VI_REPHASE_MODE_NONE,
+            VI_REPHASE_MODE_NONE
+        }
+    },
+    {
+        WDR_MODE_NONE,
+        1080
+    },
+    DATA_RATE_X1
+};
+
+VI_DEV_ATTR_S DEV_ATTR_JXF23_2M_BASE =
 {
     VI_MODE_MIPI,
     VI_WORK_MODE_1Multiplex,
@@ -1656,9 +1730,17 @@ HI_S32 SAMPLE_COMM_VI_GetComboAttrBySns(SAMPLE_SNS_TYPE_E enSnsType, combo_dev_t
             //hi_memcpy(pstComboAttr, sizeof(combo_dev_attr_t), &MIPI_4lane_CHN0_SENSOR_IMX307_12BIT_2M_NOWDR_ATTR, sizeof(combo_dev_attr_t));
 //            break;
 
-        case SONY_IMX307_MIPI_2M_30FPS_12BIT_WDR2TO1:
-            hi_memcpy(pstComboAttr, sizeof(combo_dev_attr_t), &MIPI_4lane_CHN0_SENSOR_IMX307_12BIT_2M_WDR2to1_ATTR, sizeof(combo_dev_attr_t));
-            break;
+        case JX_F23_2L_MIPI_2M_30FPS_10BIT:   
+            if (0 == MipiDev)
+            {
+                hi_memcpy(pstComboAttr, sizeof(combo_dev_attr_t), &MIPI_2lane_CHN0_SENSOR_JXF23_10BIT_2M_NOWDR_ATTR, sizeof(combo_dev_attr_t));
+            }
+            else if (1 == MipiDev)
+            {
+                hi_memcpy(pstComboAttr, sizeof(combo_dev_attr_t), &MIPI_2lane_CHN1_SENSOR_JXF23_10BIT_2M_NOWDR_ATTR, sizeof(combo_dev_attr_t));
+            }
+
+            break;        	 
 
         case PANASONIC_MN34220_LVDS_2M_30FPS_12BIT:
             hi_memcpy(pstComboAttr, sizeof(combo_dev_attr_t), &LVDS_4lane_CHN0_SENSOR_MN34220_12BIT_2M_NOWDR_ATTR, sizeof(combo_dev_attr_t));
@@ -2048,7 +2130,9 @@ HI_S32 SAMPLE_COMM_VI_GetDevAttrBySns(SAMPLE_SNS_TYPE_E enSnsType, VI_DEV_ATTR_S
             hi_memcpy(pstViDevAttr, sizeof(VI_DEV_ATTR_S), &DEV_ATTR_IMX307_2M_BASE, sizeof(VI_DEV_ATTR_S));
             pstViDevAttr->au32ComponentMask[0] = 0xFFC00000;
             break;
-
+        case JX_F23_2L_MIPI_2M_30FPS_10BIT:
+            hi_memcpy(pstViDevAttr, sizeof(VI_DEV_ATTR_S), &DEV_ATTR_JXF23_2M_BASE, sizeof(VI_DEV_ATTR_S));
+            break; 
         case PANASONIC_MN34220_LVDS_2M_30FPS_12BIT:
             hi_memcpy(pstViDevAttr, sizeof(VI_DEV_ATTR_S), &DEV_ATTR_MN34220_2M_BASE, sizeof(VI_DEV_ATTR_S));
             break;
@@ -2128,6 +2212,11 @@ HI_S32 SAMPLE_COMM_VI_GetPipeAttrBySns(SAMPLE_SNS_TYPE_E enSnsType, VI_PIPE_ATTR
             pstPipeAttr->enPixFmt = PIXEL_FORMAT_RGB_BAYER_10BPP;
             pstPipeAttr->enBitWidth = DATA_BITWIDTH_10;
             break;
+        case JX_F23_2L_MIPI_2M_30FPS_10BIT:
+            hi_memcpy(pstPipeAttr, sizeof(VI_DEV_ATTR_S), &PIPE_ATTR_1920x1080_RAW12_420_3DNR_RFR, sizeof(VI_PIPE_ATTR_S));
+            pstPipeAttr->enPixFmt = PIXEL_FORMAT_RGB_BAYER_10BPP;
+            pstPipeAttr->enBitWidth = DATA_BITWIDTH_10;            
+            break;    
 
         case PANASONIC_MN34220_LVDS_2M_30FPS_12BIT:
             hi_memcpy(pstPipeAttr, sizeof(VI_PIPE_ATTR_S), &PIPE_ATTR_1920x1080_RAW12_420_3DNR_RFR, sizeof(VI_PIPE_ATTR_S));
@@ -2194,7 +2283,9 @@ HI_S32 SAMPLE_COMM_VI_GetChnAttrBySns(SAMPLE_SNS_TYPE_E enSnsType, VI_CHN_ATTR_S
         case SONY_IMX307_MIPI_2M_30FPS_12BIT_WDR2TO1:
             hi_memcpy(pstChnAttr, sizeof(VI_CHN_ATTR_S), &CHN_ATTR_1920x1080_420_SDR8_LINEAR, sizeof(VI_CHN_ATTR_S));
             break;
-
+        case JX_F23_2L_MIPI_2M_30FPS_10BIT:
+        	hi_memcpy(pstChnAttr, sizeof(VI_CHN_ATTR_S), &CHN_ATTR_1920x1080_420_SDR8_LINEAR, sizeof(VI_CHN_ATTR_S));
+        	break;   
         case PANASONIC_MN34220_LVDS_2M_30FPS_12BIT:
             hi_memcpy(pstChnAttr, sizeof(VI_CHN_ATTR_S), &CHN_ATTR_1920x1080_420_SDR8_LINEAR, sizeof(VI_CHN_ATTR_S));
             break;
@@ -3570,6 +3661,9 @@ HI_S32 SAMPLE_COMM_VI_GetSizeBySensor(SAMPLE_SNS_TYPE_E enMode, PIC_SIZE_E* penS
             *penSize = PIC_1080P;
             break;
 
+		case JX_F23_2L_MIPI_2M_30FPS_10BIT:
+            *penSize = PIC_1080P;		
+		    break;
         case PANASONIC_MN34220_LVDS_2M_30FPS_12BIT:
             *penSize = PIC_1080P;
             break;
@@ -3640,6 +3734,7 @@ HI_S32 SAMPLE_COMM_VI_GetFrameRateBySensor(SAMPLE_SNS_TYPE_E enMode, HI_U32* pu3
         case PANASONIC_MN34220_LVDS_2M_30FPS_12BIT:
         case OMNIVISION_OS05A_MIPI_4M_30FPS_12BIT:
         case OMNIVISION_OS05A_MIPI_4M_30FPS_10BIT_WDR2TO1:
+		case JX_F23_2L_MIPI_2M_30FPS_10BIT:
             *pu32FrameRate = 30;
             break;
 
@@ -3720,6 +3815,7 @@ combo_dev_t SAMPLE_COMM_VI_GetComboDevBySensor(SAMPLE_SNS_TYPE_E enMode, HI_S32 
         case PANASONIC_MN34220_LVDS_2M_30FPS_12BIT:
         case OMNIVISION_OS05A_MIPI_4M_30FPS_12BIT:
         case OMNIVISION_OS05A_MIPI_4M_30FPS_10BIT_WDR2TO1:
+		case JX_F23_2L_MIPI_2M_30FPS_10BIT:
             if (0 == s32SnsIdx)
             {
                 dev = 0;

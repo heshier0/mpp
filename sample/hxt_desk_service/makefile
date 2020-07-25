@@ -20,15 +20,15 @@ INCS = -I$(ROOT_DIR)/. \
        -I/mnt/g/workspace/plugins/cjson/include    \
        -I/mnt/g/workspace/plugins/libuwsc/include \
        -I/mnt/g/workspace/plugins/libmbedtls/include \
-       -I/mnt/g/workspace/plugins/libqrcode/include 
-
+       -I/mnt/g/workspace/plugins/libqrcode/include \
+ 
 LIBS = -L/mnt/g/workspace/plugins/libev/lib -lev \
              -L/mnt/g/workspace/plugins/cjson/lib -lcjson \
              -L/mnt/g/workspace/plugins/libuwsc/lib -luwsc \
              -L/mnt/g/workspace/plugins/libmbedtls/lib -lmbedx509 \
              -L/mnt/g/workspace/plugins/libmbedtls/lib -lmbedtls \
              -L/mnt/g/workspace/plugins/libmbedtls/lib -lmbedcrypto \
-             -L/mnt/g/workspace/plugins/libqrcode/lib -lqrcode \
+	     -L/mnt/g/workspace/plugins/libqrcode/lib -lqrcode \
              -L/mnt/g/workspace/plugins/libqrcode/lib -lzbar
 
 #TARGET := $(SMP_SRCS:%.c=%)

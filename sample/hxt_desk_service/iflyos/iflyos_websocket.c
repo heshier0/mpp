@@ -5,9 +5,12 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <pthread.h>
+#include <sys/ioctl.h>
+#include <fcntl.h>
 
 #include <uwsc/uwsc.h>
 
+#include "common.h"
 #include "utils.h"
 #include "databuffer.h"
 
@@ -17,7 +20,6 @@
 #define PCM_LENGTH      640
 
 static BOOL g_sampling = TRUE;
-static BOOL g_playing = TRUE;
 static BOOL g_stop_capture = FALSE;
 
 static pthread_t read_pcm_tid;
@@ -43,7 +45,7 @@ static void thread_read_pcm_cb(void *data)
     char pcm_buf[PCM_LENGTH] = {0};
     memset(pcm_buf, 0, PCM_LENGTH);
         
-    int fd = iflyos_get_audio_data_handle();
+    int fd = utils_open_fifo(PCM_FIFO, O_RDONLY);
     while(g_sampling)
     {
         int read_count = read(fd, pcm_buf, PCM_LENGTH);
@@ -113,25 +115,13 @@ static void thread_send_pcm_cb(void *data)
     return;
 }
 
-
-static void thread_play_mp3_cb(void *data)
-{
-    board_play_mp3_fifo(g_playing);
-}
-
 static void uwsc_onopen(struct uwsc_client *cl)
 {
-    uwsc_log_info("iflyos onopen\n");
+    printf("iflyos onopen\n");
 
-    // added by hekai
+    /* sample voice to iflyos */
     pthread_create(&read_pcm_tid, NULL, thread_read_pcm_cb, NULL);
-
     pthread_create(&send_pcm_tid, NULL, thread_send_pcm_cb, (void*)cl);
-
-    // pthread_t tid2;
-    // pthread_create(&tid2, NULL, thread_play_mp3_cb, NULL);
-    // pthread_detach(tid2);
-    // end added
 }
 
 static void uwsc_onmessage(struct uwsc_client *cl,
@@ -160,7 +150,6 @@ static void uwsc_onmessage(struct uwsc_client *cl,
         }
         free(name);
     }
-    //printf("Please input:\n");
 }
 
 static void uwsc_onerror(struct uwsc_client *cl, int err, const char *msg)
@@ -190,8 +179,6 @@ static void signal_cb(struct ev_loop *loop, ev_signal *w, int revents)
         g_sampling = FALSE;
         pthread_join(read_pcm_tid, 0);
         pthread_join(send_pcm_tid, 0);
-
-        g_playing = FALSE;
 
         ev_break(loop, EVBREAK_ALL);
 

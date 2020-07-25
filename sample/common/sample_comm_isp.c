@@ -77,6 +77,16 @@ ISP_PUB_ATTR_S ISP_PUB_ATTR_IMX307_MIPI_2M_30FPS_WDR2TO1_LINE =
     0,
 };
 
+ISP_PUB_ATTR_S ISP_PUB_ATTR_JXF23_MIPI_2M_30FPS =
+{
+    {0, 0, 1920, 1080},
+    {1920, 1080},
+    25,
+    BAYER_BGGR,
+    WDR_MODE_NONE,
+    0,	
+};
+
 ISP_PUB_ATTR_S ISP_PUB_ATTR_MN34220_LVDS_2M_30FPS =
 {
     {0, 0, 1920, 1080},
@@ -224,6 +234,10 @@ HI_S32 SAMPLE_COMM_ISP_GetIspAttrBySns(SAMPLE_SNS_TYPE_E enSnsType, ISP_PUB_ATTR
         case SONY_IMX307_MIPI_2M_30FPS_12BIT:
             memcpy(pstPubAttr, &ISP_PUB_ATTR_IMX307_MIPI_2M_30FPS, sizeof(ISP_PUB_ATTR_S));
             break;
+			
+        case JX_F23_2L_MIPI_2M_30FPS_10BIT:
+        	memcpy(pstPubAttr, &ISP_PUB_ATTR_JXF23_MIPI_2M_30FPS, sizeof(ISP_PUB_ATTR_S));
+        	break;   
 
         case SONY_IMX307_MIPI_2M_30FPS_12BIT_WDR2TO1:
             memcpy(pstPubAttr, &ISP_PUB_ATTR_IMX307_MIPI_2M_30FPS_WDR2TO1_LINE, sizeof(ISP_PUB_ATTR_S));
@@ -312,6 +326,9 @@ ISP_SNS_OBJ_S* SAMPLE_COMM_ISP_GetSnsObj(HI_U32 u32SnsId)
         case SONY_IMX307_MIPI_2M_30FPS_12BIT:
         case SONY_IMX307_MIPI_2M_30FPS_12BIT_WDR2TO1:
             return &stSnsImx307Obj;
+     
+        case JX_F23_2L_MIPI_2M_30FPS_10BIT:
+        	return &stSnsSoiSensorObj;  
 
         case SONY_IMX335_MIPI_5M_30FPS_12BIT:
         case SONY_IMX335_MIPI_5M_30FPS_10BIT_WDR2TO1:

@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
@@ -21,7 +22,6 @@ static char* separate_filename(const char *url)
 
     char *start = NULL;
     char *end = NULL;
-    int with_token= 0;
 
     if ((start = strrchr(url, '/')) == NULL)
     {
@@ -41,7 +41,6 @@ static char* separate_filename(const char *url)
         filename = (char*)utils_calloc(length+1);
         memcpy(filename, start, (end - start));
     }
-    int count = strlen(filename);
     filename[strlen(filename)] = '\0';
 
     return filename;
@@ -174,7 +173,6 @@ BOOL utils_reload_cfg(const char* cfg, cJSON* root)
 
 char* utils_get_cfg_str_value(cJSON* root, const char* params_item, const char* prop_item)
 {
-    char* prop_item_val = NULL;
     if (NULL == root || 
         NULL == params_item || 
         NULL == prop_item)
@@ -219,8 +217,6 @@ double utils_get_cfg_number_value(cJSON* root, const char* params_item, const ch
 
 BOOL utils_set_cfg_str_value(cJSON* root, const char* cfg, const char* params_item, const char* prop_item, const char* value)
 {
-    char* prop_item_val = NULL;
-
     if (NULL == cfg || 
         NULL == root || 
         NULL == params_item || 
@@ -310,13 +306,13 @@ BOOL utils_send_local_voice(const char *path)
         return FALSE;
     }
 
-    int fd = utils_open_fifo(LOCAL_MP3_FIFO, O_WRONLY);
+    int fd = utils_open_fifo(MP3_FIFO, O_WRONLY);
     if (-1 == fd)
     {
         return FALSE;
     }
 
-    File *fp = fopen(path, "rb");
+    FILE *fp = fopen(path, "rb");
     if(NULL == fp)
     {
         return FALSE;
@@ -328,14 +324,14 @@ BOOL utils_send_local_voice(const char *path)
         read_length = fread(buff, 1024, 1, fp);
         if(read_length > 0)
         {
-            int write_length = write(fd, buff, 1024); //block
+            write(fd, buff, 1024); //block
         }
         
     } while (read_length);
 
     fclose(fp);
     close(fd);
-    
+
     return TRUE;
 }
 
@@ -343,9 +339,9 @@ BOOL utils_send_mp3_voice(const char *url)
 {
     char cmd[256] = {0};
 #ifdef DEBUG    
-    sprintf(cmd, "curl --insecure -o %s %s", IFLYOS_MP3_FIFO, url);
+    sprintf(cmd, "curl --insecure -o %s %s", MP3_FIFO, url);
 #else
-    sprintf(cmd, "curl --insecure -s -o %s %s", IFLYOS_MP3_FIFO, url);
+    sprintf(cmd, "curl --insecure -s -o %s %s", MP3_FIFO, url);
 #endif   
     pid_t status = system(cmd);
     
@@ -436,14 +432,18 @@ BOOL utils_post_json_data(const char *url, const char* header_content, const cha
     }
 
     char CMD_POST_JSON[512] = {0};
+    char* extra_header = (char *)header_content;
+    if( NULL == extra_header)
+    {
+        extra_header = "";
+    }
 #ifdef DEBUG
-    sprintf(CMD_POST_JSON, "curl --insecure -X POST -H \"Content-Type:application/json;charset=UTF-8\" -H \"%s\" -d \"%s\" %s", 
-                                header_content, json_data, url);
+    sprintf(CMD_POST_JSON, "curl --insecure -X POST -H \"Content-Type:application/json;charset=UTF-8\" -H \"%s\" -d \'%s\' %s", 
+                                extra_header, json_data, url);
 #else 
-    sprintf(CMD_POST_JSON, "curl --insecure -s -X POST -H \"Content-Type:application/json;charset=UTF-8\" -H \"%s\" -d \"%s\" %s", 
+    sprintf(CMD_POST_JSON, "curl --insecure -s -X POST -H \"Content-Type:application/json;charset=UTF-8\" -H \"%s\" -d \'%s\' %s", 
                                 header_content, json_data, url);
 #endif // DEBUG
-
     FILE *fp = NULL;
     fp = popen(CMD_POST_JSON, "r");
     if(NULL != fp)
@@ -667,7 +667,7 @@ int utils_split_file_to_chunk(const char* path)
     
     //modify chunk file index 
     char CMD_CHUNK_SERIAL[256] = {0};
-    sprintf(CMD_CHUNK_SERIAL, "sh /user/bin/modify_chunk_names.sh %s_%s", file_name, suffix);
+    sprintf(CMD_CHUNK_SERIAL, "sh /userdata/bin/script/modify_chunk_names.sh %s_%s", file_name, suffix);
     system(CMD_CHUNK_SERIAL);
 
     return chunk_count;
@@ -676,7 +676,7 @@ int utils_split_file_to_chunk(const char* path)
 int utils_open_fifo(const char* name, int mode)
 {
     int fd = -1;
-    char* fifo_name = name;
+    char* fifo_name = (char *)name;
     if(NULL == fifo_name)
     {
         return fd;
@@ -687,11 +687,29 @@ int utils_open_fifo(const char* name, int mode)
         int res = mkfifo(fifo_name, 0777);
         if(res != 0)
         {
-            printf("could not create fifo %s\n", fifo_name);
+            utils_print("could not create fifo %s\n", fifo_name);
             return -1;
         }
     }
     fd = open(fifo_name, mode);
 
     return fd; 
+}
+
+void utils_link_wifi(const char* ssid, const char* pwd)
+{
+    if(NULL == ssid || NULL == pwd)
+    {
+        return;
+    }
+
+    char CMD_SAVE_WIFI_INFO[256] = {0};
+    sprintf(CMD_SAVE_WIFI_INFO, "wpa_passphrase %s %s > %s", ssid, pwd, WIFI_CFG);
+    system(CMD_SAVE_WIFI_INFO);
+
+    char CMD_LINK_WIFI[256] = {0};
+    sprintf(CMD_LINK_WIFI, "sh /userdata/bin/script/link-wifi.sh");
+    system(CMD_LINK_WIFI);
+
+    return;
 }
