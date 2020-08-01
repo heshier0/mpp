@@ -33,7 +33,7 @@
 #define launch_back_result       "launcher.back_result"
 #define launch_sel_result        "launcher.select_result"
 //wakeword
-#define ww_result                "wakeword.set_wakeword_result"
+#define wakeword_result                "wakeword.set_wakeword_result"
 
 /*****response define*****/
 //recognizer
@@ -77,7 +77,7 @@
 #define launch_back                  "launcher.back"
 #define launch_sel                   "launcher.select"
 //wake word
-#define ww_set_ww                    "wakeword.set_wakeword"
+#define wakeword_set_wakeword                   "wakeword.set_wakeword"
 //interceptor
 #define itcpt_custom                 "interceptor.custom"
 #define itcpt_trans_sema             "interceptor.transfer_semantic"

@@ -102,7 +102,7 @@ void hxt_init_cfg(void* data)
     break;
     //704x576
     case 2:
-        g_video_width = 704;
+        g_video_width = 720;
         g_video_height = 576;
     break;
     //
@@ -112,7 +112,7 @@ void hxt_init_cfg(void* data)
     break;
     //704x576
     default:
-        g_video_width = 704;
+        g_video_width = 720;
         g_video_height = 576;        
     break;
     }
@@ -162,6 +162,17 @@ void hxt_init_cfg(void* data)
     }
 
     return;
+}
+
+
+char* hxt_get_posture_coco_model_path()
+{
+    return utils_get_cfg_str_value(g_cfg_root, "model", "coco_model");
+}
+
+char* hxt_get_posture_class_model_path()
+{
+    return utils_get_cfg_str_value(g_cfg_root, "model", "class_model");
 }
 
 //get
@@ -222,11 +233,20 @@ int hxt_get_video_ratio_cfg()
 
 int hxt_get_video_width_cfg()
 {
+    if(g_video_width == 0)
+    {
+        g_video_width = 640;
+    }
+
     return g_video_width;
 }
 
 int hxt_get_video_height_cfg()
 {
+    if(g_video_height == 0)
+    {
+        g_video_height = 360; 
+    }
     return g_video_height;
 }
 
@@ -301,6 +321,25 @@ char* hxt_get_desk_code_cfg()
     return utils_get_cfg_str_value(g_cfg_root, "desk", "deskCode");
 }
 //set 
+
+BOOL hxt_set_posture_coco_model_path(const char* value)
+{
+    if (NULL == value)
+    {
+        return FALSE;
+    }
+    return utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "model", "coco_model", value);
+}
+
+BOOL hxt_set_posture_class_model_path(const char* value)
+{
+    if (NULL == value)
+    {
+        return FALSE;
+    }
+    return utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "model", "class_model", value);
+}
+
 BOOL hxt_set_desk_uuid_cfg(const char* value)
 {
     if (NULL == value)

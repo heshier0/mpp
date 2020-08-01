@@ -540,7 +540,7 @@ VI_DEV_ATTR_S DEV_ATTR_JXF23_2M_BASE =
     VI_VSYNC_PULSE, VI_VSYNC_NEG_LOW, VI_HSYNC_VALID_SINGNAL,VI_HSYNC_NEG_HIGH,VI_VSYNC_VALID_SINGAL,VI_VSYNC_VALID_NEG_HIGH,
 
     /*hsync_hfb    hsync_act    hsync_hhb*/
-    {0,            1280,        0,
+    {0,            1820,        0,
     /*vsync0_vhb vsync0_act vsync0_hhb*/
      0,            720,        0,
     /*vsync1_vhb vsync1_act vsync1_hhb*/

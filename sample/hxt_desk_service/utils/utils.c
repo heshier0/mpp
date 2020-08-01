@@ -299,8 +299,52 @@ BOOL utils_set_cfg_number_value(cJSON* root, const char* cfg, const char* params
     return TRUE;
 }
 
+BOOL utils_write_fifo(const int fd, const char* write_buffer, const int write_len, const int timeout_val)
+{
+    BOOL write_result = FALSE;
+    int ret = -1;
+    struct timeval time_out;
+    fd_set write_fds;
+
+    if(-1 == fd)
+    {
+        return FALSE;
+    }
+
+    while(1)
+    {
+        FD_ZERO(&write_fds);
+        FD_SET(fd, &write_fds);
+
+        time_out.tv_sec = timeout_val;
+        time_out.tv_usec = 0;
+
+        ret = select(fd + 1, NULL, &write_fds, NULL, &time_out);
+        if (ret < 0)
+        {
+            utils_print("get select error\n");
+            break;
+        }
+        else if (0 == ret) 
+        {
+            utils_print("get select write timeout\n");
+            break;
+        }
+        if(FD_ISSET(fd, &write_fds))
+        {
+            write(fd, write_buffer, write_len);
+            write_result = TRUE;
+        }
+    }
+    
+    return write_result;
+}
+
 BOOL utils_send_local_voice(const char *path)
 {
+
+    int ret = -1;
+
     if(NULL == path)
     {
         return FALSE;
@@ -319,15 +363,37 @@ BOOL utils_send_local_voice(const char *path)
     }
     char buff[1024];
     int read_length = 0; 
-    do
+
+    struct timeval time_out;
+    fd_set write_fds;
+
+    while(1)
     {
-        read_length = fread(buff, 1024, 1, fp);
-        if(read_length > 0)
+        FD_ZERO(&write_fds);
+        FD_SET(fd, &write_fds);
+
+        time_out.tv_sec = 1;
+        time_out.tv_usec = 0;
+        ret = select(fd + 1, NULL, &write_fds, NULL, &time_out);
+        if (ret < 0)
         {
-            write(fd, buff, 1024); //block
+            utils_print("get MP3_FIFO select error\n");
+            break;
         }
-        
-    } while (read_length);
+        else if (0 == ret) 
+        {
+            utils_print("get MP3_FIFO select write timeout\n");
+            break;
+        }
+        if(FD_ISSET(fd, &write_fds))
+        {
+            read_length = fread(buff, 1024, 1, fp);
+            if(read_length > 0)
+            {
+                write(fd, buff, 1024); //block
+            }
+        }
+    }
 
     fclose(fp);
     close(fd);
@@ -684,7 +750,7 @@ int utils_open_fifo(const char* name, int mode)
 
     if (access(fifo_name, F_OK) == -1)
     {
-        int res = mkfifo(fifo_name, 0777);
+        int res = mkfifo(fifo_name, 0666);
         if(res != 0)
         {
             utils_print("could not create fifo %s\n", fifo_name);
@@ -713,3 +779,4 @@ void utils_link_wifi(const char* ssid, const char* pwd)
 
     return;
 }
+

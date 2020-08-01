@@ -10,7 +10,6 @@
 //wifi config file
 #define WIFI_CFG                "/userdata/config/wifi.conf"
 
-
 //local voice
 #define VOICE_DEVICE_OPEN                       "/userdata/media/voice/V001.mp3"
 #define VOICE_CONNECT_ERROR                     "/userdata/media/voice/V002.mp3"  
@@ -45,7 +44,11 @@
 #define VOICE_WARNING_BUZZ                      "/userdata/media/voice/V031.mp3"  
 #define VOICE_WARNING_MUTE                      "/userdata/media/voice/V032.mp3"  
 #define VOICE_DESK_DEREGISTER                   "/userdata/media/voice/V033.mp3"  
-
+#define VOICE_SITTING_PRAISE1                   "/userdata/media/voice/V034.mp3" 
+#define VOICE_SITTING_PRAISE2                   "/userdata/media/voice/V035.mp3"
+#define VOICE_SITTING_PRAISE3                   "/userdata/media/voice/V036.mp3"
+#define VOICE_SITTING_PRAISE4                   "/userdata/media/voice/V037.mp3"
+#define VOICE_SITTING_PRAISE5                   "/userdata/media/voice/V038.mp3"
 
 int g_play_status;
 int g_voice_status;

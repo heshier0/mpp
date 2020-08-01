@@ -154,12 +154,14 @@ static cJSON* iflyos_create_context(FlyosContext* context)
     cJSON* audio_player = NULL;
     cJSON* playback = NULL;
     cJSON* speaker = NULL;
+    cJSON* wakeword = NULL;
 
     root = cJSON_CreateObject();
 
     cJSON_AddItemToObject(root, "system", system = cJSON_CreateObject());
     cJSON_AddItemToObject(root, "audio_player", audio_player = cJSON_CreateObject());
     cJSON_AddItemToObject(root, "speaker", speaker = cJSON_CreateObject());
+    // cJSON_AddItemToObject(root, "wakeword", wakeword = cJSON_CreateObject());
 
     cJSON_AddStringToObject(system, "version", context->system->version);
     cJSON_AddBoolToObject(system, "software_updater", context->system->software_updater);
@@ -177,6 +179,9 @@ static cJSON* iflyos_create_context(FlyosContext* context)
     cJSON_AddStringToObject(speaker, "version", context->speaker->version);
     cJSON_AddNumberToObject(speaker, "volume", context->speaker->volume);
     cJSON_AddStringToObject(speaker, "type", context->speaker->type);
+
+    //wakeup word
+    // cJSON_AddStringToObject(wakeword, "version", "1.1");
 
     return root;
 }
@@ -213,15 +218,24 @@ char*  iflyos_create_audio_in_request()
     //audio-in request
     cJSON *request_header = NULL;
     cJSON *request_payload = NULL;
+
     cJSON_AddItemToObject(request_node, "header", request_header = cJSON_CreateObject());
     cJSON_AddItemToObject(request_node, "payload", request_payload = cJSON_CreateObject());
 
     cJSON_AddStringToObject(request_header, "name", recog_audion_in);
     cJSON_AddStringToObject(request_header, "request_id", "");
 
+    cJSON *payload_wakeup = NULL;
     cJSON_AddStringToObject(request_payload, "profile", "CLOSE_TALK");
     cJSON_AddStringToObject(request_payload, "format", "AUDIO_L16_RATE_16000_CHANNELS_1");
-    
+    cJSON_AddItemToObject(request_payload, "iflyos_wake_up", payload_wakeup = cJSON_CreateObject());
+
+    cJSON_AddNumberToObject(payload_wakeup, "score", 666);
+    cJSON_AddNumberToObject(payload_wakeup, "start_index_in_samples", 50);
+    cJSON_AddNumberToObject(payload_wakeup, "end_index_in_samples", 150);
+    cJSON_AddStringToObject(payload_wakeup, "word", "蓝小飞");
+    cJSON_AddStringToObject(payload_wakeup, "prompt", "我在");
+
     char* request = cJSON_Print(root);
 
     //for test
@@ -273,6 +287,52 @@ char* iflyos_create_txt_in_request(const char* txt_buffer)
     cJSON_free(header_node);
     cJSON_free(context_node);
     cJSON_free(root);
+    //end test
+
+    iflyos_deinit_request();
+
+    return request;
+}
+
+char* iflyos_create_set_wakeword_request()
+{
+    cJSON *root = NULL;
+
+    iflyos_init_request();
+
+    cJSON* header_node = iflyos_create_header(inited_header);
+    cJSON* context_node = iflyos_create_context(inited_context);
+    
+    
+    cJSON* request_node = NULL;
+
+    root = cJSON_CreateObject();
+    cJSON_AddItemToObject(root, "iflyos_header", header_node);
+    cJSON_AddItemToObject(root, "iflyos_context", context_node);
+
+    cJSON_AddItemToObject(root, "iflyos_request", request_node = cJSON_CreateObject());
+
+    //set wakeword request
+    cJSON *request_header = NULL;
+    cJSON *request_payload = NULL;
+    cJSON_AddItemToObject(request_node, "header", request_header = cJSON_CreateObject());
+    cJSON_AddItemToObject(request_node, "payload", request_payload = cJSON_CreateObject());
+
+    cJSON_AddStringToObject(request_header, "name", wakeword_result);
+    cJSON_AddStringToObject(request_header, "request_id", "");
+
+    // cJSON_AddStringToObject(request_payload, "result", "SUCCEED");
+    // cJSON_AddStringToObject(request_payload, "wakeword", "蓝小飞");
+    // cJSON_AddStringToObject(request_payload, "error_type", "DOWNLOAD_ERROR");
+    
+    char* request = cJSON_Print(root);
+
+    //for test
+    cJSON_free(header_node);
+    cJSON_free(context_node);
+    cJSON_free(root);
+
+    iflyos_deinit_request();
     //end test
 
     return request;

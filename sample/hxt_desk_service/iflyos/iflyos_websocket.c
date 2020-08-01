@@ -101,8 +101,12 @@ static void thread_send_pcm_cb(void *data)
         {
             char *req = iflyos_create_audio_in_request();
             cl->send(cl, req, strlen(req), UWSC_OP_TEXT);
+            // printf("%s: [%.*s]\n", get_cur_time(), (int)strlen(req), (char *)req);
             free(req);
             requested = TRUE;
+            // test, send wakeup bin
+
+
         }
 
         // send data
@@ -134,7 +138,6 @@ static void uwsc_onmessage(struct uwsc_client *cl,
     } 
     else 
     {
-        printf("%s: [%.*s]\n", get_cur_time(), (int)len, (char *)data);
         char* name = iflyos_get_response_name(data);
         if (NULL == name)
         {
@@ -148,6 +151,11 @@ static void uwsc_onmessage(struct uwsc_client *cl,
         {
             g_stop_capture = TRUE;
         }
+        else
+        {
+            printf("%s: [%.*s]\n", get_cur_time(), (int)len, (char *)data);
+        }
+        
         free(name);
     }
 }
@@ -162,7 +170,6 @@ static void uwsc_onclose(struct uwsc_client *cl, int code, const char *reason)
 {
     utils_print("iflyos onclose:%d: %s\n", code, reason);
     //added by hekai
-    iflyos_deinit_request();
     g_sampling = FALSE;
 
     pthread_join(read_pcm_tid, 0);
@@ -218,7 +225,8 @@ int iflyos_websocket_start()
     ev_signal_start(loop, &signal_watcher);
 
     ev_run(loop, 0);
-    free(cl);       
+   
+    // free(cl);       
     iflyos_unload_cfg();
     
     destroy_buffer();

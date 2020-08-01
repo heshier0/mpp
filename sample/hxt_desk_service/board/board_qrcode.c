@@ -15,6 +15,7 @@
 #include "hi_comm_vpss.h"
 #include "mpi_vpss.h"
 
+#include "common.h"
 #include "utils.h"
 
 #define MAX_FRM_WIDTH   20480
@@ -154,6 +155,7 @@ static HI_S32 VPSS_Restore()
     return HI_SUCCESS;
 }
 
+#if 0
 BOOL get_qrcode_yuv_buffer(void **qrcode_info)
 {
     HI_U32 u32Cnt = 1;
@@ -278,5 +280,49 @@ BOOL get_qrcode_yuv_buffer(void **qrcode_info)
     VPSS_Restore(VpssGrp, VpssChn);
     return TRUE;
 }
+#endif
 
+BOOL get_qrcode_yuv_buffer(void **qrcode_info)
+{
+    int width = hxt_get_video_width_cfg();
+    int height = hxt_get_video_height_cfg();
+    int size = width * height * 3 / 2 ;
+
+    char *yuv_buff = (char*) utils_malloc(size);
+    if(NULL == yuv_buff)
+    {
+        return FALSE;
+    }
+
+    int fd = utils_open_fifo(VIDEO_FIFO, O_RDONLY);
+    if (-1 == fd)
+    {
+        return FALSE;
+    }
+    utils_print("To read yuv data from fifo....\n");
+    int read_count = read(fd, yuv_buff, size);
+    utils_print("read %d yuv bytes from fifo\n", read_count);
+
+ #ifdef DEBUG   
+    FILE* pfd = fopen("qrcode_vpss.yuv", "wb");
+    fwrite(yuv_buff, size, 1, pfd);
+    fflush(pfd);
+    fclose(pfd);
+ #endif 
+
+    int ret = QRcode_Detection(yuv_buff, width, height, qrcode_info);
+    if (ret == -1)
+    {
+        utils_print("QRCode not recognize...\n");
+        return FALSE;
+    }
+
+    if(yuv_buff != NULL)
+    {
+        utils_free(yuv_buff);
+        yuv_buff = NULL;
+    }
+
+    return TRUE;
+}
 

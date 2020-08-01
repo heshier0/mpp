@@ -243,8 +243,10 @@ else ifeq ($(HIARCH),$(filter $(HIARCH), hi3519av100))
 	LIBS_CFLAGS    += -mcpu=cortex-a53 -mfloat-abi=softfp -mfpu=neon-vfpv4
 	LIBS_LD_CFLAGS += -mcpu=cortex-a53 -mfloat-abi=softfp -mfpu=neon-vfpv4
 else ifeq ($(HIARCH),$(filter $(HIARCH), hi3516cv500))
-	LIBS_CFLAGS    += -mcpu=cortex-a7 -mfloat-abi=softfp -mfpu=neon-vfpv4
-	LIBS_LD_CFLAGS += -mcpu=cortex-a7 -mfloat-abi=softfp -mfpu=neon-vfpv4
+	#LIBS_CFLAGS    += -mcpu=cortex-a7 -mfloat-abi=softfp -mfpu=neon-vfpv4
+	#LIBS_LD_CFLAGS += -mcpu=cortex-a7 -mfloat-abi=softfp -mfpu=neon-vfpv4	
+    LIBS_CFLAGS    += -mcpu=cortex-a7 -mfloat-abi=softfp
+	LIBS_LD_CFLAGS += -mcpu=cortex-a7 -mfloat-abi=softfp
 endif
 
 
