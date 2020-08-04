@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <fcntl.h>
+#include <sys/time.h>
+#include <signal.h>
 
 
 #include <sitting_posture.h>
@@ -16,6 +18,16 @@
 static void* g_recog_handle = NULL;
 static pthread_t g_proc_yuv_tid = NULL;
 static BOOL g_keep_processing = TRUE;
+
+
+static void take_rest(int time_ms)
+{
+    struct timeval timeout;
+    timeout.tv_sec = 0;
+    timeout.tv_usec = time_ms * 1000;
+
+    select(0, NULL, NULL, NULL, &timeout);
+}
 
 
 static void* thread_proc_yuv_data_cb(void *param)
@@ -78,7 +90,7 @@ static void* thread_proc_yuv_data_cb(void *param)
             yuv_buf = NULL;
         }
         
-        usleep(300 * 1000); 
+        take_rest(333 * 1000); 
     }
   
 
