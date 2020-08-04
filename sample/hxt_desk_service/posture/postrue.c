@@ -59,7 +59,7 @@ static void* thread_proc_yuv_data_cb(void *param)
             check_count = 0;
 
             /* step to sleep countdown */
-            
+
         }
         else if (recog_result == 0)
         {
@@ -99,6 +99,9 @@ void start_posture_recognize()
     g_recog_handle = init_sit_posture(model_path1, model_path2);
 
     pthread_create(&g_proc_yuv_tid, NULL, thread_proc_yuv_data_cb, NULL);
+
+    /* every 300ms to get a yuv buffer*/
+    
 
     return;
 }
