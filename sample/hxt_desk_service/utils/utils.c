@@ -7,6 +7,8 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <time.h>
+
 #include <cJSON.h>
 
 #include "common.h"
@@ -388,10 +390,11 @@ BOOL utils_send_local_voice(const char *path)
         if(FD_ISSET(fd, &write_fds))
         {
             read_length = fread(buff, 1024, 1, fp);
-            if(read_length > 0)
+            if(read_length <= 0)
             {
-                write(fd, buff, 1024); //block
+                break;
             }
+            write(fd, buff, 1024); //block
         }
     }
 
@@ -780,3 +783,45 @@ void utils_link_wifi(const char* ssid, const char* pwd)
     return;
 }
 
+void utils_generate_mp4_file_name(char* file_name)
+{
+    if( NULL == file_name)
+    {
+        return ;
+    }
+
+	struct tm * tm;
+	time_t now = time(0);
+	tm = localtime(&now);
+	
+	snprintf(file_name, 128, "%04d%02d%02d-%02d%02d%02d.mp4", 
+    	     tm->tm_year + 1900,
+	         tm->tm_mon + 1,
+	         tm->tm_mday,
+	         tm->tm_hour,
+	         tm->tm_min,
+	         tm->tm_sec);
+	
+    return;
+}
+
+void utils_save_yuv_test(const char* yuv_data, const int width, const int height)
+{
+    struct tm * tm;
+	time_t now = time(0);
+	tm = localtime(&now);
+	char file_name[128] = {0};
+
+	snprintf(file_name, 128, "%04d%02d%02d-%02d%02d%02d.yuv", 
+    	     tm->tm_year + 1900,
+	         tm->tm_mon + 1,
+	         tm->tm_mday,
+	         tm->tm_hour,
+	         tm->tm_min,
+	         tm->tm_sec);
+
+    FILE* pfd = fopen(file_name, "wb");
+    fwrite(yuv_data, width * height * 3 / 2, 1, pfd);
+    fflush(pfd);
+    fclose(pfd);
+}

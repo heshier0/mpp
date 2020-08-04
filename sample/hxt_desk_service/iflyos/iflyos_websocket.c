@@ -19,6 +19,8 @@
 #define BUFFER_SIZE     (8*1024*1024)
 #define PCM_LENGTH      640
 
+DATABUFFER g_voice_buffer;
+
 static BOOL g_sampling = TRUE;
 static BOOL g_stop_capture = FALSE;
 
@@ -53,7 +55,7 @@ static void thread_read_pcm_cb(void *data)
         {
             continue;
         }
-        char *ptr = get_free_buffer(read_count);
+        char *ptr = get_free_buffer(&g_voice_buffer, read_count);
         if(NULL == ptr)
         {
             memset(pcm_buf, 0, PCM_LENGTH);
@@ -62,7 +64,7 @@ static void thread_read_pcm_cb(void *data)
         memcpy(ptr, pcm_buf, read_count);
         memset(pcm_buf, 0, PCM_LENGTH);
 
-        use_free_buffer(read_count);
+        use_free_buffer(&g_voice_buffer, read_count);
     }
 
     close(fd);
@@ -91,7 +93,7 @@ static void thread_send_pcm_cb(void *data)
             requested = FALSE;
         }
 
-        char* ptr = get_buffer(PCM_LENGTH);
+        char* ptr = get_buffer(&g_voice_buffer, PCM_LENGTH);
         if(NULL == ptr)
         {
             continue;
@@ -112,7 +114,7 @@ static void thread_send_pcm_cb(void *data)
         // send data
         cl->send(cl, ptr, PCM_LENGTH, UWSC_OP_BINARY);
 
-        release_buffer(PCM_LENGTH);
+        release_buffer(&g_voice_buffer, PCM_LENGTH);
     }
     utils_print("send pcm thread exit...\n");
     
@@ -200,8 +202,7 @@ int iflyos_websocket_start()
 	int ping_interval = 10;	/* second */
     struct uwsc_client *cl;
 
-
-    init_buffer(BUFFER_SIZE);
+    create_buffer(&g_voice_buffer, BUFFER_SIZE);
     iflyos_load_cfg();
 
     char ifly_url[255] = {0};
@@ -229,7 +230,7 @@ int iflyos_websocket_start()
     // free(cl);       
     iflyos_unload_cfg();
     
-    destroy_buffer();
+    destroy_buffer(&g_voice_buffer);
 
     return 0;
 }

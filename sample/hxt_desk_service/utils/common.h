@@ -55,5 +55,4 @@ int g_voice_status;
 int g_video_status;
 
 
-
 #endif //__COMMON_H__

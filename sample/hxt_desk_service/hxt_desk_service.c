@@ -9,8 +9,8 @@
 
 #include <sitting_posture.h>
 
+#include "yuv2mp4.h"
 #include "utils.h"
-#include "databuffer.h"
 #include "common.h"
 
 static pthread_t play_tid, voice_tid, video_tid;
@@ -22,6 +22,8 @@ static void handle_signal(int signo)
         g_play_status = 0;
         g_voice_status = 0;
         g_video_status = 0;
+
+        posture_stop_recognize();
    }
 }
 
@@ -36,50 +38,48 @@ int main(int argc, char **argv)
     signal(SIGTERM, handle_signal);   
 
     /* init gpio */
-    board_gpio_init();
+    // board_gpio_init();
 
     /* load config */
     hxt_load_cfg();
 
     /* init board */
-    board_mpp_init();
+    if (!board_mpp_init())
+    {
+        utils_print("board mpp init error...\n");
+        goto EXIT;
+    }
 
-    g_video_status = 1;
-    video_tid = start_sample_video();
+
     g_play_status = 1;
     play_tid = start_play_mp3();
     g_voice_status = 1;
     voice_tid = start_sample_voice();
+    g_video_status = 1;
+    video_tid = start_sample_video();
 
     usleep(500);
     utils_send_local_voice(VOICE_DEVICE_OPEN);
     usleep(500);
 
+    start_posture_recognize();
+
 
     // /* QRcode parse */
     // // wifi_exist = (hxt_get_wifi_ssid_cfg() != NULL);
-    // while (0)
+    // while (g_video_status)
     // {
-        char* qrcode_info = NULL;
-        utils_print("To scan QRcode....\n");    
-        if (!get_qrcode_yuv_buffer(&qrcode_info))
-        {
-            utils_send_local_voice(VOICE_CONNECT_ERROR);
-        }
-        utils_print("qrcode: [%s]\n", qrcode_info);
-    //     if (!hxt_query_wifi_info(qrcode_info))
+    //     char* qrcode_info = NULL;
+    //     printf("To scan QRcode....\n");    
+    //     if (!get_qrcode_yuv_buffer(&qrcode_info))
     //     {
     //         utils_send_local_voice(VOICE_CONNECT_ERROR);
-    //         sleep(10);
-    //         continue;
     //     }
-    //     if(qrcode_info != NULL)
-    //     {
-    //         free(qrcode_info);　
-    //         qrcode_info = NULL;
-    //     }
-    //     wifi_exist = TRUE;
+    //     printf("qrcode: [%s]\n", qrcode_info);
     // }
+
+
+
     // /* connect to wifi */
     // utils_link_wifi(hxt_get_wifi_ssid_cfg(), hxt_get_wifi_pwd_cfg());
 
@@ -110,15 +110,18 @@ int main(int argc, char **argv)
     //     waitpid(iflyos_pid, &st2, 0);
     // }
 
-    // pthread_join(play_tid, NULL);
-    // pthread_join(voice_tid, NULL);
+    pthread_join(play_tid, NULL);
+    pthread_join(voice_tid, NULL);
     pthread_join(video_tid, NULL);
 
-    utils_print("~~~~EXIT~~~~\n");
-
-    hxt_unload_cfg();
     board_mpp_deinit();
-    board_gpio_uninit();
+
+
+EXIT:
+    utils_print("~~~~EXIT~~~~\n");
+    hxt_unload_cfg();
+
+    // board_gpio_uninit();
 
     return 0;
 }

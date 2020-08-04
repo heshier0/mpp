@@ -16,10 +16,13 @@
 #include "acodec.h"
 #include "audio_mp3_adp.h"
 
+#include "databuffer.h"
 #include "common.h"
 #include "utils.h"
 
 #define BYTE_ALIGN(a,b)    ((( a ) / b) * b)
+
+DATABUFFER g_video_buffer;
 
 WDR_MODE_E enWDRMode = WDR_MODE_NONE;
 DYNAMIC_RANGE_E enDynamicRange = DYNAMIC_RANGE_SDR8;
@@ -58,8 +61,7 @@ static sem_t sem_snap[2];
 
 static SAMPLE_VI_CONFIG_S g_vi_configs;
 
-
-static void sample_yuv_8bit_dump(VIDEO_FRAME_S* pVBuf, void **pOutBuf)
+void sample_yuv_8bit_dump(VIDEO_FRAME_S* pVBuf, void **pOutBuf)
 {
     unsigned int w, h;
     char* pVBufVirt_Y;
@@ -89,7 +91,7 @@ static void sample_yuv_8bit_dump(VIDEO_FRAME_S* pVBuf, void **pOutBuf)
     pVBufVirt_Y = pUserPageAddr[0];
     pVBufVirt_C = pVBufVirt_Y + (pVBuf->u32Stride[0]) * (pVBuf->u32Height);
 
-    utils_print("saving......Y......\n");
+    // utils_print("saving......Y......\n");
     for (h = 0; h < pVBuf->u32Height; h++)
     {
         pMemContent = pVBufVirt_Y + h * pVBuf->u32Stride[0];
@@ -98,7 +100,7 @@ static void sample_yuv_8bit_dump(VIDEO_FRAME_S* pVBuf, void **pOutBuf)
 
     if (PIXEL_FORMAT_YUV_400 != enPixelFormat)
     {
-        utils_print("saving......U......\n");
+        // utils_print("saving......U......\n");
         for (h = 0; h < u32UvHeight; h++)
         {
             pMemContent = pVBufVirt_C + h * pVBuf->u32Stride[1];
@@ -113,7 +115,7 @@ static void sample_yuv_8bit_dump(VIDEO_FRAME_S* pVBuf, void **pOutBuf)
                         pVBuf->u32Width / 2);
         }
 
-        utils_print("saving......V......\n");
+        // utils_print("saving......V......\n");
         for (h = 0; h < u32UvHeight; h++)
         {
             pMemContent = pVBufVirt_C + h * pVBuf->u32Stride[1];
@@ -128,12 +130,11 @@ static void sample_yuv_8bit_dump(VIDEO_FRAME_S* pVBuf, void **pOutBuf)
                         pVBuf->u32Width / 2);
         }
     }
-    utils_print("done %d!\n", pVBuf->u32TimeRef);   
+    // utils_print("done %d!\n", pVBuf->u32TimeRef);   
 
     HI_MPI_SYS_Munmap(pUserPageAddr[0], u32Size);
     pUserPageAddr[0] = HI_NULL;
 }
-
 
 static void stop_vi()
 {
@@ -712,7 +713,7 @@ static void board_get_venc_stream()
                     if (i == 0 || i == 1)
                     {	
                     	//264保存成mp4
-                        //HI_PDT_WriteVideo(i,  &venc_stream);
+                        // HI_PDT_WriteVideo(i,  &venc_stream);
                     }     
                     else if (i == 2 || i == 3)
                     {
@@ -768,12 +769,12 @@ static void board_store_yuv_from_vpss_chn()
     fd_set write_fds;
     int ret = -1;
     char *yuv_buf = NULL;
+
     int fd = utils_open_fifo(VIDEO_FIFO, O_WRONLY);
     if (-1 == fd)
     {
         return;
     }
-    utils_print("To get chn Frame from vpss\n");
     
     while(g_video_status)
     {
@@ -783,22 +784,16 @@ static void board_store_yuv_from_vpss_chn()
 		    SAMPLE_PRT("vpss get frame failed, ret:0x%08x\n", ret_val);
 		    continue;
 		}
-#if 0
-        ret_val = HI_MPI_VPSS_GetChnFrame(vpss_grp[1], 2, &gray_frame, time_out);
-		if (HI_SUCCESS != ret_val)
-		{
-		    SAMPLE_PRT("vpss get frame failed, ret:0x%08x\n", ret_val);
-		    break;
-		}
-#endif 
+
         /* to change to yuv picture */
         sample_yuv_8bit_dump(&color_frame.stVFrame, (void *)&yuv_buf);
         /* to write into fifo */
         if(yuv_buf == NULL)
         {
-                continue;
+            utils_print("change to yuv data failed\n");
+            goto RELEASE;
         }
-
+    
         FD_ZERO(&write_fds);
         FD_SET(fd, &write_fds);
 
@@ -820,7 +815,7 @@ static void board_store_yuv_from_vpss_chn()
             int write_count = write(fd, yuv_buf, color_frame.stVFrame.u32Height * color_frame.stVFrame.u32Width*3/2);
             utils_print("write %d bytes yuv data in fifo\n", write_count);
         }
-
+RELEASE:
         ret_val = HI_MPI_VPSS_ReleaseChnFrame(vpss_grp[0], 2, &color_frame);
         if ( HI_SUCCESS != ret_val )
         {
@@ -828,14 +823,6 @@ static void board_store_yuv_from_vpss_chn()
             continue;
         }  
 
-    #if 0    
-        ret_val = HI_MPI_VPSS_ReleaseChnFrame(vpss_grp[1], 2, &gray_frame);
-        if ( HI_SUCCESS != ret_val )
-        {
-            SAMPLE_PRT("vpss release frame failed, ret:0x%08x\n", ret_val);
-            break;
-        }  
-    #endif
     }
 
 }
@@ -982,7 +969,7 @@ static void* sample_pcm_cb(void *data)
             }
 
             int write_count = write(fd, stStream.pStream, stStream.u32Len);
-            utils_print("write %d bytes into fifo\n", write_count);
+            //utils_print("write %d bytes into fifo\n", write_count);
 
             s32Ret = HI_MPI_AENC_ReleaseStream(AeChn, &stStream);
             if (HI_SUCCESS != s32Ret)
@@ -1086,7 +1073,8 @@ static void* play_mp3_cb(void* data)
     }
 
     //设置音量
-    s32Ret = HI_MPI_AO_SetVolume(AoDev, -51);
+    //s32Ret = HI_MPI_AO_SetVolume(AoDev, -51);
+    s32Ret = HI_MPI_AO_SetVolume(AoDev, -20);
     if (s32Ret != HI_SUCCESS)
     {
         utils_print("ret=%d\n",s32Ret);
@@ -1183,14 +1171,14 @@ static void* sample_video_cb(void* data)
         return NULL;
     }
 
-    // init_result = start_venc();
-    // if(!init_result)
-    // {
-    //     utils_print("start venc failed\n");
-    //     stop_all_vpss();
-    //     stop_vi();
-    //     return NULL;
-    // }
+    init_result = start_venc();
+    if(!init_result)
+    {
+        utils_print("start venc failed\n");
+        stop_all_vpss();
+        stop_vi();
+        return NULL;
+    }
     
     init_result = bind_vi_vpss();
     if(!init_result)
@@ -1202,16 +1190,16 @@ static void* sample_video_cb(void* data)
         return NULL;
     }
 
-    // init_result = bind_vpss_venc();
-    // if(!init_result)
-    // {
-    //     utils_print("bind vi and vpss failed\n");
-    //     unbind_vi_vpss();
-    //     stop_all_venc();
-    //     stop_all_vpss();
-    //     stop_vi();
-    //     return NULL;
-    // }
+    init_result = bind_vpss_venc();
+    if(!init_result)
+    {
+        utils_print("bind vi and vpss failed\n");
+        stop_all_venc();
+        unbind_vi_vpss();
+        stop_all_vpss();
+        stop_vi();
+        return NULL;
+    }
 
     init_result = rotate_picture();
     if(!init_result)
@@ -1221,44 +1209,49 @@ static void* sample_video_cb(void* data)
     }
 
     // board_store_yuv_from_vpss_chn();
-    
-    while (g_video_status)
-    {
-        sleep(5)
-    }
+    board_get_venc_stream();
 
-    // board_get_venc_stream();
+    // while (g_video_status)
+    // {
+    //     sleep(5)
+    // }
+
+
   
 EXIT:
-    // unbind_vpss_venc();
+    unbind_vpss_venc();
+    stop_all_venc();
     unbind_vi_vpss();
-    // stop_all_venc();
     stop_all_vpss();
     stop_vi();
     utils_print("video sample thread exit...\n");
     return NULL;
 }
 
-void board_mpp_init()
+BOOL board_mpp_init()
 {
+    BOOL ret = TRUE;
     HI_S32 ret_val = HI_SUCCESS;
     int blk_size = 0;
     PIC_SIZE_E pic_size_type;
     SIZE_S pic_size;
+
+    /* create data buffer */
+    create_buffer(&g_video_buffer, 10*1024*1024);
 
     /* get picture size */
     ret_val = SAMPLE_COMM_VI_GetSizeBySensor(SENSOR0_TYPE, &pic_size_type);
     if (HI_SUCCESS != ret_val)
     {
         utils_print("get picture size by sensor failed!\n");
-        return ret_val;
+        return FALSE;
     }
 
     ret_val = SAMPLE_COMM_SYS_GetPicSize(pic_size_type, &pic_size);
     if (HI_SUCCESS != ret_val)
     {
         utils_print("get picture size failed!\n");
-        return ret_val;
+        return FALSE;
     }
 
     /* init vb */
@@ -1278,14 +1271,45 @@ void board_mpp_init()
     if (HI_SUCCESS != ret_val)
     {
         utils_print("system init failed with %d!\n", ret_val);
-        return;
-    }       
+        return FALSE;
+    }
+
+    return ret;       
 }
 
 void board_mpp_deinit()
 {
     /* exit system */
     SAMPLE_COMM_SYS_Exit();
+
+    /* destroy data buffer */
+    destroy_buffer(&g_video_buffer);
+}
+
+void board_get_yuv_from_vpss_chn(char **yuv_buf)
+{
+    HI_S32 ret_val;
+    VPSS_GRP vpss_grp[2] = {0, 1};
+    HI_S32 time_out = 2000;
+    VPSS_CHN vpss_chn = 2;
+    VIDEO_FRAME_INFO_S  video_frame;
+
+    ret_val = HI_MPI_VPSS_GetChnFrame(vpss_grp[0], 2, &video_frame, time_out);
+    if (HI_SUCCESS != ret_val)
+    {
+        SAMPLE_PRT("vpss get frame failed, ret:0x%08x\n", ret_val);
+        return;
+    }
+
+    /* to change to yuv picture */
+    sample_yuv_8bit_dump(&video_frame.stVFrame, (void *)yuv_buf);
+
+    ret_val = HI_MPI_VPSS_ReleaseChnFrame(vpss_grp[0], 2, &video_frame);
+    if ( HI_SUCCESS != ret_val )
+    {
+        SAMPLE_PRT("vpss release frame failed, ret:0x%08x\n", ret_val);
+        return;
+    }  
 }
 
 pthread_t start_sample_video()
