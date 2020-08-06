@@ -23,7 +23,7 @@ static void handle_signal(int signo)
         g_voice_status = 0;
         g_video_status = 0;
 
-        posture_stop_recognize();
+        stop_video_recording();
    }
 }
 
@@ -63,7 +63,6 @@ int main(int argc, char **argv)
     usleep(500);
 
     start_posture_recognize();
-
 
     // /* QRcode parse */
     // // wifi_exist = (hxt_get_wifi_ssid_cfg() != NULL);

@@ -165,9 +165,9 @@ void hxt_init_cfg(void* data)
 }
 
 
-char* hxt_get_posture_coco_model_path()
+char* hxt_get_posture_detect_model_path()
 {
-    return utils_get_cfg_str_value(g_cfg_root, "model", "coco_model");
+    return utils_get_cfg_str_value(g_cfg_root, "model", "detect_model");
 }
 
 char* hxt_get_posture_class_model_path()

@@ -3,10 +3,9 @@
 #include <libavformat/avformat.h>
 
 #include "sample_comm.h"
-
+#include "utils.h"
 //#define USING_PTS
 #define USING_SEQ
-
 
 #define VENC_CHN_NUM 2
 #define STREAM_FRAME_RATE 25
@@ -39,11 +38,11 @@ static ffmpegCtx_t * GetVencChnCtx(int VeChn)
 
 static int HI_PDT_Add_Stream(VENC_CHN VeChn)
 {
-    AVOutputFormat *pOutFmt = NULL;	//用于获取AVFormatContext->Format
+    AVOutputFormat *pOutFmt = NULL;			//用于获取AVFormatContext->Format
     AVCodecParameters *vAVCodecPar=NULL;	//新替代参数AVStream->CodecPar
 
-    AVStream *vAVStream = NULL;	//用于指向新建的视频流
-	AVCodec *vcodec = NULL;	    //用于指向视频编码器
+    AVStream *vAVStream = NULL;				//用于指向新建的视频流
+	AVCodec *vcodec = NULL;	    			//用于指向视频编码器
 
 	ffmpegCtx_t * fc = GetVencChnCtx(VeChn);
 	
@@ -93,7 +92,7 @@ static void generate_file_name(VENC_CHN VeChn)
 	
 	tm = localtime(&now);
 	
-	snprintf(fc->filename, 128, "ch%02d-%04d%02d%02d-%02d%02d%02d.mp4", VeChn,
+	snprintf(fc->filename, 128, "/user/ch%02d-%04d%02d%02d-%02d%02d%02d.mp4", VeChn,
 	         tm->tm_year + 1900,
 	         tm->tm_mon + 1,
 	         tm->tm_mday,
@@ -253,13 +252,13 @@ void HI_PDT_CloseMp4(VENC_CHN VeChn)
 
 HI_S32 HI_PDT_WriteVideo(VENC_CHN VeChn, VENC_STREAM_S *pstStream)
 {
-	HI_U32 i=0;	//
+	HI_U32 i=0;	
 	HI_U8* pPackVirtAddr = NULL;	//码流首地址
-	HI_U32 u32PackLen = 0;	//码流长度
+	HI_U32 u32PackLen = 0;			//码流长度
     int ret = 0;
-    AVStream *Vpst = NULL; //视频流指针
-    AVPacket pkt;	//音视频包结构体，这个包不是海思的包，填充之后，用于最终写入数据
-    uint8_t sps_buf[32];	//
+    AVStream *Vpst = NULL; 			//视频流指针
+    AVPacket pkt;					//音视频包结构体，这个包不是海思的包，填充之后，用于最终写入数据
+    uint8_t sps_buf[32];			//
     uint8_t pps_buf[32];
     uint8_t sps_pps_buf[64];	
     HI_U32 pps_len=0;
@@ -268,24 +267,24 @@ HI_S32 HI_PDT_WriteVideo(VENC_CHN VeChn, VENC_STREAM_S *pstStream)
     
 	if(NULL == pstStream)	//裸码流有效判断
 	{
-		return HI_SUCCESS;
+		return HI_FAILURE;
 	}
-	//u32PackCount是海思中记录此码流结构体中码流包数量，一般含I帧的是4个包，P帧1个
+
+	// frame I : 4 packs; frame P: 1 packs
     for (i = 0 ; i < pstStream->u32PackCount; i++)	
     {
     	//从海思码流包中获取数据地址，长度
         pPackVirtAddr = pstStream->pstPack[i].pu8Addr + pstStream->pstPack[i].u32Offset;	
-        u32PackLen = pstStream->pstPack[i].u32Len -pstStream->pstPack[i].u32Offset;	
+        u32PackLen = pstStream->pstPack[i].u32Len - pstStream->pstPack[i].u32Offset;	
 		av_init_packet(&pkt);	//初始化AVpack包，
-		pkt.flags=AV_PKT_FLAG_KEY;	//默认是关键帧，关不关键好像都没问题
+		pkt.flags=AV_PKT_FLAG_KEY;	//默认是关键帧
 		switch(pstStream->pstPack[i].DataType.enH264EType)
 		{
 			case H264E_NALU_SPS:	//如果这个包是SPS
 				pkt.flags =   0;	//不是关键帧
 				if(fc->b_First_IDR_Find == 2)	//如果不是第一个SPS帧
 				{
-					continue;	//不处理，丢弃
-					//我只要新建文件之后的第一个SPS PPS信息，后面都是一样的，只要第一个即可
+					continue; //discard
 				}
 				else //如果是第一个SPS帧
 				{
@@ -302,8 +301,7 @@ HI_S32 HI_PDT_WriteVideo(VENC_CHN VeChn, VENC_STREAM_S *pstStream)
 					}
 					fc->b_First_IDR_Find++;
 				}
-				continue; //继续
-				//break; 
+				continue;
 			case H264E_NALU_PPS:
 				pkt.flags = 0;	//不是关键帧
 				if(fc->b_First_IDR_Find == 2)	//如果不是第一个PPS帧
@@ -338,52 +336,44 @@ HI_S32 HI_PDT_WriteVideo(VENC_CHN VeChn, VENC_STREAM_S *pstStream)
 			default:
 				break;
 		}
-		
 		if(fc->vi < 0)	//流索引号，如果g_OutFmt_Ctx里面还没有新建视频流，也就是说还没收到I帧
 		{
 			printf("vi less than 0 \n");
 			return HI_SUCCESS;
 		}
-
 		if(fc->Vfirst==0)	//如果是文件的第一帧视频
 		{
 			fc->Vfirst=1;	
-			#ifdef USING_SEQ	//使用帧序号计算PTS
-			    fc->Video_PTS = pstStream->u32Seq; //记录初始序号
+			#ifdef USING_SEQ						//使用帧序号计算PTS
+			    fc->Video_PTS = pstStream->u32Seq; 	//记录初始序号
 			#endif
-			#ifdef USING_PTS	//直接使用海思的PTS
+			#ifdef USING_PTS						//直接使用海思的PTS
 			    fc->Video_PTS = pstStream->pstPack[i].u64PTS;	//记录开始时间戳
 			#endif
 		}
-		
 		Vpst = fc->g_OutFmt_Ctx->streams[fc->vi];	//根据索引号获取视频流地址
-	    pkt.stream_index = Vpst->index;	//视频流的索引号 赋给 包里面的流索引号，表示这个包属于视频流
+	    pkt.stream_index = Vpst->index;				//视频流的索引号 赋给 包里面的流索引号，表示这个包属于视频流
 		
 		//以下，时间基转换，PTS很重要，涉及音视频同步问题
 		#if 0	//原博主的，可以用
 			pkt.pts = av_rescale_q_rnd((fc->VptsInc++), Vpst->codec->time_base,Vpst->time_base,(enum AVRounding)(AV_ROUND_NEAR_INF|AV_ROUND_PASS_MINMAX));
 			pkt.dts = av_rescale_q_rnd(pkt.pts, Vpst->time_base,Vpst->time_base,(enum AVRounding)(AV_ROUND_NEAR_INF|AV_ROUND_PASS_MINMAX));
 		#endif
-		#if 1	//我用的
+		#if 1	
 			#ifdef USING_SEQ	
-				//跟原博主差不多，我怕中间丢帧，导致不同步，所以用序号来计算
 				pkt.pts = av_rescale_q_rnd(pstStream->u32Seq - fc->Video_PTS, (AVRational){1, STREAM_FRAME_RATE},Vpst->time_base,(enum AVRounding)(AV_ROUND_NEAR_INF|AV_ROUND_PASS_MINMAX));
 				pkt.dts = pkt.pts;	//只有I、P帧，相等就行了
 			#endif
 			#ifdef USING_PTS	
-				//海思的PTS是us单位，所以将真实世界的1000000us转成90000Hz频率的时间
 				pkt.pts = pkt.dts =(int64_t)((pstStream->pstPack[i].u64PTS - fc->Video_PTS) *0.09+0.5);
 			#endif
 		#endif
-		//一秒25帧，一帧40ms，好像写0也行，ffmpeg内部处理了？
-		//按理说，新建流的时候，给了codepar帧率参数，ffmpeg是可以计算的
 		pkt.duration = 40;	
 		pkt.duration = av_rescale_q(pkt.duration, Vpst->time_base, Vpst->time_base);
-		pkt.pos = -1;	//默认
-		
-		//最重要的数据要给AVpack包
+		pkt.pos = -1;			
 		pkt.data = pPackVirtAddr ;	//接受视频数据NAUL
-   		pkt.size = u32PackLen;	//视频数据长度
+   		pkt.size = u32PackLen;		//视频数据长度
+		
 		//把AVpack包写入mp4
 		ret = av_interleaved_write_frame(fc->g_OutFmt_Ctx, &pkt);
 		if (ret < 0)
@@ -418,4 +408,10 @@ int HI_PDT_Exit(void)
 	}
 		
 	return 0;
+}
+
+
+void start_save_bad_posture_video()
+{
+	utils_print("BAD POSTURE WARNING !!!\n");
 }
