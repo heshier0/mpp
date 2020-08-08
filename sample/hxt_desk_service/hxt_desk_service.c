@@ -27,6 +27,7 @@ static void handle_signal(int signo)
    }
 }
 
+
 int main(int argc, char **argv)
 {
     int st1, st2, st3;
@@ -34,8 +35,10 @@ int main(int argc, char **argv)
     BOOL wifi_exist = FALSE;
     utils_print("HXT V1.0.0\n");
 
+#ifdef DEBUG
     signal(SIGINT, handle_signal);
     signal(SIGTERM, handle_signal);   
+#endif
 
     /* init gpio */
     // board_gpio_init();
@@ -49,7 +52,6 @@ int main(int argc, char **argv)
         utils_print("board mpp init error...\n");
         goto EXIT;
     }
-
 
     g_play_status = 1;
     play_tid = start_play_mp3();
@@ -83,31 +85,33 @@ int main(int argc, char **argv)
     // utils_link_wifi(hxt_get_wifi_ssid_cfg(), hxt_get_wifi_pwd_cfg());
 
     /* connect to hxt server */
-    // if (hxt_get_token_cfg() == NULL)
-    // {
-    //     utils_print("send request to get token\n");
-    //     server_started = hxt_get_token_request();
-    // }
+    if (hxt_get_token_cfg() == NULL)
+    {
+        utils_print("send request to get token\n");
+        server_started = hxt_get_token_request();
+    }
     
-    // if (server_started)
-    // {
-    //     pid_t hxt_pid = fork();
-    //     if (hxt_pid == 0)
-    //     {
-    //         hxt_websocket_start();
-    //         return 0;
-    //     }
+    hxt_report_info_request(1, 1);
 
-    //     pid_t iflyos_pid = fork();
-    //     if (iflyos_pid == 0)
-    //     {
-    //         iflyos_websocket_start();
-    //         return 0;
-    //     }
+    if (server_started)
+    {
+        pid_t hxt_pid = fork();
+        if (hxt_pid == 0)
+        {
+            hxt_websocket_start();
+            return 0;
+        }
 
-    //     waitpid(hxt_pid, &st1, 0);
-    //     waitpid(iflyos_pid, &st2, 0);
-    // }
+        pid_t iflyos_pid = fork();
+        if (iflyos_pid == 0)
+        {
+            iflyos_websocket_start();
+            return 0;
+        }
+
+        waitpid(hxt_pid, &st1, 0);
+        waitpid(iflyos_pid, &st2, 0);
+    }
 
     pthread_join(play_tid, NULL);
     pthread_join(voice_tid, NULL);

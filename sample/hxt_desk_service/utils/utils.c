@@ -70,6 +70,21 @@ static BOOL check_system_cmd_result(const pid_t status)
     return FALSE;
 }
 
+char *get_current_time()
+{
+    static char s[20] = {0};
+    memset(s, 0, 20);
+    time_t t;
+    struct tm* ltime;
+    
+    time(&t);
+    ltime = localtime(&t);
+    strftime(s, 20, "%Y-%m-%d %H:%M:%S", ltime);
+    s[19] = '\0';
+
+    return s;
+}
+
 cJSON* utils_load_cfg(const char* cfg)
 {
     FILE *file = NULL;
@@ -500,7 +515,7 @@ BOOL utils_post_json_data(const char *url, const char* header_content, const cha
         return FALSE;
     }
 
-    char CMD_POST_JSON[512] = {0};
+    char CMD_POST_JSON[1024] = {0};
     char* extra_header = (char *)header_content;
     if( NULL == extra_header)
     {
@@ -513,6 +528,8 @@ BOOL utils_post_json_data(const char *url, const char* header_content, const cha
     sprintf(CMD_POST_JSON, "curl --insecure -s -X POST -H \"Content-Type:application/json;charset=UTF-8\" -H \"%s\" -d \'%s\' %s", 
                                 header_content, json_data, url);
 #endif // DEBUG
+    utils_print("%s\n", CMD_POST_JSON);
+
     FILE *fp = NULL;
     fp = popen(CMD_POST_JSON, "r");
     if(NULL != fp)
@@ -522,6 +539,7 @@ BOOL utils_post_json_data(const char *url, const char* header_content, const cha
             pclose(fp);
             return FALSE;
         }
+        utils_print("%s\n", out);
         out[out_length-1] = '\0';
     }
     pclose(fp);

@@ -36,6 +36,8 @@ typedef enum
     FALSE  = 0
 }BOOL;
 
+char *get_current_time();
+
 void init_plugins();
 void deinit_plugins();
 

@@ -17,20 +17,30 @@
 #define BAD_POSTURE             1
 #define AWAY_STATUS             2
 
-#define DEPART_ALARM_TIMEVAL       (3*60)          // 
-#define ALARM_TIMEVAL              (3*60)          //5 minutes   
+#define DEPART_ALARM_TIMEVAL       (60) //(3*60)         
+#define ALARM_TIMEVAL              (30)//(3*60)          
 #define BAD_ALARM_TIMEVAL           (10)
-#define CORRECT_JUDGE_TIMEVAL       (5)             //5 senconds
+#define CORRECT_JUDGE_TIMEVAL       (5)             
+#define MIN_DURATION_TIME         (5)
 
 typedef struct check_status_t
 {
-    time_t _time;
-    int _result;
+    time_t _start_time;
+    time_t _last_time;
+    time_t _last_alarm_time;
+    int _start_posture;
+    int _last_posture;
 };
 
 static void* g_recog_handle = NULL;
 static pthread_t g_proc_yuv_tid = NULL;
 static BOOL g_keep_processing = TRUE;
+
+static BOOL g_is_recording = FALSE;
+static BOOL g_is_inited = FALSE;
+static BOOL g_change_to_correct = FALSE;
+static BOOL g_first_alarm = TRUE;
+static BOOL g_first_away = TRUE;
 
 static void play_random_warn_voice()
 {
@@ -57,6 +67,195 @@ static void take_rest(int time_ms)
     select(0, NULL, NULL, NULL, &timeout);
 }
 
+static BOOL begin_recording()
+{
+    if(!g_is_recording)
+    {
+        start_video_recording();
+        g_is_recording = TRUE;
+        utils_print("START To record.......\n");
+    }
+    return TRUE;
+}
+
+static void delete_recorded()
+{
+    if(g_is_recording)
+    {
+        utils_print("Deleting video.....\n");
+        delete_posture_video();
+        g_is_recording = FALSE;
+    }
+}
+
+static void stop_record()
+{
+    if(g_is_recording)
+    {
+        stop_video_recording();
+        g_is_recording = FALSE;
+    }
+
+}
+
+static void mark_first_away_alarm()
+{
+    if(!g_first_away)
+    {
+        g_first_away = TRUE;
+    }
+}
+
+static BOOL init_check_status(struct check_status_t *check_status, int check_result)
+{
+    if(!g_is_inited)
+    {
+        check_status->_start_posture = check_status->_last_posture = check_result;
+        check_status->_start_time = check_status->_last_time = time(NULL);
+
+        g_is_inited = TRUE;
+
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+/* confirm if change to normal posture */
+static BOOL check_posture_changed(struct check_status_t *check_status, int check_result)
+{
+    time_t now = time(NULL); 
+
+    if (check_status->_start_posture == check_result)
+    {
+        check_status->_last_posture = check_result;
+        check_status->_last_time = now;
+
+        if (check_status->_start_posture != BAD_POSTURE)
+        {
+            delete_recorded();
+        }
+
+        return FALSE;
+    }
+
+    if (check_status->_last_posture != check_result)
+    {
+        check_status->_last_posture = check_result;
+        check_status->_last_time = now;
+    }
+    else
+    {
+        int interval = now - check_status->_last_time;
+        if (interval >= MIN_DURATION_TIME)
+        {
+            if(check_status->_last_posture != BAD_POSTURE)
+            {
+                delete_recorded();
+            }
+            else
+            {
+                begin_recording();
+            }
+            
+            if (check_status->_start_posture == BAD_POSTURE)
+            {
+                if (check_result == NORMAL_POSTURE)
+                {
+                     play_random_praise_voice();
+                }
+            }
+
+            if (check_status->_start_posture == AWAY_STATUS)
+            {
+                if(!g_first_away)
+                {
+                    utils_send_local_voice(VOICE_CHILD_REAPPEAR);
+                }
+                mark_first_away_alarm();
+                
+            }
+
+            check_status->_start_posture = check_result;
+            check_status->_start_time = now;
+            check_status->_last_posture = check_result;
+            check_status->_last_time = now;
+
+            return TRUE;
+        }    
+    }      
+
+    return FALSE;
+}
+
+static BOOL check_posture_alarm(struct check_status_t *check_status, int check_result)
+{
+    time_t now = time(NULL);
+    int interval = now - check_status->_start_time;
+    int start_posture = check_status->_start_posture;
+    if (start_posture != check_result)
+    {
+        return FALSE;
+    }
+
+    switch (check_result)
+    {
+    case NORMAL_POSTURE:
+        break;
+    case BAD_POSTURE:
+        if (interval >= BAD_ALARM_TIMEVAL)
+        {
+            if(g_first_alarm)
+            {
+                play_random_warn_voice();
+                utils_print("BAD POSTURE ALARM !!!\n");
+                check_status->_last_alarm_time = now;
+                g_first_alarm = FALSE;
+            }
+            else
+            {
+                if ((now - check_status->_last_alarm_time) >= ALARM_TIMEVAL)
+                {
+                    play_random_warn_voice();
+                    utils_print("BAD POSTURE ALARM2222 !!!\n");
+                    check_status->_last_alarm_time = now;
+                }
+            }
+            check_status->_start_posture = check_result;
+            check_status->_start_time = now;
+            stop_record();
+        }                   
+        break;
+    case AWAY_STATUS:
+        if(interval >= DEPART_ALARM_TIMEVAL)
+        {
+            if (g_first_away)
+            {
+                utils_send_local_voice(VOICE_CHILD_AWAY);
+                utils_print("AWAY ALARM !!!\n");
+                check_status->_start_time = now;
+                g_first_away = FALSE;
+            }
+            else
+            {
+                utils_send_local_voice(VOICE_CAMERA_SLEEP);
+                utils_print("AWAY ALARM22222 !!!\n");
+                /* exit recog thread */
+                g_keep_processing = FALSE;
+            }
+            delete_recorded();
+
+            /* send message to hxt server */
+            
+        }
+        break;    
+    default:
+        break;
+    }
+
+    return TRUE;
+}
+
 static void* thread_proc_yuv_data_cb(void *param)
 {
     int one_check_result = 0;
@@ -64,6 +263,7 @@ static void* thread_proc_yuv_data_cb(void *param)
     BOOL change_to_correct = FALSE;
     BOOL first_away_alarm = TRUE;
     BOOL first_bad_alarm = TRUE;
+    BOOL recording = FALSE;
 
     struct check_status_t check_status;
     memset(&check_status, 0, sizeof(struct check_status_t));
@@ -89,96 +289,21 @@ static void* thread_proc_yuv_data_cb(void *param)
         /* 1 : bad posture */
         /* 2 : away */
         one_check_result = run_sit_posture(g_recog_handle, yuv_buf, width, height, 3);
-        utils_print("one_check_reuslt = %d\n", one_check_result);
-        if(!inited_status)
+        utils_print("%s -----> %d\n", get_current_time(), one_check_result);
+        if (init_check_status(&check_status, one_check_result))
         {
-            check_status._result = one_check_result;
-            check_status._time = time(NULL);
-
-            inited_status = TRUE;
+            continue;
         }
 
-        if (one_check_result == BAD_POSTURE)
+        // BOOL recording = begin_recording(one_check_result);
+        check_posture_changed(&check_status, one_check_result);
+        if(check_posture_changed(&check_status, one_check_result))
         {
-            /* start record video */
-
+            utils_print("POSTURE CHANGED\n");
+            continue;
         }
 
-        if(one_check_result != check_status._result)
-        {
-            if (check_status._result == BAD_POSTURE)
-            {
-                change_to_correct = TRUE;
-            }
-            else 
-            {
-                change_to_correct = FALSE;
-            }
-            check_status._result = one_check_result;
-            check_status._time = time(NULL);
-        }
-        else
-        {
-            time_t now = time(NULL);
-            int interval = now - check_status._time;
-            utils_print("%ld - %ld = %ld\n", now, check_status._time, interval);
-            if( interval >= CORRECT_JUDGE_TIMEVAL)
-            {
-                switch (one_check_result)
-                {
-                case NORMAL_POSTURE:
-                    if(change_to_correct)
-                    {                    
-                        if(interval >= CORRECT_JUDGE_TIMEVAL)
-                        {
-                            play_random_praise_voice();
-                            check_status._time = now;
-                        }
-                    }
-                    break;
-                case BAD_POSTURE:
-                    if (interval >= BAD_ALARM_TIMEVAL)
-                    {
-                        if(first_bad_alarm)
-                        {
-                            play_random_warn_voice();
-                            check_status._time = now;
-                            first_bad_alarm = FALSE;
-                        }
-                        else
-                        {
-                            if (interval >= ALARM_TIMEVAL)
-                            {
-                                play_random_warn_voice();
-                                check_status._time = now;
-                            }
-                        }
-                        /* save video */
-                        
-                    }                   
-                    break;
-                case AWAY_STATUS:
-                    if(interval >= DEPART_ALARM_TIMEVAL)
-                    {
-                        if (first_away_alarm)
-                        {
-                            utils_send_local_voice(VOICE_CHILD_AWAY);
-                            check_status._time = now;
-                            first_away_alarm = FALSE;
-                        }
-                        else
-                        {
-                            utils_send_local_voice(VOICE_CAMERA_SLEEP);
-                            /* exit recog thread */
-                            g_keep_processing = FALSE;
-                        }
-                    }
-                    break;    
-                default:
-                    break;
-                }
-            }
-        }        
+        check_posture_alarm(&check_status, one_check_result);
 
         if (yuv_buf != NULL)
         {

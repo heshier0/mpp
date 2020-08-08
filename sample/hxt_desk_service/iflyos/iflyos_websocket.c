@@ -27,21 +27,6 @@ static BOOL g_stop_capture = FALSE;
 static pthread_t read_pcm_tid;
 static pthread_t send_pcm_tid;
 
-static char *get_cur_time()
-{
-    static char s[20] = {0};
-    memset(s, 0, 20);
-    time_t t;
-    struct tm* ltime;
-    
-    time(&t);
-    ltime = localtime(&t);
-    strftime(s, 20, "%Y-%m-%d %H:%M:%S", ltime);
-    s[19] = '\0';
-
-    return s;
-}
-
 static void thread_read_pcm_cb(void *data)
 {
     char pcm_buf[PCM_LENGTH] = {0};
@@ -155,7 +140,7 @@ static void uwsc_onmessage(struct uwsc_client *cl,
         }
         else
         {
-            printf("%s: [%.*s]\n", get_cur_time(), (int)len, (char *)data);
+            printf("%s: [%.*s]\n", get_current_time(), (int)len, (char *)data);
         }
         
         free(name);

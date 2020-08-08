@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <time.h>
+#include <unistd.h>
+
 #include <libavformat/avformat.h>
 
 #include "sample_comm.h"
@@ -7,7 +9,7 @@
 //#define USING_PTS
 #define USING_SEQ
 
-#define VENC_CHN_NUM 2
+#define VENC_CHN_NUM 1
 #define STREAM_FRAME_RATE 25
 
 typedef struct
@@ -92,14 +94,13 @@ static void generate_file_name(VENC_CHN VeChn)
 	
 	tm = localtime(&now);
 	
-	snprintf(fc->filename, 128, "/user/ch%02d-%04d%02d%02d-%02d%02d%02d.mp4", VeChn,
-	         tm->tm_year + 1900,
-	         tm->tm_mon + 1,
-	         tm->tm_mday,
-	         tm->tm_hour,
-	         tm->tm_min,
-	         tm->tm_sec);
-	
+	snprintf(fc->filename, 128, "/user/%04d%02d%02d-%02d%02d%02d.mp4",
+								tm->tm_year + 1900,
+								tm->tm_mon + 1,
+								tm->tm_mday,
+								tm->tm_hour,
+								tm->tm_min,
+								tm->tm_sec);	
 }
 
 static HI_S32 HI_ADD_SPS_PPS(VENC_CHN VeChn, uint8_t *buf, uint32_t size)
@@ -248,6 +249,8 @@ void HI_PDT_CloseMp4(VENC_CHN VeChn)
 	fc->Afirst=0;
 	fc->Vfirst=0;
 	fc->b_First_IDR_Find = 0;
+
+	utils_print("SAVE MP4 Successfully\n");
 }
 
 HI_S32 HI_PDT_WriteVideo(VENC_CHN VeChn, VENC_STREAM_S *pstStream)
@@ -410,8 +413,10 @@ int HI_PDT_Exit(void)
 	return 0;
 }
 
-
-void start_save_bad_posture_video()
+void delete_current_mp4_file()
 {
-	utils_print("BAD POSTURE WARNING !!!\n");
+	ffmpegCtx_t * fc = GetVencChnCtx(0);
+	unlink(fc->filename);
+
+	return;
 }

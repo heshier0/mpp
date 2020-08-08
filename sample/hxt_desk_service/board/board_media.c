@@ -63,7 +63,7 @@ static sem_t sem_snap[2];
 
 static SAMPLE_VI_CONFIG_S g_vi_configs;
 
-static BOOL g_start_record = TRUE;
+static BOOL g_start_record = FALSE;
 static BOOL g_start_snap = FALSE;
 
 static void stop_vi()
@@ -202,6 +202,7 @@ static BOOL start_vi()
 static BOOL rotate_picture()
 {
     HI_S32 ret_val = HI_FAILURE;
+    ROTATION_E rotate =  ROTATION_90;  //ROTATION_270;
     // VI_PIPE vi_pipe[4] = {0, 1, 2, 3};
     // VI_CHN vi_chn = 0;
 
@@ -224,28 +225,28 @@ static BOOL rotate_picture()
     VPSS_GRP           vpss_grp[2]        = {0, 1};
     VPSS_CHN           vpss_chn0  = VPSS_CHN1, vpss_chn1 = VPSS_CHN2;
 
-    ret_val = HI_MPI_VPSS_SetChnRotation(vpss_grp[0], vpss_chn0, ROTATION_270);
+    ret_val = HI_MPI_VPSS_SetChnRotation(vpss_grp[0], vpss_chn0, rotate);
     if (HI_SUCCESS != ret_val)
     {
         utils_print("vpss grp0 chn1 rotate failed, s32Ret: 0x%x !\n", ret_val);
         return FALSE;
     }
 
-    ret_val = HI_MPI_VPSS_SetChnRotation(vpss_grp[0], vpss_chn1, ROTATION_270);
+    ret_val = HI_MPI_VPSS_SetChnRotation(vpss_grp[0], vpss_chn1, rotate);
     if (HI_SUCCESS != ret_val)
     {
         utils_print("vpss grp0 chn2 rotate failed, s32Ret: 0x%x !\n", ret_val);
         return FALSE;
     }
     
-    ret_val = HI_MPI_VPSS_SetChnRotation(vpss_grp[1], vpss_chn0, ROTATION_270);
+    ret_val = HI_MPI_VPSS_SetChnRotation(vpss_grp[1], vpss_chn0, rotate);
     if (HI_SUCCESS != ret_val)
     {
         utils_print("vpss grp1 chn1 rotate failed, s32Ret: 0x%x !\n", ret_val);
         return FALSE;
     }
     
-    ret_val = HI_MPI_VPSS_SetChnRotation(vpss_grp[1], vpss_chn1, ROTATION_270);
+    ret_val = HI_MPI_VPSS_SetChnRotation(vpss_grp[1], vpss_chn1, rotate);
     if (HI_SUCCESS != ret_val)
     {
         utils_print("vpss grp1 chn2 rotate failed, s32Ret: 0x%x !\n", ret_val);
@@ -1093,6 +1094,8 @@ BOOL board_mpp_init()
     //     return FALSE;
     // }
 
+    // board_get_stream_from_venc_chn();
+
     return ret;       
 }
 
@@ -1340,19 +1343,12 @@ void board_get_stream_from_venc_chn()
         return;
     }
 
-    // if (max_fd <= venc_fd)
-    // {
-    //     max_fd = venc_fd;
-    // }
-
     ret_val = HI_MPI_VENC_GetStreamBufInfo (venc_chn, &steam_buff_infos);
     if (HI_SUCCESS != ret_val)
     {
         utils_print("HI_MPI_VENC_GetStreamBufInfo failed with %#x!\n", ret_val);
         return;
     }
-
-    HI_PDT_Init();
 
     while (g_video_status)
     {        
@@ -1423,13 +1419,11 @@ void board_get_stream_from_venc_chn()
                     break;
                 }
                 
-                // HI_PDT_WriteVideo(venc_chn,  &venc_stream);  
-                // else if (i == 2 || i == 3)
-                // {
-                //     //jpeg存文件
-                //     SnapSave(i, &venc_stream);
-                //     sem_post(&sem_snap[i - 2]);
-                // }	 
+                /* to save mp4 */
+                if(g_start_record)
+                {   
+                    HI_PDT_WriteVideo(venc_chn,  &venc_stream);  
+                }
 
                 if (HI_SUCCESS != ret_val)
                 {
@@ -1458,10 +1452,7 @@ void board_get_stream_from_venc_chn()
             }    
         }
     }
-    
-    HI_PDT_Exit();
-    utils_print("mp4 save successfully.....\n");
-
+   
     return;
 }
 
@@ -1620,12 +1611,19 @@ pthread_t start_sample_voice()
 
 void start_video_recording()
 {
+    HI_PDT_Init();
     g_start_record = TRUE;
 }
 
 void stop_video_recording()
 {
     g_start_record = FALSE;
+    HI_PDT_Exit();
 }
 
+void delete_posture_video()
+{
+    g_start_record = FALSE;
+    delete_current_mp4_file();
+}
 
