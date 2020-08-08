@@ -64,7 +64,7 @@ int main(int argc, char **argv)
     utils_send_local_voice(VOICE_DEVICE_OPEN);
     usleep(500);
 
-    start_posture_recognize();
+    //start_posture_recognize();
 
     // /* QRcode parse */
     // // wifi_exist = (hxt_get_wifi_ssid_cfg() != NULL);

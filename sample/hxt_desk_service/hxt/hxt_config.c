@@ -235,7 +235,7 @@ int hxt_get_video_width_cfg()
 {
     if(g_video_width == 0)
     {
-        g_video_width = 640;
+        g_video_width = 1920;
     }
 
     return g_video_width;
@@ -245,7 +245,7 @@ int hxt_get_video_height_cfg()
 {
     if(g_video_height == 0)
     {
-        g_video_height = 360; 
+        g_video_height = 1080; 
     }
     return g_video_height;
 }

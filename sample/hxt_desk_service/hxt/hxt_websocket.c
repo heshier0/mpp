@@ -7,6 +7,15 @@
 #include "utils.h"
 #include "hxt_defines.h"
 
+typedef enum 
+{
+    POWER_ON = 1,
+    POWER_OFF,
+    HEARTBEAT
+};
+
+
+
 static void parse_server_config_data(void *data)
 {
     if(NULL == data)
@@ -97,7 +106,7 @@ static void parse_server_config_data(void *data)
     case 14:
         /* stop studying */
     break;
-    case 15：
+    case 15:
         /* disconnect */
     break;
     case 16:
@@ -121,7 +130,37 @@ static void parse_server_config_data(void *data)
     return;
 }
 
-static void hxt_uwsc_onopen(struct uwsc_client *cl)
+static void hxt_send_heartbeat_info(struct uwsc_client *cl)
+{
+    int report_type = 3; 
+    if(NULL == cl)
+    {
+        return;
+    }
+
+    //post json data to server
+    cJSON *root = cJSON_CreateObject();    
+    if (NULL == root)
+    {
+        goto CLEANUP4;
+    }
+    cJSON_AddNumberToObject(root, "reportType", reportType);
+    cJSON_AddNumberToObject(root, "cameraStatus", cameraStatus);
+    
+    char* json_data = cJSON_PrintUnformatted(root);
+    if (NULL == json_data)
+    {
+        goto CLEANUP3;
+    }
+    utils_print("%s\n", json_data);
+}
+
+static void hxt_send_study_info(struct uwsc_client *cl)
+{
+
+}
+
+static void hxt_wsc_onopen(struct uwsc_client *cl)
 {
     utils_print("hxt onopen\n");
 
@@ -129,7 +168,7 @@ static void hxt_uwsc_onopen(struct uwsc_client *cl)
     //end added
 }
 
-static void hxt_uwsc_onmessage(struct uwsc_client *cl,void *data, size_t len, bool binary)
+static void hxt_wsc_onmessage(struct uwsc_client *cl,void *data, size_t len, bool binary)
 {
     utils_print("hxt recv:\n");
 
@@ -143,19 +182,19 @@ static void hxt_uwsc_onmessage(struct uwsc_client *cl,void *data, size_t len, bo
     }
 }
 
-static void hxt_uwsc_onerror(struct uwsc_client *cl, int err, const char *msg)
+static void hxt_wsc_onerror(struct uwsc_client *cl, int err, const char *msg)
 {
     utils_print("hxt onerror:%d: %s\n", err, msg);
     ev_break(cl->loop, EVBREAK_ALL);
 }
 
-static void hxt_uwsc_onclose(struct uwsc_client *cl, int code, const char *reason)
+static void hxt_wsc_onclose(struct uwsc_client *cl, int code, const char *reason)
 {
     utils_print("hxt onclose:%d: %s\n", code, reason);
     ev_break(cl->loop, EVBREAK_ALL);
 }
 
-static void hxt_uwsc_ping(struct uwsc_client *cl)
+static void hxt_wsc_ping(struct uwsc_client *cl)
 {
     
 }
@@ -192,11 +231,11 @@ int hxt_websocket_start()
         
 	utils_print("Hxt start connect...\n");
 
-    cl->onopen = hxt_uwsc_onopen;
-    cl->onmessage = hxt_uwsc_onmessage;
-    cl->onerror = hxt_uwsc_onerror;
-    cl->onclose = hxt_uwsc_onclose;
-    cl->ping = hxt_uwsc_ping;
+    cl->onopen = hxt_wsc_onopen;
+    cl->onmessage = hxt_wsc_onmessage;
+    cl->onerror = hxt_wsc_onerror;
+    cl->onclose = hxt_wsc_onclose;
+    cl->ping = hxt_wsc_ping;
 
     ev_signal_init(&signal_watcher, signal_cb, SIGINT);
     ev_signal_start(loop, &signal_watcher);

@@ -305,7 +305,7 @@ static BOOL start_vpss()
     vpss_chn_attrs[vpss_chn0].enPixelFormat               = PIXEL_FORMAT_YVU_SEMIPLANAR_420;
     vpss_chn_attrs[vpss_chn0].stFrameRate.s32SrcFrameRate = -1;
     vpss_chn_attrs[vpss_chn0].stFrameRate.s32DstFrameRate = -1;
-    vpss_chn_attrs[vpss_chn0].u32Depth                    = 0;
+    vpss_chn_attrs[vpss_chn0].u32Depth                    = 1;
     vpss_chn_attrs[vpss_chn0].bMirror                     = HI_FALSE;
     vpss_chn_attrs[vpss_chn0].bFlip                       = HI_FALSE;
     vpss_chn_attrs[vpss_chn0].stAspectRatio.enMode        = ASPECT_RATIO_NONE;

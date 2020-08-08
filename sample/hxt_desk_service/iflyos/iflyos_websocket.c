@@ -167,6 +167,7 @@ static void uwsc_onclose(struct uwsc_client *cl, int code, const char *reason)
 }
 
 static void signal_cb(struct ev_loop *loop, ev_signal *w, int revents)
+
 {
     if (w->signum == SIGINT) {
 
