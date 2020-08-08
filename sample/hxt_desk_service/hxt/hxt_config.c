@@ -10,11 +10,14 @@
 
 
 static cJSON* g_cfg_root  = NULL;     //指向配置文件的Object
+
 static int g_children_unid = 0;
 static char g_desk_sn_code[64] = {0};
 
 static int g_video_width = 0;
 static int g_video_height = 0;
+
+static int g_camera_status = 1;
 
 void hxt_load_cfg()
 {
@@ -523,4 +526,20 @@ BOOL hxt_set_desk_code_cfg(const char* value)
     }
 
     return utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "desk", "deskCode", value);
+}
+
+BOOL hxt_set_camera_status(int status)
+{
+    if(status < 1 || status > 3)
+    {
+        return FALSE;
+    }
+    g_camera_status = status;
+
+    return TRUE;
+}
+
+int hxt_get_camera_status()
+{
+    return g_camera_status;
 }

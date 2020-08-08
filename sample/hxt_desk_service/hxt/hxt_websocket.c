@@ -14,13 +14,14 @@ typedef enum
     HEARTBEAT
 }REPORT_TYPE;
 
-typedef enum 
+typedef enum
 {
-    CAMERA_ON = 1, 
-    CAMERA_OFF,
-    CAMERA_ERR
-}CAMERA_STATUS;
-
+    STUDY_BEGIN = 1,
+    STUDY_END,
+    CHILD_AWAY, 
+    CHILD_BACK,
+    BAD_POSTURE
+}STUDY_REPORT;
 
 static void parse_server_config_data(void *data)
 {
@@ -156,9 +157,9 @@ static void hxt_send_heartbeat_info(struct uwsc_client *cl)
     cJSON_AddNumberToObject(root, "dataType", HXT_DESK_STATUS);
     cJSON_AddItemToObject(root, "data", data_item = cJSON_CreateObject());
     cJSON_AddNumberToObject(data_item, "reportType", HEARTBEAT);
-    cJSON_AddNumberToObject(data_item, "cameraStatus", CAMERA_ON);
+    cJSON_AddNumberToObject(data_item, "cameraStatus", hxt_get_camera_status());
     
-    char* json_data = cJSON_Print(root);
+    char* json_data = cJSON_PrintUnformatted(root);
     if (NULL == json_data)
     {
         return;
@@ -176,7 +177,49 @@ static void hxt_send_heartbeat_info(struct uwsc_client *cl)
 
 static void hxt_send_study_info(struct uwsc_client *cl)
 {
+    int report_type = STUDY_BEGIN;
+    int studyMode = 0; //hxt_get_study_mode_cfg();
+    char study_date[32] = {0};
+    char study_time[32] = {0};
+    int duration = 0;
+    char videoUrl[256] = {0};
+    char photoUrl[256] = {0};
+    int camera_status = 1;
 
+     if(NULL == cl)
+    {
+        return;
+    }
+
+    //post json data to server
+    cJSON *root = cJSON_CreateObject();    
+    if (NULL == root)
+    {
+        return;
+    }
+
+    cJSON *data_item = NULL;
+    cJSON_AddStringToObject(root, "senderId", "");
+    cJSON_AddStringToObject(root, "targetId", "");
+    cJSON_AddNumberToObject(root, "dataType", HXT_DESK_STATUS);
+    cJSON_AddItemToObject(root, "data", data_item = cJSON_CreateObject());
+    cJSON_AddNumberToObject(data_item, "reportType", HEARTBEAT);
+    cJSON_AddNumberToObject(data_item, "cameraStatus", hxt_get_camera_status());
+    
+    char* json_data = cJSON_PrintUnformatted(root);
+    if (NULL == json_data)
+    {
+        return;
+    }
+    utils_print("HEARTBEAT: %s\n", json_data);
+    cl->send(cl, json_data, strlen(json_data), UWSC_OP_PING);
+
+    if(root != NULL)
+    {
+        cJSON_Delete(root);
+    }
+
+    return;
 }
 
 static void hxt_wsc_onopen(struct uwsc_client *cl)
@@ -215,7 +258,7 @@ static void hxt_wsc_onclose(struct uwsc_client *cl, int code, const char *reason
 
 static void hxt_wsc_ping(struct uwsc_client *cl)
 {
-    
+    hxt_send_heartbeat_info(cl);
 }
 
 static void signal_cb(struct ev_loop *loop, ev_signal *w, int revents)
