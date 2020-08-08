@@ -16,6 +16,26 @@
 #define HXT_RET_OK                      1
 #define HXT_STATUS_OK                   "S0001"
 
+
+#define HXT_CONNECT_OK          0
+#define HXT_DEFAULT_CFG         1
+#define HXT_UPDATE_REMIND       2
+#define HXT_WAKE_CAMERA         3
+#define HXT_VARY_TONE           4
+#define HXT_TONE_TYPE           5
+#define HXT_VERIFY_CODE         6
+#define HXT_BIND_CHILD_ID       7
+#define HXT_VARY_CHILD_ID       8
+#define HXT_GET_IFLYOS_TOKEN    10
+#define HXT_STOP_STUDY          14
+#define HXT_DISCONNECT          15
+#define HXT_POWEROFF            16
+#define HXT_RESTART             17
+
+#define HXT_DESK_STATUS         11
+#define HXT_STUDY_INFO          12
+#define HXT_STUDY_INFOS         13
+
 #pragma pack(push, 1)
 typedef struct hxt_result
 {

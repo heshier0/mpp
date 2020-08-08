@@ -12,8 +12,14 @@ typedef enum
     POWER_ON = 1,
     POWER_OFF,
     HEARTBEAT
-};
+}REPORT_TYPE;
 
+typedef enum 
+{
+    CAMERA_ON = 1, 
+    CAMERA_OFF,
+    CAMERA_ERR
+}CAMERA_STATUS;
 
 
 static void parse_server_config_data(void *data)
@@ -132,7 +138,6 @@ static void parse_server_config_data(void *data)
 
 static void hxt_send_heartbeat_info(struct uwsc_client *cl)
 {
-    int report_type = 3; 
     if(NULL == cl)
     {
         return;
@@ -142,17 +147,31 @@ static void hxt_send_heartbeat_info(struct uwsc_client *cl)
     cJSON *root = cJSON_CreateObject();    
     if (NULL == root)
     {
-        goto CLEANUP4;
+        return;
     }
-    cJSON_AddNumberToObject(root, "reportType", reportType);
-    cJSON_AddNumberToObject(root, "cameraStatus", cameraStatus);
+
+    cJSON *data_item = NULL;
+    cJSON_AddStringToObject(root, "senderId", "");
+    cJSON_AddStringToObject(root, "targetId", "");
+    cJSON_AddNumberToObject(root, "dataType", HXT_DESK_STATUS);
+    cJSON_AddItemToObject(root, "data", data_item = cJSON_CreateObject());
+    cJSON_AddNumberToObject(data_item, "reportType", HEARTBEAT);
+    cJSON_AddNumberToObject(data_item, "cameraStatus", CAMERA_ON);
     
-    char* json_data = cJSON_PrintUnformatted(root);
+    char* json_data = cJSON_Print(root);
     if (NULL == json_data)
     {
-        goto CLEANUP3;
+        return;
     }
-    utils_print("%s\n", json_data);
+    utils_print("HEARTBEAT: %s\n", json_data);
+    cl->send(cl, json_data, strlen(json_data), UWSC_OP_PING);
+
+    if(root != NULL)
+    {
+        cJSON_Delete(root);
+    }
+
+    return;
 }
 
 static void hxt_send_study_info(struct uwsc_client *cl)
