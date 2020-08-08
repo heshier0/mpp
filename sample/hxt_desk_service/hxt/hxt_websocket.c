@@ -29,25 +29,25 @@ static void parse_server_config_data(void *data)
     {
      case 1:
         item = cJSON_GetObjectItem(root, "data");
-        sub_item = cJSON_GetObjectItem(item, "postureCountDuration");
+        sub_item = cJSON_GetObjectItem(item, "postureCountDuration");   //不良坐姿时长判定值
         hxt_set_posture_judge_cfg(sub_item->valueint);
-        sub_item = cJSON_GetObjectItem(item, "videoRecordDuration");
+        sub_item = cJSON_GetObjectItem(item, "videoRecordDuration");    //视频记录时长
         hxt_set_video_length_cfg(sub_item->valueint);
-        sub_item = cJSON_GetObjectItem(item, "videoRecordRatio");
+        sub_item = cJSON_GetObjectItem(item, "videoRecordRatio");       //视频记录时长
         hxt_set_video_ratio_cfg(sub_item->valueint);
-        sub_item = cJSON_GetObjectItem(item, "videoRecordCount");
+        sub_item = cJSON_GetObjectItem(item, "videoRecordCount");       //视频记录个数
         hxt_set_video_count_cfg(sub_item->valueint);
-        sub_item = cJSON_GetObjectItem(item, "photoRecordCount");
+        sub_item = cJSON_GetObjectItem(item, "photoRecordCount");       //照片记录张数
         hxt_set_photo_count_cfg(sub_item->valueint);
         hxt_reload_cfg();
     break;
     case 2:
         item = cJSON_GetObjectItem(root, "data");
-        sub_item = cJSON_GetObjectItem(item, "newVersionId");
+        sub_item = cJSON_GetObjectItem(item, "newVersionId");           //新版本id，大于0时有效
         hxt_set_version_id_cfg(sub_item->valueint);
-        sub_item = cJSON_GetObjectItem(item, "newVersionNo");
+        sub_item = cJSON_GetObjectItem(item, "newVersionNo");           //新版本号
         hxt_set_version_cfg(sub_item->valuestring);
-        sub_item = cJSON_GetObjectItem(item, "upgradepackUrl");
+        sub_item = cJSON_GetObjectItem(item, "upgradepackUrl");         //新版本文件地址
         hxt_set_upgrade_pack_url_cfg(sub_item->valuestring);
         hxt_reload_cfg();
         //to upgrade
@@ -58,36 +58,53 @@ static void parse_server_config_data(void *data)
     break;
     case 4:
         item = cJSON_GetObjectItem(root, "data");
-        sub_item = cJSON_GetObjectItem(item, "alarmUnid");
-        hxt_set_alarm_unid_cfg(sub_item->valueint);
-        sub_item = cJSON_GetObjectItem(item, "alarmFileUrl");
+        sub_item = cJSON_GetObjectItem(item, "alarmUnid");          //书桌提示音ID
+        hxt_set_alarm_unid_cfg(sub_item->valueint); 
+        sub_item = cJSON_GetObjectItem(item, "alarmFileUrl");       //自定义语音时文件地址
         hxt_set_alarm_file_url_cfg(sub_item->valuestring);
         hxt_reload_cfg();
     break;       
     case 5:
         item = cJSON_GetObjectItem(root, "data");
-        cJSON *sub_item1 = cJSON_GetObjectItem(item, "childrenUnid");
-        cJSON *sub_item2 = cJSON_GetObjectItem(item, "alarmType");
+        cJSON *sub_item1 = cJSON_GetObjectItem(item, "childrenUnid");       //孩子ID
+        cJSON *sub_item2 = cJSON_GetObjectItem(item, "alarmType");          //提醒方式 ：0-静音 1-蜂鸣 2-语音
         hxt_set_alarm_type_cfg(sub_item1->valueint, sub_item2->valueint);
         hxt_reload_cfg();
     break;
     case 6:
         //check code to sound
-        item = cJSON_GetObjectItem(root, "data");
-        sub_item = cJSON_GetObjectItem(item, "checkCode");
-        // play_sound_check_code(sub_item->valuestring);
+        item = cJSON_GetObjectItem(root, "data");                           
+        sub_item = cJSON_GetObjectItem(item, "checkCode");                  //验证码内容
+        /* play check code */
     break;
     case 7:
         // child unid
         item = cJSON_GetObjectItem(root, "data");
-        sub_item = cJSON_GetObjectItem(item, "childrenUnid");
+        sub_item = cJSON_GetObjectItem(item, "childrenUnid");              //书桌新关联孩子
         hxt_set_children_unid(sub_item->valueint);
     break;
     case 8:
         //
         item = cJSON_GetObjectItem(root, "data");
-        sub_item = cJSON_GetObjectItem(item, "childrenUnid");
+        sub_item = cJSON_GetObjectItem(item, "childrenUnid");               //设置/变更上报数据的孩子ID
         hxt_set_children_unid(sub_item->valueint);
+    break;
+    case 10:
+        item = cJSON_GetObjectItem(root, "data");
+        sub_item = cJSON_GetObjectItem(item, "iflyosToken");
+        iflyos_set_token(sub_item->valuestring);
+    break;
+    case 14:
+        /* stop studying */
+    break;
+    case 15：
+        /* disconnect */
+    break;
+    case 16:
+        /* power off */
+    break;
+    case 17:
+        /* restart */
     break;
     case 0:
     default:
@@ -104,8 +121,7 @@ static void parse_server_config_data(void *data)
     return;
 }
 
-
-static void uwsc_onopen(struct uwsc_client *cl)
+static void hxt_uwsc_onopen(struct uwsc_client *cl)
 {
     utils_print("hxt onopen\n");
 
@@ -113,8 +129,7 @@ static void uwsc_onopen(struct uwsc_client *cl)
     //end added
 }
 
-static void uwsc_onmessage(struct uwsc_client *cl,
-	void *data, size_t len, bool binary)
+static void hxt_uwsc_onmessage(struct uwsc_client *cl,void *data, size_t len, bool binary)
 {
     utils_print("hxt recv:\n");
 
@@ -125,20 +140,24 @@ static void uwsc_onmessage(struct uwsc_client *cl,
     {
         printf("[%.*s]\n", (int)len, (char *)data);
         parse_server_config_data(data);
-
     }
 }
 
-static void uwsc_onerror(struct uwsc_client *cl, int err, const char *msg)
+static void hxt_uwsc_onerror(struct uwsc_client *cl, int err, const char *msg)
 {
     utils_print("hxt onerror:%d: %s\n", err, msg);
     ev_break(cl->loop, EVBREAK_ALL);
 }
 
-static void uwsc_onclose(struct uwsc_client *cl, int code, const char *reason)
+static void hxt_uwsc_onclose(struct uwsc_client *cl, int code, const char *reason)
 {
     utils_print("hxt onclose:%d: %s\n", code, reason);
     ev_break(cl->loop, EVBREAK_ALL);
+}
+
+static void hxt_uwsc_ping(struct uwsc_client *cl)
+{
+    
 }
 
 static void signal_cb(struct ev_loop *loop, ev_signal *w, int revents)
@@ -149,12 +168,11 @@ static void signal_cb(struct ev_loop *loop, ev_signal *w, int revents)
     }
 }
 
-
 int hxt_websocket_start()
 {
     struct ev_loop *loop = EV_DEFAULT;
     struct ev_signal signal_watcher;
-	int ping_interval = 10;	/* second */
+	int ping_interval = 120;	        /* second */
     struct uwsc_client *cl;
 
     char* hxt_url = hxt_get_websocket_url_cfg();
@@ -174,10 +192,11 @@ int hxt_websocket_start()
         
 	utils_print("Hxt start connect...\n");
 
-    cl->onopen = uwsc_onopen;
-    cl->onmessage = uwsc_onmessage;
-    cl->onerror = uwsc_onerror;
-    cl->onclose = uwsc_onclose;
+    cl->onopen = hxt_uwsc_onopen;
+    cl->onmessage = hxt_uwsc_onmessage;
+    cl->onerror = hxt_uwsc_onerror;
+    cl->onclose = hxt_uwsc_onclose;
+    cl->ping = hxt_uwsc_ping;
 
     ev_signal_init(&signal_watcher, signal_cb, SIGINT);
     ev_signal_start(loop, &signal_watcher);
