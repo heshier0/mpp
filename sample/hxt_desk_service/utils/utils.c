@@ -1,20 +1,22 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <sys/ioctl.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <time.h>
+#include <sys/ipc.h>
+#include <sys/msg.h>
 
 #include <cJSON.h>
 
 #include "common.h"
 #include "utils.h"
 
-#define STUDY_INFO_MQ       (232323L)
+#define STUDY_INFO_MQ_KEY       (232323L)
 
 static char* separate_filename(const char *url)
 {
@@ -846,7 +848,30 @@ void utils_save_yuv_test(const char* yuv_data, const int width, const int height
     fclose(pfd);
 }
 
-int utils_send_msg(void* data)
+
+int utils_send_msg(void* data, int length)
 {
-    
+    int msqid; 
+
+    msqid = msgget(STUDY_INFO_MQ_KEY, 0600 | IPC_CREAT);
+    if(msqid < 0)
+    {
+        utils_print("create message queue error\n");
+        return -1;
+    }
+
+    return msgsnd(msqid, data, length, 0);
+}
+
+int utils_recv_msg(void* data, int length)
+{
+    int msqid;
+    msqid = msgget(STUDY_INFO_MQ_KEY, 0);
+    if (msqid < 0)
+    {
+        utils_print("get message queue error\n");
+        return -1;
+    }
+
+    return msgrcv(msqid, data, length, 1, 0);
 }

@@ -31,7 +31,7 @@ static void* send_study_info_cb(void *params)
     {
         return NULL;
     }    
-    struct uwsc_client *cl = (struct uwsc_client *)data;
+    struct uwsc_client *cl = (struct uwsc_client *)params;
 
     
 }
@@ -219,7 +219,7 @@ static void hxt_send_study_info(struct uwsc_client *cl)
     cJSON_AddNumberToObject(root, "dataType", HXT_STUDY_INFO);
     cJSON_AddItemToObject(root, "data", data_item = cJSON_CreateObject());
     cJSON_AddNumberToObject(data_item, "childrenUnid", child_id);
-    cJSON_AddNumberToObject(data_item, "parentUnid", parent_id;
+    cJSON_AddNumberToObject(data_item, "parentUnid", parent_id);
     cJSON_AddStringToObject(data_item, "studyDate", study_date);
     cJSON_AddStringToObject(data_item, "reportTime", report_time);
     cJSON_AddNumberToObject(data_item, "studyMode", study_mode);

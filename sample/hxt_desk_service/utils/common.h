@@ -50,6 +50,13 @@
 #define VOICE_SITTING_PRAISE4                   "/userdata/media/voice/V037.mp3"
 #define VOICE_SITTING_PRAISE5                   "/userdata/media/voice/V038.mp3"
 
+#pragma pack(push, 1)
+typedef struct study_info_s
+{
+    
+}
+#pragma pack(pop)
+
 int g_play_status;
 int g_voice_status;
 int g_video_status;
