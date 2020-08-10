@@ -14,6 +14,8 @@
 #include "common.h"
 #include "utils.h"
 
+#define STUDY_INFO_MQ       (232323L)
+
 static char* separate_filename(const char *url)
 {
     char * filename = NULL;
@@ -842,4 +844,9 @@ void utils_save_yuv_test(const char* yuv_data, const int width, const int height
     fwrite(yuv_data, width * height * 3 / 2, 1, pfd);
     fflush(pfd);
     fclose(pfd);
+}
+
+int utils_send_msg(void* data)
+{
+    
 }
