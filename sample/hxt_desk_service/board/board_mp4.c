@@ -177,11 +177,11 @@ int HI_PDT_CreateMp4(VENC_CHN VeChn)
 		goto exit_outFmt_failed;
 	}
 	
-	if (pOutFmt->audio_codec == AV_CODEC_ID_NONE)	//检查音频编码器
-    {
-        printf("Muxing:add_audio_stream ID failed\n"); 
-		goto exit_outFmt_failed;
-	}
+	// if (pOutFmt->audio_codec == AV_CODEC_ID_NONE)	//检查音频编码器
+    // {
+    //     printf("Muxing:add_audio_stream ID failed\n"); 
+	// 	goto exit_outFmt_failed;
+	// }
 	
     if (!(pOutFmt->flags & AVFMT_NOFILE))	//应该是判断文件IO是否打开
     {
@@ -196,9 +196,9 @@ int HI_PDT_CreateMp4(VENC_CHN VeChn)
     
 	//初始化一些参数
 	fc->Video_PTS = 0;	
-	fc->Audio_PTS = 0;
+	// fc->Audio_PTS = 0;
 	fc->Vfirst = 0;
-	fc->Afirst = 0;
+	// fc->Afirst = 0;
 	fc->vi = -1;
 	fc->ai = -1;
 	fc->b_First_IDR_Find = 0;

@@ -325,13 +325,13 @@ char* hxt_get_desk_code_cfg()
 }
 //set 
 
-BOOL hxt_set_posture_coco_model_path(const char* value)
+BOOL hxt_set_posture_detect_model_path(const char* value)
 {
     if (NULL == value)
     {
         return FALSE;
     }
-    return utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "model", "coco_model", value);
+    return utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "model", "detect_model", value);
 }
 
 BOOL hxt_set_posture_class_model_path(const char* value)

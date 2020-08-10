@@ -611,46 +611,28 @@ END:
 
 char* utils_date_to_string()
 {
-    const static char* CMD_GET_DATE = "date +\"%Y-%m-%d\"";
     static char str_date[16] = {0};
-    char line[16] = {0};
-    FILE *fp = NULL;
-    fp = popen(CMD_GET_DATE, "r");
-    if(NULL != fp)
-    {
-        if(fgets(line, sizeof(line), fp) == NULL)
-        {
-            pclose(fp);
-            return NULL;
-        }
-        line[strlen(line)-1] = '\0';
-    }
-
-    pclose(fp);
-    strcpy(str_date, line);
+    time_t t;
+    struct tm* ltime;
+    
+    time(&t);
+    ltime = localtime(&t);
+    strftime(str_date, 16, "%Y-%m-%d", ltime);
+    str_date[15] = '\0';
 
     return str_date;
 }
 
 char* utils_time_to_string()
 {
-    const static char* CMD_GET_TIME = "date +\"%Y-%m-%d %H:%M:%S\"";
-    static char str_time[24] = {0};
-    char line[24] = {0};
-    FILE *fp = NULL;
-    fp = popen(CMD_GET_TIME, "r");
-    if(NULL != fp)
-    {
-        if(fgets(line, sizeof(line), fp) == NULL)
-        {
-            pclose(fp);
-            return NULL;
-        }
-        line[strlen(line)-1] = '\0';
-    }
-
-    pclose(fp);
-    strcpy(str_time, line);
+    static char str_time[20] = {0};
+    time_t t;
+    struct tm* ltime;
+    
+    time(&t);
+    ltime = localtime(&t);
+    strftime(str_time, 20, "%Y-%m-%d %H:%M:%S", ltime);
+    str_time[19] = '\0';
 
     return str_time;
 }

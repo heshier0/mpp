@@ -51,10 +51,31 @@
 #define VOICE_SITTING_PRAISE5                   "/userdata/media/voice/V038.mp3"
 
 #pragma pack(push, 1)
+
+typedef enum
+{
+    STUDY_BEGIN = 1,
+    STUDY_END,
+    CHILD_AWAY, 
+    CHILD_BACK,
+    BAD_POSTURE
+}STUDY_REPORT_TYPE;
+
 typedef struct study_info_s
 {
-    
-}
+    int child_unid; 
+    int parent_unid;
+    int report_type;
+    char *study_date;
+    char *report_time;
+    int study_mode;
+    int duration;
+    char *video_url;
+    char *photo_url;
+    int camera_status;
+}StudyInfo;
+
+
 #pragma pack(pop)
 
 int g_play_status;

@@ -38,9 +38,11 @@ static BOOL g_keep_processing = TRUE;
 
 static BOOL g_is_recording = FALSE;
 static BOOL g_is_inited = FALSE;
-static BOOL g_change_to_correct = FALSE;
 static BOOL g_first_alarm = TRUE;
 static BOOL g_first_away = TRUE;
+
+static char g_video_url[256] = {0};
+static char g_photo_url[256] = {0};
 
 static void play_random_warn_voice()
 {
@@ -121,6 +123,11 @@ static BOOL init_check_status(struct check_status_t *check_status, int check_res
     return FALSE;
 }
 
+static BOOL send_study_report_type(STUDY_REPORT_TYPE *type)
+{
+    utils_send_msg((void*)type, sizeof(STUDY_REPORT_TYPE));
+}
+
 /* confirm if change to normal posture */
 static BOOL check_posture_changed(struct check_status_t *check_status, int check_result)
 {
@@ -154,7 +161,8 @@ static BOOL check_posture_changed(struct check_status_t *check_status, int check
                 delete_recorded();
             }
             else
-            {
+            { 
+                /* means already change to bad posture */
                 begin_recording();
             }
             
@@ -173,7 +181,8 @@ static BOOL check_posture_changed(struct check_status_t *check_status, int check
                     utils_send_local_voice(VOICE_CHILD_REAPPEAR);
                 }
                 mark_first_away_alarm();
-                
+                STUDY_REPORT_TYPE type = CHILD_BACK;
+                send_study_report_type(&type);
             }
 
             check_status->_start_posture = check_result;
@@ -224,6 +233,10 @@ static BOOL check_posture_alarm(struct check_status_t *check_status, int check_r
             check_status->_start_posture = check_result;
             check_status->_start_time = now;
             stop_record();
+
+            STUDY_REPORT_TYPE type = BAD_POSTURE;
+            send_study_report_type(&type);
+            
         }                   
         break;
     case AWAY_STATUS:
@@ -246,7 +259,8 @@ static BOOL check_posture_alarm(struct check_status_t *check_status, int check_r
             delete_recorded();
 
             /* send message to hxt server */
-            
+            STUDY_REPORT_TYPE type = CHILD_AWAY;
+            send_study_report_type(&type);
         }
         break;    
     default:
@@ -337,10 +351,13 @@ void start_posture_recognize()
 
     pthread_create(&g_proc_yuv_tid, NULL, thread_proc_yuv_data_cb, NULL);
 
+    STUDY_REPORT_TYPE type = STUDY_BEGIN;
+    send_study_report_type(&type);
+
     return;
 }
 
-void posture_stop_recognize()
+void stop_posture_recognize()
 {
     if(g_keep_processing)
     {
@@ -355,5 +372,8 @@ void posture_stop_recognize()
         {
             uninit_sit_posture(&g_recog_handle);
         }
+
+        STUDY_REPORT_TYPE type = STUDY_END;
+        send_study_report_type(&type);
     }
 }
