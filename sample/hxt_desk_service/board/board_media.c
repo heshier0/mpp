@@ -33,31 +33,31 @@ VIDEO_FORMAT_E  enVideoFormat   = VIDEO_FORMAT_LINEAR;
 COMPRESS_MODE_E enCompressMode  = COMPRESS_MODE_NONE;
 VI_VPSS_MODE_E  enMastPipeMode  = VI_OFFLINE_VPSS_OFFLINE;
 
-typedef struct
-{
-	//媒体信息
-	HI_BOOL bInit;
-    VB_CONFIG_S stVbConf;
-    SIZE_S stSize;
-    VO_LAYER VoLayer;
-    HI_U32 VpssGrpNum;
+// typedef struct
+// {
+// 	//媒体信息
+// 	HI_BOOL bInit;
+//     VB_CONFIG_S stVbConf;
+//     SIZE_S stSize;
+//     VO_LAYER VoLayer;
+//     HI_U32 VpssGrpNum;
 
-    SAMPLE_VI_CONFIG_S stViConfig;
-    SAMPLE_VDEC_ATTR astSampleVdec[VDEC_MAX_CHN_NUM];
-    VPSS_CHN_ATTR_S astVpssChnAttr[VPSS_MAX_CHN_NUM];
-    SAMPLE_VO_CONFIG_S stVoConfig;
-    VPSS_GRP_ATTR_S stVpssGrpAttr;
-    HI_BOOL abChnEnable[VPSS_MAX_CHN_NUM];
+//     SAMPLE_VI_CONFIG_S stViConfig;
+//     SAMPLE_VDEC_ATTR astSampleVdec[VDEC_MAX_CHN_NUM];
+//     VPSS_CHN_ATTR_S astVpssChnAttr[VPSS_MAX_CHN_NUM];
+//     SAMPLE_VO_CONFIG_S stVoConfig;
+//     VPSS_GRP_ATTR_S stVpssGrpAttr;
+//     HI_BOOL abChnEnable[VPSS_MAX_CHN_NUM];
     
-    //编码线程信息
-    pthread_t stVencPid;
+//     //编码线程信息
+//     pthread_t stVencPid;
     
-    //采集线程信息
-    pthread_t stVinPid;
-    HI_BOOL bVinThreadRun;    
-} media_info_t;
+//     //采集线程信息
+//     pthread_t stVinPid;
+//     HI_BOOL bVinThreadRun;    
+// } media_info_t;
 
-static media_info_t media_info;
+// static media_info_t media_info;
 static SAMPLE_VENC_GETSTREAM_PARA_S gs_stPara;
 static sem_t sem_snap[2];
 
@@ -1350,6 +1350,10 @@ void board_get_stream_from_venc_chn()
         return;
     }
 
+    // for test
+    HI_PDT_Init();
+    //end test
+
     while (g_video_status)
     {        
         FD_ZERO(&read_fds);
@@ -1420,10 +1424,10 @@ void board_get_stream_from_venc_chn()
                 }
                 
                 /* to save mp4 */
-                if(g_start_record)
-                {   
+                // if(g_start_record)
+                // {   
                     HI_PDT_WriteVideo(venc_chn,  &venc_stream);  
-                }
+                // }
 
                 if (HI_SUCCESS != ret_val)
                 {
@@ -1452,7 +1456,9 @@ void board_get_stream_from_venc_chn()
             }    
         }
     }
-   
+    //for test
+    HI_PDT_Exit();
+    //end test
     return;
 }
 

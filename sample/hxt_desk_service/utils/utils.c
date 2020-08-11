@@ -619,7 +619,7 @@ char* utils_date_to_string()
     ltime = localtime(&t);
     strftime(str_date, 16, "%Y-%m-%d", ltime);
     str_date[15] = '\0';
-
+    utils_print("%s\n", str_date);
     return str_date;
 }
 
