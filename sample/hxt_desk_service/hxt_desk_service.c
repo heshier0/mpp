@@ -64,7 +64,7 @@ int main(int argc, char **argv)
     utils_send_local_voice(VOICE_DEVICE_OPEN);
     usleep(500);
 
-    start_posture_recognize();
+    // start_posture_recognize();
 
     // /* QRcode parse */
     // // wifi_exist = (hxt_get_wifi_ssid_cfg() != NULL);
@@ -82,20 +82,20 @@ int main(int argc, char **argv)
     // utils_link_wifi(hxt_get_wifi_ssid_cfg(), hxt_get_wifi_pwd_cfg());
 
     /* connect to hxt server */
-    // if (hxt_get_token_cfg() == NULL)
-    // {
-    //     utils_print("send request to get token\n");
-    //     server_started = hxt_get_token_request();
-    // }
+    if (hxt_get_token_cfg() == NULL)
+    {
+        utils_print("send request to get token\n");
+        server_started = hxt_get_token_request();
+    }
     
-    // if (server_started)
-    // {
-        // pid_t hxt_pid = fork();
-        // if (hxt_pid == 0)
-        // {
-        //     hxt_websocket_start();
-        //     return 0;
-        // }
+    if (server_started)
+    {
+        pid_t hxt_pid = fork();
+        if (hxt_pid == 0)
+        {
+            hxt_websocket_start();
+            return 0;
+        }
 
         // pid_t iflyos_pid = fork();
         // if (iflyos_pid == 0)
@@ -104,9 +104,9 @@ int main(int argc, char **argv)
         //     return 0;
         // }
 
-        // waitpid(hxt_pid, &st1, 0);
+        waitpid(hxt_pid, &st1, 0);
         // waitpid(iflyos_pid, &st2, 0);
-    // }
+    }
 
     pthread_join(play_tid, NULL);
     pthread_join(voice_tid, NULL);

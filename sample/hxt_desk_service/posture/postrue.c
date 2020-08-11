@@ -138,7 +138,7 @@ static BOOL check_posture_changed(struct check_status_t *check_status, int check
 
         if (check_status->_start_posture != BAD_POSTURE)
         {
-            // delete_recorded(); /* marked for test*/
+            delete_recorded(); 
         }
 
         return FALSE;
@@ -156,12 +156,12 @@ static BOOL check_posture_changed(struct check_status_t *check_status, int check
         {
             if(check_status->_last_posture != BAD_POSTURE)
             {
-                // delete_recorded(); /* marked for test*/
+                delete_recorded();
             }
             else
             { 
                 /* means already change to bad posture */
-                //begin_recording(); /*marked for test*/
+                begin_recording(); 
             }
             
             if (check_status->_start_posture == BAD_POSTURE)
@@ -230,7 +230,7 @@ static BOOL check_posture_alarm(struct check_status_t *check_status, int check_r
             }
             check_status->_start_posture = check_result;
             check_status->_start_time = now;
-            // stop_record(); /*marked for test*/
+            stop_record(); 
 
             STUDY_REPORT_TYPE type = BAD_POSTURE;
             send_study_report_type(&type);
@@ -254,7 +254,7 @@ static BOOL check_posture_alarm(struct check_status_t *check_status, int check_r
                 /* exit recog thread */
                 g_keep_processing = FALSE;
             }
-            //delete_recorded(); /* marked for test */
+            delete_recorded(); 
 
             /* send message to hxt server */
             STUDY_REPORT_TYPE type = CHILD_AWAY;
