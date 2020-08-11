@@ -20,13 +20,14 @@
 #include "common.h"
 #include "utils.h"
 
+
 BOOL get_qrcode_yuv_buffer(void **qrcode_info)
 {
     char *yuv_data = NULL;
     int width = hxt_get_video_height_cfg();
     int height = hxt_get_video_width_cfg();
     int size = width * height * 3 / 2;
-    board_get_yuv_from_vpss_chn(yuv_data);
+    board_get_yuv_from_vpss_chn(&yuv_data);
     if(NULL == yuv_data)
     {
         return FALSE;
@@ -55,3 +56,4 @@ BOOL get_qrcode_yuv_buffer(void **qrcode_info)
 
     return TRUE;
 }
+

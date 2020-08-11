@@ -11,7 +11,7 @@
 
 static cJSON* g_cfg_root  = NULL;     //指向配置文件的Object
 
-static int g_children_unid = 0;
+static int g_children_unid = 1;
 static char g_desk_sn_code[64] = {0};
 
 static int g_video_width = 0;
@@ -238,7 +238,7 @@ int hxt_get_video_width_cfg()
 {
     if(g_video_width == 0)
     {
-        g_video_width = 1920;
+        g_video_width = 640;
     }
 
     return g_video_width;
@@ -248,7 +248,7 @@ int hxt_get_video_height_cfg()
 {
     if(g_video_height == 0)
     {
-        g_video_height = 1080; 
+        g_video_height = 360; 
     }
     return g_video_height;
 }

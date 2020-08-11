@@ -33,31 +33,6 @@ VIDEO_FORMAT_E  enVideoFormat   = VIDEO_FORMAT_LINEAR;
 COMPRESS_MODE_E enCompressMode  = COMPRESS_MODE_NONE;
 VI_VPSS_MODE_E  enMastPipeMode  = VI_OFFLINE_VPSS_OFFLINE;
 
-typedef struct
-{
-	//媒体信息
-	HI_BOOL bInit;
-    VB_CONFIG_S stVbConf;
-    SIZE_S stSize;
-    VO_LAYER VoLayer;
-    HI_U32 VpssGrpNum;
-
-    SAMPLE_VI_CONFIG_S stViConfig;
-    SAMPLE_VDEC_ATTR astSampleVdec[VDEC_MAX_CHN_NUM];
-    VPSS_CHN_ATTR_S astVpssChnAttr[VPSS_MAX_CHN_NUM];
-    SAMPLE_VO_CONFIG_S stVoConfig;
-    VPSS_GRP_ATTR_S stVpssGrpAttr;
-    HI_BOOL abChnEnable[VPSS_MAX_CHN_NUM];
-    
-    //编码线程信息
-    pthread_t stVencPid;
-    
-    //采集线程信息
-    pthread_t stVinPid;
-    HI_BOOL bVinThreadRun;    
-} media_info_t;
-
-static media_info_t media_info;
 static SAMPLE_VENC_GETSTREAM_PARA_S gs_stPara;
 static sem_t sem_snap[2];
 
@@ -618,34 +593,34 @@ static void* sample_pcm_cb(void *data)
     stAioAttr.enI2sType      = AIO_I2STYPE_INNERCODEC;
     
     //回声消除功能
-    HI_S16 s16ERLBand[6] = {4, 6, 36, 49, 50, 51};
-    HI_S16 s16ERL[7] = {7, 10, 16, 10, 18, 18, 18};
-    memset(&stAiVqeTalkAttr, 0, sizeof(AI_TALKVQE_CONFIG_S));
-    stAiVqeTalkAttr.enWorkstate = VQE_WORKSTATE_COMMON;
-    stAiVqeTalkAttr.s32FrameSample = 1024;
-    stAiVqeTalkAttr.s32WorkSampleRate = AUDIO_SAMPLE_RATE_16000;
-    stAiVqeTalkAttr.stAecCfg.bUsrMode = HI_TRUE;
-    stAiVqeTalkAttr.stAecCfg.s16EchoBandLow = 10;
-    stAiVqeTalkAttr.stAecCfg.s16EchoBandLow2 = 25;
-    stAiVqeTalkAttr.stAecCfg.s16EchoBandHigh = 28;
-    stAiVqeTalkAttr.stAecCfg.s16EchoBandHigh2 = 35;
-    memcpy(stAiVqeTalkAttr.stAecCfg.s16ERLBand, &s16ERLBand, sizeof(s16ERLBand));
-    memcpy(stAiVqeTalkAttr.stAecCfg.s16ERL, &s16ERL, sizeof(s16ERL));
-    stAiVqeTalkAttr.stAecCfg.s16VioceProtectFreqL = 3;
-    stAiVqeTalkAttr.stAecCfg.s16VioceProtectFreqL1 = 6;
-    stAiVqeTalkAttr.stAgcCfg.bUsrMode = HI_FALSE;
-    stAiVqeTalkAttr.stAnrCfg.bUsrMode = HI_TRUE;
-    stAiVqeTalkAttr.stAnrCfg.s16NrIntensity = 25;
-    stAiVqeTalkAttr.stAnrCfg.s16NoiseDbThr = 60;
-    stAiVqeTalkAttr.stAnrCfg.s8SpProSwitch = 0;
-    stAiVqeTalkAttr.stHpfCfg.bUsrMode = HI_TRUE;
-    stAiVqeTalkAttr.stHpfCfg.enHpfFreq = AUDIO_HPF_FREQ_150;
-    stAiVqeTalkAttr.u32OpenMask = AI_TALKVQE_MASK_AEC | AI_TALKVQE_MASK_ANR | AI_TALKVQE_MASK_HPF;
+    // HI_S16 s16ERLBand[6] = {4, 6, 36, 49, 50, 51};
+    // HI_S16 s16ERL[7] = {7, 10, 16, 10, 18, 18, 18};
+    // memset(&stAiVqeTalkAttr, 0, sizeof(AI_TALKVQE_CONFIG_S));
+    // stAiVqeTalkAttr.enWorkstate = VQE_WORKSTATE_COMMON;
+    // stAiVqeTalkAttr.s32FrameSample = 1024;
+    // stAiVqeTalkAttr.s32WorkSampleRate = AUDIO_SAMPLE_RATE_16000;
+    // stAiVqeTalkAttr.stAecCfg.bUsrMode = HI_TRUE;
+    // stAiVqeTalkAttr.stAecCfg.s16EchoBandLow = 10;
+    // stAiVqeTalkAttr.stAecCfg.s16EchoBandLow2 = 25;
+    // stAiVqeTalkAttr.stAecCfg.s16EchoBandHigh = 28;
+    // stAiVqeTalkAttr.stAecCfg.s16EchoBandHigh2 = 35;
+    // memcpy(stAiVqeTalkAttr.stAecCfg.s16ERLBand, &s16ERLBand, sizeof(s16ERLBand));
+    // memcpy(stAiVqeTalkAttr.stAecCfg.s16ERL, &s16ERL, sizeof(s16ERL));
+    // stAiVqeTalkAttr.stAecCfg.s16VioceProtectFreqL = 3;
+    // stAiVqeTalkAttr.stAecCfg.s16VioceProtectFreqL1 = 6;
+    // stAiVqeTalkAttr.stAgcCfg.bUsrMode = HI_FALSE;
+    // stAiVqeTalkAttr.stAnrCfg.bUsrMode = HI_TRUE;
+    // stAiVqeTalkAttr.stAnrCfg.s16NrIntensity = 25;
+    // stAiVqeTalkAttr.stAnrCfg.s16NoiseDbThr = 60;
+    // stAiVqeTalkAttr.stAnrCfg.s8SpProSwitch = 0;
+    // stAiVqeTalkAttr.stHpfCfg.bUsrMode = HI_TRUE;
+    // stAiVqeTalkAttr.stHpfCfg.enHpfFreq = AUDIO_HPF_FREQ_150;
+    // stAiVqeTalkAttr.u32OpenMask = AI_TALKVQE_MASK_AEC | AI_TALKVQE_MASK_ANR | AI_TALKVQE_MASK_HPF;
 
     //开启Audio In
     s32AiChnCnt = stAioAttr.u32ChnCnt;
-    s32Ret = SAMPLE_COMM_AUDIO_StartAi(AiDev, s32AiChnCnt, &stAioAttr, AUDIO_SAMPLE_RATE_BUTT, HI_FALSE, pAiVqeAttr, 2);
-    //s32Ret = SAMPLE_COMM_AUDIO_StartAi(AiDev, s32AiChnCnt, &stAioAttr, AUDIO_SAMPLE_RATE_BUTT, HI_FALSE, NULL, 0);
+    // s32Ret = SAMPLE_COMM_AUDIO_StartAi(AiDev, s32AiChnCnt, &stAioAttr, AUDIO_SAMPLE_RATE_BUTT, HI_FALSE, pAiVqeAttr, 2);
+    s32Ret = SAMPLE_COMM_AUDIO_StartAi(AiDev, s32AiChnCnt, &stAioAttr, AUDIO_SAMPLE_RATE_BUTT, HI_FALSE, NULL, 0);
     if (s32Ret != HI_SUCCESS)
     {
         utils_print("ret=%d\n",s32Ret);
@@ -837,7 +812,7 @@ static void* play_mp3_cb(void* data)
 
     //设置音量
     //s32Ret = HI_MPI_AO_SetVolume(AoDev, -51);
-    s32Ret = HI_MPI_AO_SetVolume(AoDev, -20);
+    s32Ret = HI_MPI_AO_SetVolume(AoDev, -10);
     if (s32Ret != HI_SUCCESS)
     {
         utils_print("ret=%d\n",s32Ret);
@@ -1452,7 +1427,7 @@ void board_get_stream_from_venc_chn()
             }    
         }
     }
-   
+
     return;
 }
 
@@ -1611,19 +1586,19 @@ pthread_t start_sample_voice()
 
 void start_video_recording()
 {
-    HI_PDT_Init();
+    board_create_mp4_file();
     g_start_record = TRUE;
 }
 
 void stop_video_recording()
 {
     g_start_record = FALSE;
-    HI_PDT_Exit();
+    board_close_mp4_file();
 }
 
 void delete_posture_video()
 {
     g_start_record = FALSE;
-    delete_current_mp4_file();
+    board_delete_current_mp4_file();
 }
 

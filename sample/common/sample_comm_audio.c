@@ -1385,32 +1385,32 @@ HI_S32 SAMPLE_COMM_AUDIO_StartAo(AUDIO_DEV AoDevId, HI_S32 s32AoChnCnt,
         }
 
         //added by hekai
-        AO_VQE_CONFIG_S stAoVqeAttr;
-        memset(&stAoVqeAttr, 0, sizeof(AO_VQE_CONFIG_S));
+        // AO_VQE_CONFIG_S stAoVqeAttr;
+        // memset(&stAoVqeAttr, 0, sizeof(AO_VQE_CONFIG_S));
 
-        stAoVqeAttr.enWorkstate = VQE_WORKSTATE_COMMON;
-        stAoVqeAttr.s32WorkSampleRate = pstAioAttr->enSamplerate;
-        stAoVqeAttr.s32FrameSample = pstAioAttr->u32PtNumPerFrm;
-        stAoVqeAttr.stAnrCfg.bUsrMode = HI_TRUE;
-        stAoVqeAttr.stAnrCfg.s16NrIntensity = 25;
-        stAoVqeAttr.stAnrCfg.s16NoiseDbThr = 60;
-        stAoVqeAttr.stAnrCfg.s8SpProSwitch = 0;
-        stAoVqeAttr.stHpfCfg.bUsrMode = HI_TRUE;
-        stAoVqeAttr.stHpfCfg.enHpfFreq = AUDIO_HPF_FREQ_150;
+        // stAoVqeAttr.enWorkstate = VQE_WORKSTATE_COMMON;
+        // stAoVqeAttr.s32WorkSampleRate = pstAioAttr->enSamplerate;
+        // stAoVqeAttr.s32FrameSample = pstAioAttr->u32PtNumPerFrm;
+        // stAoVqeAttr.stAnrCfg.bUsrMode = HI_TRUE;
+        // stAoVqeAttr.stAnrCfg.s16NrIntensity = 25;
+        // stAoVqeAttr.stAnrCfg.s16NoiseDbThr = 60;
+        // stAoVqeAttr.stAnrCfg.s8SpProSwitch = 0;
+        // stAoVqeAttr.stHpfCfg.bUsrMode = HI_TRUE;
+        // stAoVqeAttr.stHpfCfg.enHpfFreq = AUDIO_HPF_FREQ_150;
         
-        s32Ret = HI_MPI_AO_SetVqeAttr(AoDevId, i, &stAoVqeAttr);
-        if(HI_SUCCESS != s32Ret)
-        {
-            printf("line %d: HI_MPI_AO_SetVqeAttr(%d) failed with %#x!\n", __LINE__, i, s32Ret);
-            return HI_FAILURE;
-        }
+        // s32Ret = HI_MPI_AO_SetVqeAttr(AoDevId, i, &stAoVqeAttr);
+        // if(HI_SUCCESS != s32Ret)
+        // {
+        //     printf("line %d: HI_MPI_AO_SetVqeAttr(%d) failed with %#x!\n", __LINE__, i, s32Ret);
+        //     return HI_FAILURE;
+        // }
  
-        s32Ret = HI_MPI_AO_EnableVqe(AoDevId, i);
-        if (HI_SUCCESS != s32Ret)
-        {
-            printf("%s: HI_MPI_AO_EnableVqe(%d,%d) failed with %#x\n", __FUNCTION__, AoDevId, i, s32Ret);
-            return HI_FAILURE;
-        }
+        // s32Ret = HI_MPI_AO_EnableVqe(AoDevId, i);
+        // if (HI_SUCCESS != s32Ret)
+        // {
+        //     printf("%s: HI_MPI_AO_EnableVqe(%d,%d) failed with %#x\n", __FUNCTION__, AoDevId, i, s32Ret);
+        //     return HI_FAILURE;
+        // }
     }
 
     s32Ret = HI_MPI_AO_EnableChn(AoDevId, AO_SYSCHN_CHNID);

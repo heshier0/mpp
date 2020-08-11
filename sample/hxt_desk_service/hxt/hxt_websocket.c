@@ -15,7 +15,9 @@ typedef enum
     HEARTBEAT
 }REPORT_TYPE;
 
-
+static BOOL g_recv_running = TRUE;
+static char g_video_url[256] = {0};
+static char g_photo_url[256] = {0};
 
 pthread_t study_info_tid;
 
@@ -25,6 +27,8 @@ static BOOL init_study_info(StudyInfo *study_info, int type)
     {
         return FALSE;
     }
+
+    memset(study_info, 0, sizeof(study_info));
 
     study_info->parent_unid = hxt_get_parent_unid_cfg();
     study_info->child_unid = hxt_get_children_unid();
@@ -37,17 +41,17 @@ static BOOL init_study_info(StudyInfo *study_info, int type)
     }
     strcpy(study_info->study_date, study_date);
     study_info->study_date[strlen(study_date)] = '\0';
-    
+
     char* report_time = utils_time_to_string();
     if (study_info->report_time == NULL)
     {
-        study_info->report_type = utils_malloc(strlen(report_time) + 1);
+        study_info->report_time = utils_malloc(strlen(report_time) + 1);
     }
     strcpy(study_info->report_time, report_time);
     
     study_info->study_mode = hxt_get_study_mode_cfg(study_info->child_unid);
-
-    if (study_info->report_type == 5)
+   
+    if (study_info->report_type == BAD_POSTURE)
     {
         study_info->duration = 10;
 
@@ -84,7 +88,7 @@ static void deinit_study_nifo(StudyInfo *study_info)
     {
         utils_free(study_info->photo_url);
     }
-    if(study_info->study_date ！= NULL)
+    if(study_info->study_date != NULL)
     {
         utils_free(study_info->study_date);
     }
@@ -96,7 +100,7 @@ static void deinit_study_nifo(StudyInfo *study_info)
     return;
 }
 
-static void hxt_send_desk_status(struct uwsc_client *cl, REPORT_TYPE type)
+static void hxt_send_desk_status(struct uwsc_client *cl, REPORT_TYPE type, int info_type)
 {
     if(NULL == cl)
     {
@@ -123,8 +127,8 @@ static void hxt_send_desk_status(struct uwsc_client *cl, REPORT_TYPE type)
     {
         return;
     }
-    utils_print("HEARTBEAT: %s\n", json_data);
-    cl->send(cl, json_data, strlen(json_data), UWSC_OP_PING);
+    utils_print("HXT_DESK_STATUS: %s\n", json_data);
+    cl->send(cl, json_data, strlen(json_data), info_type);
 
     if(root != NULL)
     {
@@ -143,55 +147,63 @@ static void* send_study_info_cb(void *params)
         return NULL;
     }    
     struct uwsc_client *cl = (struct uwsc_client *)params;
-
     STUDY_REPORT_TYPE type;
 
-    if (-1 == utils_recv_msg(&type, sizeof(STUDY_REPORT_TYPE)))
+    while (g_recv_running)
     {
-        utils_print("recv study info failed\n");
-        return NULL;
-    }
-    init_study_info(&study_info, type);
-    //post json data to server
-    cJSON *root = cJSON_CreateObject();    
-    if (NULL == root)
-    {
-        return;
-    }
+        utils_print("To wait study report .....\n");
+        if (-1 == utils_recv_msg(&type, sizeof(STUDY_REPORT_TYPE)))
+        {
+            utils_print("recv study info failed\n");
+            continue;
+        }
+        utils_print("study reportreport type is %d\n", type);
+        init_study_info(&study_info, type);
+        utils_print("inited study info....\n");
+        //post json data to server
+        cJSON *root = cJSON_CreateObject();    
+        if (NULL == root)
+        {
+            continue;
+        }
 
-    cJSON *data_item = NULL;
-    cJSON_AddStringToObject(root, "senderId", "");
-    cJSON_AddStringToObject(root, "targetId", "");
-    cJSON_AddNumberToObject(root, "dataType", HXT_STUDY_INFO);
-    cJSON_AddItemToObject(root, "data", data_item = cJSON_CreateObject());
-    cJSON_AddNumberToObject(data_item, "childrenUnid", study_info.child_unid);
-    cJSON_AddNumberToObject(data_item, "parentUnid", study_info.parent_unid);
-    cJSON_AddNumberToObject(data_item, "reportType", study_info.report_type);
-    cJSON_AddStringoObject(data_item, "studyDate", study_info.study_date);
-    cJSON_AddStringoObject(data_item, "reportTime", study_info.report_time);
-    cJSON_AddNumberToObject(data_item, "studyMode", study_info.study_mode);
-    if (study_info.study_mode == BAD_POSTURE)
-    {
-        cJSON_AddNumberToObject(data_item, "duration", study_info.duration);
-        cJSON_AddStringoObject(data_item, "videoUrl", study_info.video_url);
-        cJSON_AddStringoObject(data_item, "photoUrl", study_info.photo_url);
-    }
-    cJSON_AddNumberToObject(data_item, "cameraStatus", study_info.camera_status);
+        cJSON *data_item = NULL;
+        cJSON_AddStringToObject(root, "senderId", "");
+        cJSON_AddStringToObject(root, "targetId", "");
+        cJSON_AddNumberToObject(root, "dataType", HXT_STUDY_INFO);
+        cJSON_AddItemToObject(root, "data", data_item = cJSON_CreateObject());
+        cJSON_AddNumberToObject(data_item, "childrenUnid", study_info.child_unid);
+        cJSON_AddNumberToObject(data_item, "parentUnid", study_info.parent_unid);
+        cJSON_AddNumberToObject(data_item, "reportType", study_info.report_type);
+        cJSON_AddStringToObject(data_item, "studyDate", study_info.study_date);
+        cJSON_AddStringToObject(data_item, "reportTime", study_info.report_time);
+        cJSON_AddNumberToObject(data_item, "studyMode", study_info.study_mode);
+        if (study_info.study_mode == BAD_POSTURE)
+        {
+            cJSON_AddNumberToObject(data_item, "duration", study_info.duration);
+            cJSON_AddStringToObject(data_item, "videoUrl", study_info.video_url);
+            cJSON_AddStringToObject(data_item, "photoUrl", study_info.photo_url);
+        }
+        cJSON_AddNumberToObject(data_item, "cameraStatus", study_info.camera_status);
 
-    char* json_data = cJSON_PrintUnformatted(root);
-    if (NULL == json_data)
-    {
-        return;
-    }
-    utils_print("STUDY-INFO: %s\n", json_data);
-    cl->send(cl, json_data, strlen(json_data), UWSC_OP_TEXT);
+        char* json_data = cJSON_PrintUnformatted(root);
+        // char *json_data = cJSON_Print(root);
+        if (NULL == json_data)
+        {
+            utils_print("no study info...\n");
+            goto CLEAR;
+        }
+        utils_print("STUDY-INFO: %s\n", json_data);
+        cl->send(cl, json_data, strlen(json_data), UWSC_OP_TEXT);
+CLEAR:
+        if(root != NULL)
+        {
+            cJSON_Delete(root);
+        }
 
-    if(root != NULL)
-    {
-        cJSON_Delete(root);
+        deinit_study_nifo(&study_info);
     }
-
-    deinit_study_nifo(&study_info);
+    
 }
 
 static void parse_server_config_data(void *data)
@@ -312,7 +324,7 @@ static void hxt_wsc_onopen(struct uwsc_client *cl)
 {
     utils_print("hxt onopen\n");
 
-    hxt_send_desk_status(cl, POWER_ON);
+    hxt_send_desk_status(cl, POWER_ON, UWSC_OP_TEXT);
     pthread_create(&study_info_tid, NULL, send_study_info_cb, (void *)cl);
 }
 
@@ -333,7 +345,7 @@ static void hxt_wsc_onmessage(struct uwsc_client *cl,void *data, size_t len, boo
 static void hxt_wsc_onerror(struct uwsc_client *cl, int err, const char *msg)
 {
     utils_print("hxt onerror:%d: %s\n", err, msg);
-    ev_break(cl->loop, EVBREAK_ALL);
+    // ev_break(cl->loop, EVBREAK_ALL);
 }
 
 static void hxt_wsc_onclose(struct uwsc_client *cl, int code, const char *reason)
@@ -344,12 +356,14 @@ static void hxt_wsc_onclose(struct uwsc_client *cl, int code, const char *reason
 
 static void hxt_wsc_ping(struct uwsc_client *cl)
 {
-    hxt_send_desk_status(cl, HEARTBEAT);
+    hxt_send_desk_status(cl, HEARTBEAT, UWSC_OP_PING);
 }
 
 static void signal_cb(struct ev_loop *loop, ev_signal *w, int revents)
 {
-    if (w->signum == SIGINT) {
+    if (w->signum == SIGINT) 
+    {
+        g_recv_running = FALSE;
         ev_break(loop, EVBREAK_ALL);
         utils_print("Normal quit\n");
     }
@@ -390,7 +404,7 @@ int hxt_websocket_start()
 
     ev_run(loop, 0);
 
-    hxt_send_desk_status(cl, POWER_OFF);
+    hxt_send_desk_status(cl, POWER_OFF, UWSC_OP_TEXT);
     free(cl);
        
     return 0;

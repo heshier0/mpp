@@ -60,9 +60,9 @@ int main(int argc, char **argv)
     g_video_status = 1;
     video_tid = start_sample_video();
 
-    // usleep(500);
-    // utils_send_local_voice(VOICE_DEVICE_OPEN);
-    // usleep(500);
+    usleep(500);
+    utils_send_local_voice(VOICE_DEVICE_OPEN);
+    usleep(500);
 
     start_posture_recognize();
 
@@ -78,9 +78,6 @@ int main(int argc, char **argv)
     //     }
     //     printf("qrcode: [%s]\n", qrcode_info);
     // }
-
-
-
     // /* connect to wifi */
     // utils_link_wifi(hxt_get_wifi_ssid_cfg(), hxt_get_wifi_pwd_cfg());
 
