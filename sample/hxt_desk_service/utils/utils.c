@@ -618,8 +618,6 @@ char* utils_date_to_string()
     time(&t);
     ltime = localtime(&t);
     strftime(str_date, 16, "%Y-%m-%d", ltime);
-    str_date[15] = '\0';
-    utils_print("%s\n", str_date);
     return str_date;
 }
 
@@ -632,8 +630,7 @@ char* utils_time_to_string()
     time(&t);
     ltime = localtime(&t);
     strftime(str_time, 20, "%Y-%m-%d %H:%M:%S", ltime);
-    str_time[19] = '\0';
-
+    utils_print("%s\n", str_time);
     return str_time;
 }
 

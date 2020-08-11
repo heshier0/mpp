@@ -29,14 +29,61 @@ typedef struct
 	int file_flags;	
 	char filename[128];	               //文件名
 } ffmpegCtx_t;
-
 ffmpegCtx_t ffmpegCtx[VENC_CHN_NUM];
 
-
-static ffmpegCtx_t * GetVencChnCtx(int VeChn)
+typedef struct media_context
 {
-	return (ffmpegCtx_t * )&ffmpegCtx[VeChn];
+	AVFormatContext* foramt_ctx;
+	int vi;
+	BOOL first_IDR;
+	long vpts_inc;
+	unsigned int64 first_video;
+	long moov_flags;
+	int moov_flags;
+	int file_flags;
+	char filename[128];
+}MediaCtx;
+MediaCtx g_media_ctx;
+
+// static ffmpegCtx_t * GetVencChnCtx(int VeChn)
+// {
+// 	return (ffmpegCtx_t * )&ffmpegCtx[VeChn];
+// }
+
+static void generate_video_file_name()
+{
+	struct tm *tm;
+	time_t now = time(0);
+	tm = localtime(&now);
+	snprintf(g_media_ctx.filename, 128, "/user/%04d%02d%02d-%02d%02d%02d.mp4",
+				tm->tm_year + 1900,
+				tm->tm_mon + 1, 
+				tm->tm_mday,
+				tm->tm_hour,
+				tm->tm_min,
+				tm->tm_sec);
+
+	return;
 }
+
+static void generate_file_name(VENC_CHN VeChn)
+{
+	struct tm * tm;
+	time_t now = time(0);
+	ffmpegCtx_t * fc = GetVencChnCtx(VeChn);
+	
+	tm = localtime(&now);
+	int child_unid = hxt_get_children_unid();
+	snprintf(fc->filename, 128, "/user/child_%d/video/%04d%02d%02d-%02d%02d%02d.mp4",
+								child_unid,
+								tm->tm_year + 1900,
+								tm->tm_mon + 1,
+								tm->tm_mday,
+								tm->tm_hour,
+								tm->tm_min,
+								tm->tm_sec);	
+}
+
 
 static int HI_PDT_Add_Stream(VENC_CHN VeChn)
 {
@@ -86,23 +133,6 @@ static int HI_PDT_Add_Stream(VENC_CHN VeChn)
     return HI_SUCCESS;
 }
 
-static void generate_file_name(VENC_CHN VeChn)
-{
-	struct tm * tm;
-	time_t now = time(0);
-	ffmpegCtx_t * fc = GetVencChnCtx(VeChn);
-	
-	tm = localtime(&now);
-	
-	snprintf(fc->filename, 128, "/user/%04d%02d%02d-%02d%02d%02d.mp4",
-								tm->tm_year + 1900,
-								tm->tm_mon + 1,
-								tm->tm_mday,
-								tm->tm_hour,
-								tm->tm_min,
-								tm->tm_sec);	
-}
-
 static HI_S32 HI_ADD_SPS_PPS(VENC_CHN VeChn, uint8_t *buf, uint32_t size)
 {
 	HI_S32 ret;
@@ -142,7 +172,6 @@ Add_Stream_faild:
 	fc->b_First_IDR_Find = 0;	//sps，pps帧标志清除
 	return HI_FAILURE;
 }
-
 
 //MP4创建函数：初始化，写文件头。
 int HI_PDT_CreateMp4(VENC_CHN VeChn)
@@ -411,6 +440,13 @@ int HI_PDT_Exit(void)
 	}
 		
 	return 0;
+}
+
+
+
+int board_init_mp4()
+{
+	
 }
 
 void delete_current_mp4_file()

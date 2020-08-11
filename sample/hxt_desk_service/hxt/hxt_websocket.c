@@ -28,6 +28,8 @@ static BOOL init_study_info(StudyInfo *study_info, int type)
         return FALSE;
     }
 
+    memset(study_info, 0, sizeof(study_info));
+
     study_info->parent_unid = hxt_get_parent_unid_cfg();
     study_info->child_unid = hxt_get_children_unid();
     study_info->report_type = type;
@@ -39,16 +41,16 @@ static BOOL init_study_info(StudyInfo *study_info, int type)
     }
     strcpy(study_info->study_date, study_date);
     study_info->study_date[strlen(study_date)] = '\0';
-    
+
     char* report_time = utils_time_to_string();
     if (study_info->report_time == NULL)
     {
-        study_info->report_type = utils_malloc(strlen(report_time) + 1);
+        study_info->report_time = utils_malloc(strlen(report_time) + 1);
     }
     strcpy(study_info->report_time, report_time);
-
+    
     study_info->study_mode = hxt_get_study_mode_cfg(study_info->child_unid);
-
+   
     if (study_info->report_type == BAD_POSTURE)
     {
         study_info->duration = 10;
@@ -155,8 +157,9 @@ static void* send_study_info_cb(void *params)
             utils_print("recv study info failed\n");
             continue;
         }
-        utils_print("study report type is %d\n", type);
+        utils_print("study reportreport type is %d\n", type);
         init_study_info(&study_info, type);
+        utils_print("inited study info....\n");
         //post json data to server
         cJSON *root = cJSON_CreateObject();    
         if (NULL == root)
@@ -184,6 +187,7 @@ static void* send_study_info_cb(void *params)
         cJSON_AddNumberToObject(data_item, "cameraStatus", study_info.camera_status);
 
         char* json_data = cJSON_PrintUnformatted(root);
+        // char *json_data = cJSON_Print(root);
         if (NULL == json_data)
         {
             utils_print("no study info...\n");
@@ -341,7 +345,7 @@ static void hxt_wsc_onmessage(struct uwsc_client *cl,void *data, size_t len, boo
 static void hxt_wsc_onerror(struct uwsc_client *cl, int err, const char *msg)
 {
     utils_print("hxt onerror:%d: %s\n", err, msg);
-    ev_break(cl->loop, EVBREAK_ALL);
+    // ev_break(cl->loop, EVBREAK_ALL);
 }
 
 static void hxt_wsc_onclose(struct uwsc_client *cl, int code, const char *reason)
@@ -352,7 +356,7 @@ static void hxt_wsc_onclose(struct uwsc_client *cl, int code, const char *reason
 
 static void hxt_wsc_ping(struct uwsc_client *cl)
 {
-    // hxt_send_desk_status(cl, HEARTBEAT, UWSC_OP_PING);
+    hxt_send_desk_status(cl, HEARTBEAT, UWSC_OP_PING);
 }
 
 static void signal_cb(struct ev_loop *loop, ev_signal *w, int revents)
