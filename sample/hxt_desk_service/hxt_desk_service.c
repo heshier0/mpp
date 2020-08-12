@@ -90,12 +90,12 @@ int main(int argc, char **argv)
     
     if (server_started)
     {
-        pid_t hxt_pid = fork();
-        if (hxt_pid == 0)
-        {
-            hxt_websocket_start();
-            return 0;
-        }
+        // pid_t hxt_pid = fork();
+        // if (hxt_pid == 0)
+        // {
+        //     hxt_websocket_start();
+        //     return 0;
+        // }
 
         // pid_t iflyos_pid = fork();
         // if (iflyos_pid == 0)
@@ -104,7 +104,7 @@ int main(int argc, char **argv)
         //     return 0;
         // }
 
-        waitpid(hxt_pid, &st1, 0);
+        // waitpid(hxt_pid, &st1, 0);
         // waitpid(iflyos_pid, &st2, 0);
     }
 

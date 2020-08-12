@@ -20,7 +20,7 @@ typedef struct media_context
 	long vpts_inc;						//用于视频帧递增计数
 	unsigned long long video_pts;			//视频PTS
 	unsigned long long first_video;			//视频第一帧标志
-	long moov_flags;					//moov的pos，未使用		
+	long moov_pos;					//moov的pos，未使用		
 	int moov_flags;						//moov前置标志，未使用
 	int file_flags;
 	char filename[128];					//视频绝对路径
@@ -191,7 +191,7 @@ BOOL board_close_mp4_file()
 		ret = av_write_trailer(g_media_ctx.format_ctx);
 		if (ret < 0)
 		{
-			utils_printf("av_write_trailer failed\n");
+			utils_print("av_write_trailer failed\n");
 		}
 	}
 
@@ -200,7 +200,7 @@ BOOL board_close_mp4_file()
 		ret = avio_close(g_media_ctx.format_ctx->pb);
 		if (ret < 0)
 		{
-			utils_printf("avio_close failed\n");
+			utils_print("avio_close failed\n");
 		}
 	}
 
@@ -262,7 +262,7 @@ BOOL board_write_mp4(VENC_STREAM_S *venc_stream)
 				{
 					memcpy(sps_pps_buf, sps_buf, sps_len);				//sps
 					memcpy(sps_pps_buf + sps_len, pps_buf, pps_len);	//add pps
-					if (!dd_sps_pps(sps_pps_buf, sps_len + pps_len))
+					if (!add_sps_pps(sps_pps_buf, sps_len + pps_len))
 					{
 						return FALSE;
 					}
@@ -284,7 +284,7 @@ BOOL board_write_mp4(VENC_STREAM_S *venc_stream)
 				{
 					memcpy(sps_pps_buf, sps_buf, sps_len);
 					memcpy(sps_pps_buf + sps_len, pps_buf, pps_len);	//add pps
-					if (!dd_sps_pps(sps_pps_buf, sps_len + pps_len))
+					if (!add_sps_pps(sps_pps_buf, sps_len + pps_len))
 					{
 						return FALSE;
 					}
@@ -360,7 +360,7 @@ BOOL board_write_mp4(VENC_STREAM_S *venc_stream)
 
 void board_delete_current_mp4_file()
 {
-	unlink(g_media_ctx->filename);
+	unlink(g_media_ctx.filename);
 
 	return;
 }

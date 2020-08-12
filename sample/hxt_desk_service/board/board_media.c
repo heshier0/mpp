@@ -33,8 +33,6 @@ VIDEO_FORMAT_E  enVideoFormat   = VIDEO_FORMAT_LINEAR;
 COMPRESS_MODE_E enCompressMode  = COMPRESS_MODE_NONE;
 VI_VPSS_MODE_E  enMastPipeMode  = VI_OFFLINE_VPSS_OFFLINE;
 
-static SAMPLE_VENC_GETSTREAM_PARA_S gs_stPara;
-static sem_t sem_snap[2];
 
 static SAMPLE_VI_CONFIG_S g_vi_configs;
 
@@ -48,7 +46,7 @@ static void stop_vi()
 
 static void stop_all_vpss()
 {
-    HI_BOOL chn_enable[VPSS_MAX_PHY_CHN_NUM] = { HI_TRUE, HI_TRUE, HI_FAILURE, HI_FAILURE };
+    HI_BOOL chn_enable[VPSS_MAX_PHY_CHN_NUM] = { HI_FALSE, HI_TRUE, HI_TRUE, HI_FALSE };
     VPSS_GRP vpss_grp[2] = {0, 1};
     for(int i = 0; i < 2; i++)
     {
@@ -280,7 +278,7 @@ static BOOL start_vpss()
     vpss_chn_attrs[vpss_chn0].enPixelFormat               = PIXEL_FORMAT_YVU_SEMIPLANAR_420;
     vpss_chn_attrs[vpss_chn0].stFrameRate.s32SrcFrameRate = -1;
     vpss_chn_attrs[vpss_chn0].stFrameRate.s32DstFrameRate = -1;
-    vpss_chn_attrs[vpss_chn0].u32Depth                    = 1;
+    vpss_chn_attrs[vpss_chn0].u32Depth                    = 0;
     vpss_chn_attrs[vpss_chn0].bMirror                     = HI_FALSE;
     vpss_chn_attrs[vpss_chn0].bFlip                       = HI_FALSE;
     vpss_chn_attrs[vpss_chn0].stAspectRatio.enMode        = ASPECT_RATIO_NONE;
@@ -525,44 +523,6 @@ static void sample_yuv_8bit_dump(VIDEO_FRAME_S* pVBuf, void **pOutBuf)
 
     HI_MPI_SYS_Munmap(pUserPageAddr[0], u32Size);
     pUserPageAddr[0] = HI_NULL;
-}
-
-static HI_S32 SnapSave(HI_S32 ch, VENC_STREAM_S * pstStream)
-{
-	HI_S32 s32Ret;
-    char acFile[FILE_NAME_LEN]    = {0};
-    FILE* pFile;
-    
-	struct tm * tm;
-	time_t now = time(0);
-	
-	tm = localtime(&now);
-	
-	snprintf(acFile, 128, "SNAP_CH%02d-%04d%02d%02d-%02d%02d%02d.jpg", ch - 2,
-	         tm->tm_year + 1900,
-	         tm->tm_mon + 1,
-	         tm->tm_mday,
-	         tm->tm_hour,
-	         tm->tm_min,
-	         tm->tm_sec);
-	         
-    pFile = fopen(acFile, "wb");
-    if (pFile == NULL)
-    {
-        SAMPLE_PRT("open file err\n");
-
-        return HI_FAILURE;
-    }
-    
-    s32Ret = SAMPLE_COMM_VENC_SaveStream(pFile, pstStream);
-    if (HI_SUCCESS != s32Ret)
-    {
-        SAMPLE_PRT("save snap picture failed!\n");
-    }	
-    
-    fclose(pFile);
-    
-    return s32Ret;
 }
 
 static void* sample_pcm_cb(void *data)
@@ -947,11 +907,6 @@ static void* sample_video_cb(void* data)
     }
 
     board_get_stream_from_venc_chn();
-    // board_get_venc_stream();
-    // while (g_video_status)
-    // {
-    //     sleep(5);
-    // }
 
 EXIT:
     unbind_vpss_venc();
@@ -962,7 +917,6 @@ EXIT:
     utils_print("video sample thread exit...\n");
     return NULL;
 }
-
 
 BOOL board_mpp_init()
 {
@@ -1011,66 +965,6 @@ BOOL board_mpp_init()
         return FALSE;
     }
 
-    // /*config vi*/
-    // init_result = start_vi();
-    // if(!init_result)
-    // {
-    //     utils_print("start vi failed\n");
-    //     return FALSE;
-    // }
-
-    // init_result = start_vpss();
-    // if(!init_result)
-    // {
-    //     utils_print("start vpss failed\n");
-    //     stop_vi();
-    //     return FALSE;
-    // }
-
-    // init_result = start_venc();
-    // if(!init_result)
-    // {
-    //     utils_print("start venc failed\n");
-    //     stop_all_vpss();
-    //     stop_vi();
-    //     return FALSE;
-    // }
-    
-    // init_result = bind_vi_vpss();
-    // if(!init_result)
-    // {
-    //     utils_print("bind vi and vpss failed\n");
-    //     stop_all_venc();
-    //     stop_all_vpss();
-    //     stop_vi();
-    //     return FALSE;
-    // }
-
-    // init_result = bind_vpss_venc();
-    // if(!init_result)
-    // {
-    //     utils_print("bind vi and vpss failed\n");
-    //     stop_all_venc();
-    //     unbind_vi_vpss();
-    //     stop_all_vpss();
-    //     stop_vi();
-    //     return FALSE;
-    // }
-
-    // init_result = rotate_picture();
-    // if(!init_result)
-    // {
-    //     utils_print("rotate vi failed\n");
-    //     unbind_vpss_venc();
-    //     stop_all_venc();
-    //     unbind_vi_vpss();
-    //     stop_all_vpss();
-    //     stop_vi();
-    //     return FALSE;
-    // }
-
-    // board_get_stream_from_venc_chn();
-
     return ret;       
 }
 
@@ -1092,12 +986,12 @@ void board_mpp_deinit()
 void board_get_yuv_from_vpss_chn(char **yuv_buf)
 {
     HI_S32 ret_val;
-    VPSS_GRP vpss_grp[2] = {0, 1};
-    HI_S32 time_out = 2000;
+    VPSS_GRP vpss_grp = 0;
+    HI_S32 time_out = 3000;
     VPSS_CHN vpss_chn = 2;
     VIDEO_FRAME_INFO_S  video_frame;
 
-    ret_val = HI_MPI_VPSS_GetChnFrame(vpss_grp[1], vpss_chn, &video_frame, time_out);
+    ret_val = HI_MPI_VPSS_GetChnFrame(vpss_grp, vpss_chn, &video_frame, time_out);
     if (HI_SUCCESS != ret_val)
     {
         SAMPLE_PRT("vpss get frame failed, ret:0x%08x\n", ret_val);
@@ -1107,187 +1001,13 @@ void board_get_yuv_from_vpss_chn(char **yuv_buf)
     /* to change to yuv picture */
     sample_yuv_8bit_dump(&video_frame.stVFrame, (void *)yuv_buf);
 
-    ret_val = HI_MPI_VPSS_ReleaseChnFrame(vpss_grp[1], vpss_chn, &video_frame);
+    ret_val = HI_MPI_VPSS_ReleaseChnFrame(vpss_grp, vpss_chn, &video_frame);
     if ( HI_SUCCESS != ret_val )
     {
         SAMPLE_PRT("vpss release frame failed, ret:0x%08x\n", ret_val);
         return;
     }  
 }
-
-
-#if 1
-void board_get_venc_stream()
-{
-    VENC_CHN venc_chn = -1;
-    VENC_CHN_ATTR_S venc_chn_attrs;
-    VENC_STREAM_BUF_INFO_S steam_buff_infos[VENC_MAX_CHN_NUM];
-    VENC_CHN_STATUS_S chn_stat;
-    VENC_STREAM_S venc_stream;
-    HI_S32 venc_fd[VENC_MAX_CHN_NUM] = {0};
-    HI_S32 max_fd = 0;
-    HI_S32 ret_val = HI_FAILURE;
-    int total_chn = 4;  //venc channel count
-    fd_set read_fds;
-    struct timeval timout_val;
-    HI_U32 picture_cnt[] = {0};
-
-    for(int i = 0; i < total_chn; i++)
-    {
-        venc_chn = i;
-        ret_val = HI_MPI_VENC_GetChnAttr(venc_chn, &venc_chn_attrs);
-        if (ret_val != HI_SUCCESS)
-        {
-            utils_print("HI_MPI_VENC_GetChnAttr chn[%d] failed with %#x!\n", venc_chn, ret_val);
-            return;
-        }
-
-        venc_fd[i] = HI_MPI_VENC_GetFd(i);
-        if (venc_fd[i] < 0)
-        {
-            utils_print("HI_MPI_VENC_GetFd failed with %#x!\n", venc_fd[i]);
-            return;
-        }
-        if (max_fd <= venc_fd[i])
-        {
-            max_fd = venc_fd[i];
-        }
-
-        ret_val = HI_MPI_VENC_GetStreamBufInfo (i, &steam_buff_infos[i]);
-        if (HI_SUCCESS != ret_val)
-        {
-            utils_print("HI_MPI_VENC_GetStreamBufInfo failed with %#x!\n", ret_val);
-            return;
-        }
-    }
-
-    HI_PDT_Init();
-
-
-    while (g_video_status)
-    {
-        FD_ZERO(&read_fds);
-        int i = 0;
-        for (i = 0; i < total_chn; i++)
-        {
-            FD_SET(venc_fd[i], &read_fds);
-        }
-
-        timout_val.tv_sec  = 2;
-        timout_val.tv_usec = 0;
-        ret_val = select(max_fd + 1, &read_fds, NULL, NULL, &timout_val);
-        if (ret_val < 0)
-        {
-            utils_print("select failed!\n");
-            break;
-        }
-        else if (ret_val == 0)
-        {
-            utils_print("get venc stream time out, exit thread\n");
-            continue;
-        }
-        else
-        {
-            for (i = 0; i < total_chn; i++)
-            {
-                if (FD_ISSET(venc_fd[i], &read_fds))
-                {
-                    /*******************************************************
-                     step 2.1 : query how many packs in one-frame stream.
-                    *******************************************************/
-                    memset(&venc_stream, 0, sizeof(venc_stream));
-                    ret_val = HI_MPI_VENC_QueryStatus(i, &chn_stat);
-                    if (HI_SUCCESS != ret_val)
-                    {
-                        utils_print("HI_MPI_VENC_QueryStatus chn[%d] failed with %#x!\n", i, ret_val);
-                        break;
-                    }
-
-                    /*******************************************************
-                    step 2.2 :suggest to check both u32CurPacks and u32LeftStreamFrames at the same time,for example:
-                     if(0 == stStat.u32CurPacks || 0 == stStat.u32LeftStreamFrames)
-                     {
-                        SAMPLE_PRT("NOTE: Current  frame is NULL!\n");
-                        continue;
-                     }
-                    *******************************************************/
-                    if(0 == chn_stat.u32CurPacks)
-                    {
-                          utils_print("NOTE: Current  frame is NULL!\n");
-                          continue;
-                    }
-                    /*******************************************************
-                     step 2.3 : malloc corresponding number of pack nodes.
-                    *******************************************************/
-                    venc_stream.pstPack = (VENC_PACK_S*)malloc(sizeof(VENC_PACK_S) * chn_stat.u32CurPacks);
-                    if (NULL == venc_stream.pstPack)
-                    {
-                        utils_print("malloc stream pack failed!\n");
-                        break;
-                    }
-
-                    /*******************************************************
-                     step 2.4 : call mpi to get one-frame stream
-                    *******************************************************/
-                    venc_stream.u32PackCount = chn_stat.u32CurPacks;
-                    ret_val = HI_MPI_VENC_GetStream(i, &venc_stream, HI_TRUE);
-                    if (HI_SUCCESS != ret_val)
-                    {
-                        free(venc_stream.pstPack);
-                        venc_stream.pstPack = NULL;
-                        utils_print("HI_MPI_VENC_GetStream failed with %#x!\n", ret_val);
-                        break;
-                    }
-                    
-                    if (i == 0 || i == 1)
-                    {	
-                    	//264保存成mp4
-                        //HI_PDT_WriteVideo(i,  &venc_stream);
-                        /* write into a circle buffer, to save 10 seconds video */
-                        
-                    }     
-                    else if (i == 2 || i == 3)
-                    {
-                    	//jpeg存文件
-                    	SnapSave(i, &venc_stream);
-                    	sem_post(&sem_snap[i - 2]);
-                    }	 
-
-                    if (HI_SUCCESS != ret_val)
-                    {
-                        free(venc_stream.pstPack);
-                        venc_stream.pstPack = NULL;
-                        utils_print("save stream failed!\n");
-                        break;
-                    }
-                    /*******************************************************
-                     step 2.6 : release stream
-                     *******************************************************/
-                    ret_val = HI_MPI_VENC_ReleaseStream(i, &venc_stream);
-                    if (HI_SUCCESS != ret_val)
-                    {
-                        utils_print("HI_MPI_VENC_ReleaseStream failed!\n");
-                        free(venc_stream.pstPack);
-                        venc_stream.pstPack = NULL;
-                        break;
-                    }
-
-                    /*******************************************************
-                     step 2.7 : free pack nodes
-                    *******************************************************/
-                    free(venc_stream.pstPack);
-                    venc_stream.pstPack = NULL;
-                    picture_cnt[i]++;
-                }
-            }
-        }
-    }
-    
-    HI_PDT_Exit();
-    
-    return;
-}
-#endif
 
 /* default venc chn 0 */
 void board_get_stream_from_venc_chn()
@@ -1340,7 +1060,7 @@ void board_get_stream_from_venc_chn()
         }
         else if (ret_val == 0)
         {
-            utils_print("get venc stream time out, exit thread\n");
+            utils_print("get venc chn %d stream time out, exit thread\n", venc_chn);
             continue;
         }
         else
@@ -1397,7 +1117,7 @@ void board_get_stream_from_venc_chn()
                 /* to save mp4 */
                 if(g_start_record)
                 {   
-                    HI_PDT_WriteVideo(venc_chn,  &venc_stream);  
+                    board_write_mp4(&venc_stream);  
                 }
 
                 if (HI_SUCCESS != ret_val)

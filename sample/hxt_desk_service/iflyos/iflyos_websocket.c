@@ -140,7 +140,7 @@ static void uwsc_onmessage(struct uwsc_client *cl,
         }
         else
         {
-            printf("%s: [%.*s]\n", get_current_time(), (int)len, (char *)data);
+            printf("%s: [%.*s]\n", utils_get_current_time(), (int)len, (char *)data);
         }
         
         free(name);

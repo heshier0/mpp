@@ -292,6 +292,7 @@ static void* thread_proc_yuv_data_cb(void *param)
         board_get_yuv_from_vpss_chn(&yuv_buf);
         if(NULL == yuv_buf)
         {
+            utils_print("no vpss data...\n");
             continue;
         }
 
@@ -300,7 +301,7 @@ static void* thread_proc_yuv_data_cb(void *param)
         /* 1 : bad posture */
         /* 2 : away */
         one_check_result = run_sit_posture(g_recog_handle, yuv_buf, width, height, 3);
-        //utils_print("%s -----> %d\n", get_current_time(), one_check_result);
+        utils_print("%s -----> %d\n", utils_get_current_time(), one_check_result);
         if (init_check_status(&check_status, one_check_result))
         {
             continue;

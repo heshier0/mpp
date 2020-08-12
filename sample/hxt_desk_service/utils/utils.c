@@ -74,7 +74,7 @@ static BOOL check_system_cmd_result(const pid_t status)
     return FALSE;
 }
 
-char *get_current_time()
+char *utils_get_current_time()
 {
     static char s[20] = {0};
     memset(s, 0, 20);
@@ -826,7 +826,6 @@ void utils_save_yuv_test(const char* yuv_data, const int width, const int height
     fflush(pfd);
     fclose(pfd);
 }
-
 
 int utils_send_msg(void* data, int length)
 {
