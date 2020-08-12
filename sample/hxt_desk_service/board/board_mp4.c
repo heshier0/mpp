@@ -34,7 +34,7 @@ static void generate_video_file_name()
 	tm = localtime(&now);
 
 	int child_unid = hxt_get_children_unid();
-	snprintf(g_media_ctx.filename, 128, "/user/child_%d/%04d%02d%02d-%02d%02d%02d.mp4",
+	snprintf(g_media_ctx.filename, 128, "/user/child_%d/video/%04d%02d%02d-%02d%02d%02d.mp4",
 								child_unid,
 								tm->tm_year + 1900,
 								tm->tm_mon + 1, 
