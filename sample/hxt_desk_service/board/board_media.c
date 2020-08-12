@@ -1022,7 +1022,7 @@ void board_get_stream_from_venc_chn()
     HI_S32 max_fd = 0;
     HI_S32 ret_val = HI_FAILURE;
     fd_set read_fds;
-    struct timeval timout_val;
+    struct timeval timout_val; 
 
     ret_val = HI_MPI_VENC_GetChnAttr(venc_chn, &venc_chn_attrs);
     if (ret_val != HI_SUCCESS)
