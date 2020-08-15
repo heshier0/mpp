@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <time.h>
+#include <dirent.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
@@ -16,7 +17,7 @@
 #include "common.h"
 #include "utils.h"
 
-#define STUDY_INFO_MQ_KEY       (232323L)
+
 
 static char* separate_filename(const char *url)
 {
@@ -233,7 +234,7 @@ double utils_get_cfg_number_value(cJSON* root, const char* params_item, const ch
         return 0;
     }
     
-    return prop_node->valueint;
+    return prop_node->valuedouble;
 }
 
 BOOL utils_set_cfg_str_value(cJSON* root, const char* cfg, const char* params_item, const char* prop_item, const char* value)
@@ -485,14 +486,13 @@ BOOL utils_upload_file(const char* url, const char* header, const char* local_fi
         return FALSE;
     }
 
-    utils_print("upload file name is %s\n", local_file_path);
-
-    char CMD_UPLOAD_FILE[512] = {0};
+    char CMD_UPLOAD_FILE[1024] = {0};
 #ifdef DEBUG
     sprintf(CMD_UPLOAD_FILE, "curl --insecure -H \"%s\" -F \"file=@%s\" %s", header, local_file_path, url);
 #else
     sprintf(CMD_UPLOAD_FILE, "curl --insecure -s -H \"%s\" -F \"file=@%s\" %s", header, local_file_path, url);
 #endif // DEBUG
+    utils_print("upload cmd: [%s]\n", CMD_UPLOAD_FILE);
 
     FILE *fp = NULL;
     fp = popen(CMD_UPLOAD_FILE, "r");
@@ -630,7 +630,6 @@ char* utils_time_to_string()
     time(&t);
     ltime = localtime(&t);
     strftime(str_time, 20, "%Y-%m-%d %H:%M:%S", ltime);
-    utils_print("%s\n", str_time);
     return str_time;
 }
 
@@ -778,8 +777,13 @@ void utils_link_wifi(const char* ssid, const char* pwd)
     system(CMD_SAVE_WIFI_INFO);
 
     char CMD_LINK_WIFI[256] = {0};
-    sprintf(CMD_LINK_WIFI, "sh /userdata/bin/script/link-wifi.sh");
+    //sprintf(CMD_LINK_WIFI, "sh /userdata/bin/script/link-wifi.sh");
+    sprintf(CMD_LINK_WIFI, "nohup wpa_supplicant -B -c %s -iwlan0 > /dev/null 2>&1 &", WIFI_CFG);
     system(CMD_LINK_WIFI);
+
+    char CMD_DHCP_IP[256] = {0};
+    sprintf(CMD_DHCP_IP, "nohup udhcpc -b -i wlan0 > /dev/null 2>&1 &");
+    system(CMD_DHCP_IP);
 
     return;
 }
@@ -827,29 +831,3 @@ void utils_save_yuv_test(const char* yuv_data, const int width, const int height
     fclose(pfd);
 }
 
-int utils_send_msg(void* data, int length)
-{
-    int msqid; 
-
-    msqid = msgget(STUDY_INFO_MQ_KEY, 0600 | IPC_CREAT);
-    if(msqid < 0)
-    {
-        utils_print("create message queue error\n");
-        return -1;
-    }
-
-    return msgsnd(msqid, data, length, 0);
-}
-
-int utils_recv_msg(void* data, int length)
-{
-    int msqid;
-    msqid = msgget(STUDY_INFO_MQ_KEY, 0);
-    if (msqid < 0)
-    {
-        utils_print("get message queue error\n");
-        return -1;
-    }
-
-    return msgrcv(msqid, data, length, 1, 0);
-}

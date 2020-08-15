@@ -367,7 +367,7 @@ static void* SAMPLE_COMM_ISP_Thread(void* param)
     snprintf(szThreadName, 20, "ISP%d_RUN", IspDev);
     prctl(PR_SET_NAME, szThreadName, 0,0,0);
 
-    SAMPLE_PRT("ISP Dev %d running !\n", IspDev);
+    //SAMPLE_PRT("ISP Dev %d running !\n", IspDev);
     s32Ret = HI_MPI_ISP_Run(IspDev);
 
     if (HI_SUCCESS != s32Ret)

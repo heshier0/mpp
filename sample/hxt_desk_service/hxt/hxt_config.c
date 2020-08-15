@@ -34,12 +34,12 @@ void hxt_unload_cfg()
     utils_unload_cfg(g_cfg_root);
 }
 
-void hxt_set_children_unid(const int unid)
+void hxt_set_child_unid(const int unid)
 {
     g_children_unid = unid;
 }
 
-int hxt_get_children_unid()
+int hxt_get_child_unid()
 {
     return g_children_unid;
 }
@@ -65,28 +65,38 @@ void hxt_init_cfg(void* data)
     {
         return;
     }
+    
     cJSON* root = cJSON_Parse(data);
     if(NULL == root)
     {
         return;
     }
     cJSON* returnObject = cJSON_GetObjectItem(root, "returnObject");
+    if (NULL == returnObject)
+    {
+        utils_print("No return objects\n");
+        return;
+    }
 
-    cJSON* item = cJSON_GetObjectItem(returnObject, "token");
-    utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "server", "token", item->valuestring);
-
-    item = cJSON_GetObjectItem(returnObject, "websocketUrl");
+    cJSON* item = cJSON_GetObjectItem(returnObject, "websocketUrl");
     utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "server", "websocketUrl", item->valuestring);
 
     item = cJSON_GetObjectItem(returnObject, "uploadHostUrl");
     utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "server", "uploadHostUrl", item->valuestring);
 
+    item = cJSON_GetObjectItem(returnObject, "tokenExpireTime");
+    utils_set_cfg_number_value(g_cfg_root, HXT_CFG, "server", "tokenExpireTime", item->valuedouble);
+
+    item = cJSON_GetObjectItem(returnObject, "token");
+    utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "server", "token", item->valuestring);
+
+    item = cJSON_GetObjectItem(returnObject, "iflyosToken");
+    utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "server", "iflyosToken", item->valuestring);
+
     item = cJSON_GetObjectItem(returnObject, "upgradePackUrl");
     utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "server", "upgradePackUrl", item->valuestring);
-
     item = cJSON_GetObjectItem(returnObject, "alarmFileUrl");
     utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "server", "alarmFileUrl", item->valuestring);
-
     item = cJSON_GetObjectItem(returnObject, "postureCountDuration");
     utils_set_cfg_number_value(g_cfg_root, HXT_CFG, "device", "judgeTime", item->valueint);
 
@@ -98,25 +108,21 @@ void hxt_init_cfg(void* data)
    
     switch(item->valueint)
     {
-    //1080x720    
     case 3:
         g_video_width = 1280;
         g_video_height =720;
     break;
-    //704x576
     case 2:
-        g_video_width = 720;
-        g_video_height = 576;
+        g_video_width = 960;
+        g_video_height = 540;
     break;
-    //
     case 1:
-        g_video_width = 352;
-        g_video_height = 288;  
+        g_video_width = 640;
+        g_video_height = 360;  
     break;
-    //704x576
     default:
-        g_video_width = 720;
-        g_video_height = 576;        
+        g_video_width = 960;
+        g_video_height = 540;        
     break;
     }
 
@@ -167,7 +173,6 @@ void hxt_init_cfg(void* data)
     return;
 }
 
-
 char* hxt_get_posture_detect_model_path()
 {
     return utils_get_cfg_str_value(g_cfg_root, "model", "detect_model");
@@ -194,9 +199,20 @@ char* hxt_get_api_version_cfg()
     return utils_get_cfg_str_value(g_cfg_root, "server", "api_ver");
 }
 
+char* hxt_get_iflyos_token_cfg()
+{
+    return utils_get_cfg_str_value(g_cfg_root, "server", "iflyosToken");
+}
+
 char* hxt_get_token_cfg()
 {
     return utils_get_cfg_str_value(g_cfg_root, "server", "token");
+}
+
+int hxt_get_token_expire_time_cfg()
+{
+    long long int expire_time = utils_get_cfg_number_value(g_cfg_root, "server", "tokenExpireTime");
+    return expire_time / 1000;
 }
 
 char* hxt_get_websocket_url_cfg()
@@ -371,6 +387,15 @@ BOOL hxt_set_api_version_cfg(const char* value)
     return utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "server", "api_ver", value);
 }
 
+BOOL hxt_set_iflyos_token_cfg(const char* value)
+{
+    if (NULL == value)
+    {
+        return FALSE;
+    }       
+    return utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "server", "iflyosToken", value);  
+}
+
 BOOL hxt_set_token_cfg(const char* value)
 {
     if (NULL == value)
@@ -378,6 +403,15 @@ BOOL hxt_set_token_cfg(const char* value)
         return FALSE;
     }       
     return utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "server", "token", value);
+}
+
+BOOL hxt_set_token_expire_time_cfg(const double value)
+{
+    if (value <= 0)
+    {
+        return FALSE;
+    }       
+    return utils_set_cfg_number_value(g_cfg_root, HXT_CFG, "server", "tokenExpireTime", value);
 }
 
 BOOL hxt_set_websocket_url_cfg(const char* value)
@@ -543,3 +577,5 @@ int hxt_get_camera_status()
 {
     return g_camera_status;
 }
+
+

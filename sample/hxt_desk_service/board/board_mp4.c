@@ -27,24 +27,6 @@ typedef struct media_context
 }MediaCtx;
 MediaCtx g_media_ctx;
 
-static void generate_video_file_name()
-{
-	struct tm *tm;
-	time_t now = time(0);
-	tm = localtime(&now);
-
-	int child_unid = hxt_get_children_unid();
-	snprintf(g_media_ctx.filename, 128, "/user/child_%d/video/%04d%02d%02d-%02d%02d%02d.mp4",
-								child_unid,
-								tm->tm_year + 1900,
-								tm->tm_mon + 1, 
-								tm->tm_mday,
-								tm->tm_hour,
-								tm->tm_min,
-								tm->tm_sec);
-
-	return;
-}
 
 static BOOL init_video_codec_params()
 {
@@ -76,7 +58,7 @@ static BOOL init_video_codec_params()
 	{
 		av_codec_params->codec_type = AVMEDIA_TYPE_VIDEO;
 		av_codec_params->codec_id = AV_CODEC_ID_H264;
-		av_codec_params->bit_rate =  2000;
+		av_codec_params->bit_rate = 2000;
 		av_codec_params->width = 1280;
 		av_codec_params->height = 720;
 		av_codec_params->format = AV_PIX_FMT_YUV420P;
@@ -129,12 +111,16 @@ INIT_VIDEO_CODEC_PARAMS_FAILED:
 }
 
 /* init mp4 file structure */
-BOOL board_create_mp4_file()
+BOOL board_create_mp4_file(const char* filename)
 {
 	int ret = 0;
 	AVOutputFormat *output_fmt = NULL;
 
-	generate_video_file_name();
+	if (NULL == filename)
+	{
+		return FALSE;
+	}
+	strcpy(g_media_ctx.filename, filename);
 
 	avformat_alloc_output_context2(&(g_media_ctx.format_ctx), NULL, NULL, g_media_ctx.filename);
 	if(NULL == g_media_ctx.format_ctx)

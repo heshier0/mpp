@@ -10,6 +10,8 @@
 //wifi config file
 #define WIFI_CFG                "/userdata/config/wifi.conf"
 
+#define STUDY_INFO_MQ_KEY       (232323L)
+
 //local voice
 #define VOICE_DEVICE_OPEN                       "/userdata/media/voice/V001.mp3"
 #define VOICE_CONNECT_ERROR                     "/userdata/media/voice/V002.mp3"  
@@ -63,6 +65,21 @@ typedef enum
 
 typedef struct study_info_s
 {
+    long msg_type;
+    int info_type;
+    char file[128];
+    char snap[128];
+}StudyInfo;
+
+typedef struct study_info_msg_s
+{
+    long msg_type;
+    StudyInfo* info;
+}StudyInfoMsg;
+
+
+typedef struct report_info_s
+{
     int child_unid; 
     int parent_unid;
     int report_type;
@@ -71,9 +88,9 @@ typedef struct study_info_s
     int study_mode;
     int duration;
     char *video_url;
-    char *photo_url;
+    char *snap_url;
     int camera_status;
-}StudyInfo;
+}ReportInfo;
 
 
 #pragma pack(pop)

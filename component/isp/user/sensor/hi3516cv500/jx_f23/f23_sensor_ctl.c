@@ -68,7 +68,7 @@ int soi_sensor_i2c_init(VI_PIPE ViPipe)
 	
 	u8DevNum = g_aunSoiSensorBusInfo[ViPipe].s8I2cDev;
 	
-	printf("!!! jxf23:i2c-%d\n", u8DevNum);
+	//printf("!!! jxf23:i2c-%d\n", u8DevNum);
 	
 	snprintf( acDevFile, sizeof(acDevFile),  "/dev/i2c-%u", u8DevNum );
 	
@@ -214,9 +214,9 @@ void soi_sensor_init(VI_PIPE ViPipe)
 	//bInit		= g_pastSoiSensor[ViPipe]->bInit;
 	//u8ImgMode	= g_pastSoiSensor[ViPipe]->u8ImgMode;
 	
-	printf( "[JXF23] Date: %s\n", __DATE__ );
-	printf( "[JXF23] Time: %s\n", __TIME__ );
-	printf( ">> soi_sensor_init()\n" );
+	// printf( "[JXF23] Date: %s\n", __DATE__ );
+	// printf( "[JXF23] Time: %s\n", __TIME__ );
+	// printf( ">> soi_sensor_init()\n" );
 	
 	soi_sensor_i2c_init( ViPipe );
 	
@@ -250,7 +250,7 @@ void soi_sensor_init(VI_PIPE ViPipe)
 //		}
 //	}
 	
-	printf( "<< soi_sensor_init()\n" );
+	// printf( "<< soi_sensor_init()\n" );
 }
 
 void soi_sensor_exit(VI_PIPE ViPipe)
@@ -260,7 +260,7 @@ void soi_sensor_exit(VI_PIPE ViPipe)
 
 void soi_sensor_linear_1080p30_init(VI_PIPE ViPipe)
 {
-	printf( ">> soi_sensor_linear_1080p30_init()\n" );
+	//printf( ">> soi_sensor_linear_1080p30_init()\n" );
 	
 	delay_ms( 10 );
 	
@@ -368,12 +368,12 @@ void soi_sensor_linear_1080p30_init(VI_PIPE ViPipe)
 	soi_sensor_write_register( ViPipe, 0x48, 0x8A );
 	soi_sensor_write_register( ViPipe, 0x48, 0x0A );
 	
-	printf( "<< soi_sensor_linear_1080p30_init()\n" );
+	printf("ViPipe:%d,===SOI 1080P 30fps Init OK!===\n", ViPipe);
 }
 
 void soi_sensor_2wdr1_1080p30_init(VI_PIPE ViPipe)
 {
-	printf( ">> soi_sensor_2wdr1_1080p30_init()\n" );
+	//printf( ">> soi_sensor_2wdr1_1080p30_init()\n" );
 	
 	delay_ms( 10 );
 	
@@ -480,10 +480,10 @@ void soi_sensor_2wdr1_1080p30_init(VI_PIPE ViPipe)
     soi_sensor_write_register( ViPipe, 0x48, 0x8A );
     soi_sensor_write_register( ViPipe, 0x48, 0x0A );
 
-    printf("=========================================================================\n");
-    printf("===soi_sensor_2wdr1_1080p30_init success!===\n");
-    printf("=========================================================================\n");
+   // printf("=========================================================================\n");
+    //printf("===soi_sensor_2wdr1_1080p30_init success!===\n");
+    //printf("=========================================================================\n");
 	
-	printf( "<< soi_sensor_2wdr1_1080p30_init()\n" );
+	//printf( "<< soi_sensor_2wdr1_1080p30_init()\n" );
 }
 

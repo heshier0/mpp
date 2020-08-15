@@ -1,6 +1,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/ipc.h>
+#include <sys/msg.h>
+
 
 #include <uwsc/uwsc.h>
 
@@ -16,85 +19,93 @@ typedef enum
 }REPORT_TYPE;
 
 static BOOL g_recv_running = TRUE;
-static char g_video_url[256] = {0};
-static char g_photo_url[256] = {0};
 
 pthread_t study_info_tid;
+struct ev_loop *g_hxt_wsc_loop;
 
-static BOOL init_study_info(StudyInfo *study_info, int type)
+static BOOL init_study_info(ReportInfo *report_info, StudyInfo *study_info)
 {
-    if(NULL == study_info)
+    if(NULL == report_info || NULL == study_info)
     {
         return FALSE;
     }
 
-    memset(study_info, 0, sizeof(study_info));
+    if(study_info->info_type < 1 || study_info->info_type > 5)
+    {
+        utils_print("Study info type ERROR\n");
+        return FALSE;
+    }
 
-    study_info->parent_unid = hxt_get_parent_unid_cfg();
-    study_info->child_unid = hxt_get_children_unid();
-    study_info->report_type = type;
+    memset(report_info, 0, sizeof(report_info));
+
+    report_info->parent_unid = hxt_get_parent_unid_cfg();
+    report_info->child_unid = hxt_get_child_unid();
+
+    report_info->report_type = study_info->info_type;
     
     char* study_date = utils_date_to_string();
-    if(study_info->study_date == NULL)
+    if(report_info->study_date == NULL)
     {
-        study_info->study_date = utils_malloc(strlen(study_date) + 1);
+        report_info->study_date = utils_malloc(strlen(study_date) + 1);
     }
-    strcpy(study_info->study_date, study_date);
-    study_info->study_date[strlen(study_date)] = '\0';
+    strcpy(report_info->study_date, study_date);
+    report_info->study_date[strlen(study_date)] = '\0';
 
     char* report_time = utils_time_to_string();
-    if (study_info->report_time == NULL)
+    if (report_info->report_time == NULL)
     {
-        study_info->report_time = utils_malloc(strlen(report_time) + 1);
+        report_info->report_time = utils_malloc(strlen(report_time) + 1);
     }
-    strcpy(study_info->report_time, report_time);
+    strcpy(report_info->report_time, report_time);
     
-    study_info->study_mode = hxt_get_study_mode_cfg(study_info->child_unid);
+    report_info->study_mode = hxt_get_study_mode_cfg(report_info->child_unid);
    
-    if (study_info->report_type == BAD_POSTURE)
+    if (report_info->report_type == BAD_POSTURE)
     {
-        study_info->duration = 10;
-
-        if (study_info->video_url == NULL)
+        report_info->duration = 10;
+        
+        /* send video */        
+        if (hxt_file_upload_request(study_info->file, report_info->video_url))
         {
-            study_info->video_url = utils_malloc(strlen(g_video_url) + 1);
+            
         }
-        strcpy(study_info->video_url, g_video_url);
-        study_info->video_url[strlen(g_video_url)] = '\0';
 
-        if (study_info->photo_url == NULL)
+        if (hxt_file_upload_request(study_info->snap, report_info->snap_url))
         {
-            study_info->photo_url = utils_malloc(strlen(g_photo_url) + 1);
+            
         }
-        strcpy(study_info->photo_url, g_photo_url);
-        study_info->photo_url[strlen(g_photo_url)] = '\0';
+
     }
-    study_info->camera_status = hxt_get_camera_status();
+    report_info->camera_status = hxt_get_camera_status();
 
     return TRUE;
 }
 
-static void deinit_study_nifo(StudyInfo *study_info)
+static void deinit_study_nifo(ReportInfo *report_info)
 {
-    if (NULL == study_info)
+    if (NULL == report_info)
     {
         return;
     }
-    if(study_info->video_url != NULL)
+    if(report_info->video_url != NULL)
     {
-        utils_free(study_info->video_url);
+        utils_free(report_info->video_url);
+        report_info->video_url = NULL;
     }
-    if(study_info->photo_url != NULL)
+    if(report_info->snap_url != NULL)
     {
-        utils_free(study_info->photo_url);
+        utils_free(report_info->snap_url);
+        report_info->snap_url = NULL;
     }
-    if(study_info->study_date != NULL)
+    if(report_info->study_date != NULL)
     {
-        utils_free(study_info->study_date);
+        utils_free(report_info->study_date);
+        report_info->study_date = NULL;
     }
-    if(study_info->report_time != NULL)
+    if(report_info->report_time != NULL)
     {
-        utils_free(study_info->report_time);
+        utils_free(report_info->report_time);
+        report_info->report_time = NULL;
     }
 
     return;
@@ -140,26 +151,32 @@ static void hxt_send_desk_status(struct uwsc_client *cl, REPORT_TYPE type, int i
 
 static void* send_study_info_cb(void *params)
 {
-    StudyInfo study_info;
-
+    ReportInfo report_info;
+    StudyInfo info;
     if (NULL == params)
     {
         return NULL;
     }    
     struct uwsc_client *cl = (struct uwsc_client *)params;
-    STUDY_REPORT_TYPE type;
+
+    int msqid = msgget(STUDY_INFO_MQ_KEY, 0666 | IPC_CREAT);
+    if (msqid < 0)
+    {
+        utils_print("get message queue id error\n");
+        return -1;
+    }
 
     while (g_recv_running)
     {
         utils_print("To wait study report .....\n");
-        if (-1 == utils_recv_msg(&type, sizeof(STUDY_REPORT_TYPE)))
+        if (-1 == msgrcv(msqid, &info, sizeof(StudyInfo) - sizeof(long), 1, 0))
         {
-            utils_print("recv study info failed\n");
+            sleep(5);
             continue;
         }
-        utils_print("study reportreport type is %d\n", type);
-        init_study_info(&study_info, type);
-        utils_print("inited study info....\n");
+        utils_print("study report type is %d\n", info.info_type);
+        init_study_info(&report_info, &info);
+        utils_print("inited report info....\n");
         //post json data to server
         cJSON *root = cJSON_CreateObject();    
         if (NULL == root)
@@ -172,38 +189,38 @@ static void* send_study_info_cb(void *params)
         cJSON_AddStringToObject(root, "targetId", "");
         cJSON_AddNumberToObject(root, "dataType", HXT_STUDY_INFO);
         cJSON_AddItemToObject(root, "data", data_item = cJSON_CreateObject());
-        cJSON_AddNumberToObject(data_item, "childrenUnid", study_info.child_unid);
-        cJSON_AddNumberToObject(data_item, "parentUnid", study_info.parent_unid);
-        cJSON_AddNumberToObject(data_item, "reportType", study_info.report_type);
-        cJSON_AddStringToObject(data_item, "studyDate", study_info.study_date);
-        cJSON_AddStringToObject(data_item, "reportTime", study_info.report_time);
-        cJSON_AddNumberToObject(data_item, "studyMode", study_info.study_mode);
-        if (study_info.study_mode == BAD_POSTURE)
+        cJSON_AddNumberToObject(data_item, "childrenUnid", report_info.child_unid);
+        cJSON_AddNumberToObject(data_item, "parentUnid", report_info.parent_unid);
+        cJSON_AddNumberToObject(data_item, "reportType", report_info.report_type);
+        cJSON_AddStringToObject(data_item, "studyDate", report_info.study_date);
+        cJSON_AddStringToObject(data_item, "reportTime", report_info.report_time);
+        cJSON_AddNumberToObject(data_item, "studyMode", report_info.study_mode);
+        if (report_info.study_mode == BAD_POSTURE)
         {
-            cJSON_AddNumberToObject(data_item, "duration", study_info.duration);
-            cJSON_AddStringToObject(data_item, "videoUrl", study_info.video_url);
-            cJSON_AddStringToObject(data_item, "photoUrl", study_info.photo_url);
+            cJSON_AddNumberToObject(data_item, "duration", report_info.duration);
+            cJSON_AddStringToObject(data_item, "videoUrl", report_info.video_url);
+            cJSON_AddStringToObject(data_item, "photoUrl", report_info.snap_url);
         }
-        cJSON_AddNumberToObject(data_item, "cameraStatus", study_info.camera_status);
+        cJSON_AddNumberToObject(data_item, "cameraStatus", report_info.camera_status);
 
         char* json_data = cJSON_PrintUnformatted(root);
         // char *json_data = cJSON_Print(root);
         if (NULL == json_data)
         {
-            utils_print("no study info...\n");
             goto CLEAR;
         }
         utils_print("STUDY-INFO: %s\n", json_data);
-        cl->send(cl, json_data, strlen(json_data), UWSC_OP_TEXT);
+        int send_count = cl->send(cl, json_data, strlen(json_data), UWSC_OP_TEXT);
+        utils_print("websocket %d bytes sent ok\n", send_count);
 CLEAR:
         if(root != NULL)
         {
             cJSON_Delete(root);
         }
 
-        deinit_study_nifo(&study_info);
+        deinit_study_nifo(&report_info);
     }
-    
+    msgctl(msqid, IPC_RMID, 0);
 }
 
 static void parse_server_config_data(void *data)
@@ -280,24 +297,27 @@ static void parse_server_config_data(void *data)
         // child unid
         item = cJSON_GetObjectItem(root, "data");
         sub_item = cJSON_GetObjectItem(item, "childrenUnid");              //书桌新关联孩子
-        hxt_set_children_unid(sub_item->valueint);
+        hxt_set_child_unid(sub_item->valueint);
     break;
     case 8:
         //
         item = cJSON_GetObjectItem(root, "data");
         sub_item = cJSON_GetObjectItem(item, "childrenUnid");               //设置/变更上报数据的孩子ID
-        hxt_set_children_unid(sub_item->valueint);
+        hxt_set_child_unid(sub_item->valueint);
     break;
     case 10:
         item = cJSON_GetObjectItem(root, "data");
         sub_item = cJSON_GetObjectItem(item, "iflyosToken");
-        iflyos_set_token(sub_item->valuestring);
+        hxt_set_iflyos_token_cfg(sub_item->valuestring);
+        // iflyos_set_token(sub_item->valuestring);
     break;
     case 14:
         /* stop studying */
+        stop_posture_recognize();
     break;
     case 15:
         /* disconnect */
+
     break;
     case 16:
         /* power off */
@@ -345,7 +365,7 @@ static void hxt_wsc_onmessage(struct uwsc_client *cl,void *data, size_t len, boo
 static void hxt_wsc_onerror(struct uwsc_client *cl, int err, const char *msg)
 {
     utils_print("hxt onerror:%d: %s\n", err, msg);
-    // ev_break(cl->loop, EVBREAK_ALL);
+    ev_break(cl->loop, EVBREAK_ALL);
 }
 
 static void hxt_wsc_onclose(struct uwsc_client *cl, int code, const char *reason)
@@ -371,7 +391,7 @@ static void signal_cb(struct ev_loop *loop, ev_signal *w, int revents)
 
 int hxt_websocket_start()
 {
-    struct ev_loop *loop = EV_DEFAULT;
+    // struct ev_loop *loop = EV_DEFAULT;
     struct ev_signal signal_watcher;
 	int ping_interval = 120;	        /* second */
     struct uwsc_client *cl;
@@ -384,14 +404,15 @@ int hxt_websocket_start()
     strcat(extra_header, token);
     strcat(extra_header, "\r\n");
 
-    cl = uwsc_new(loop, hxt_url, ping_interval, extra_header);
+    g_hxt_wsc_loop = EV_DEFAULT;
+    cl = uwsc_new(g_hxt_wsc_loop, hxt_url, ping_interval, extra_header);
     if (!cl)
     {
         utils_print("hxt init failed\n");
         return -1;
     }
-        
-	utils_print("Hxt start connect...\n");
+         
+	utils_print("Hxt websocket start ...\n");
 
     cl->onopen = hxt_wsc_onopen;
     cl->onmessage = hxt_wsc_onmessage;
@@ -399,13 +420,22 @@ int hxt_websocket_start()
     cl->onclose = hxt_wsc_onclose;
     cl->ping = hxt_wsc_ping;
 
+    /* for test */
     ev_signal_init(&signal_watcher, signal_cb, SIGINT);
-    ev_signal_start(loop, &signal_watcher);
+    ev_signal_start(g_hxt_wsc_loop, &signal_watcher);
 
-    ev_run(loop, 0);
+    ev_run(g_hxt_wsc_loop, 0);
+
+    utils_print("hxt websocket exit.\n");
 
     hxt_send_desk_status(cl, POWER_OFF, UWSC_OP_TEXT);
+
     free(cl);
        
     return 0;
+}
+
+int hxt_websockt_stop()
+{
+    ev_break(g_hxt_wsc_loop, EVBREAK_ALL);
 }

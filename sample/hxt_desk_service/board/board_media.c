@@ -619,8 +619,6 @@ static void* sample_pcm_cb(void *data)
             }
             goto AIAENC_ERR4;
         }
-
-        printf("Ai(%d,%d) bind to AencChn:%d ok!\n", AiDev , AiChn, AeChn);
     }
 
     //编码
@@ -772,7 +770,7 @@ static void* play_mp3_cb(void* data)
 
     //设置音量
     //s32Ret = HI_MPI_AO_SetVolume(AoDev, -51);
-    s32Ret = HI_MPI_AO_SetVolume(AoDev, -10);
+    s32Ret = HI_MPI_AO_SetVolume(AoDev, -20);
     if (s32Ret != HI_SUCCESS)
     {
         utils_print("ret=%d\n",s32Ret);
@@ -1152,7 +1150,7 @@ void board_get_stream_from_venc_chn()
 }
 
 /* default venc chn 2 */
-void board_get_snap_from_venc_chn()
+void board_get_snap_from_venc_chn(const char* jpg_file)
 {
     VENC_CHN venc_chn = 3;
 
@@ -1164,6 +1162,11 @@ void board_get_snap_from_venc_chn()
     HI_S32 ret;
     HI_U32 idx;
     VENC_RECV_PIC_PARAM_S  snap_recv_param;
+
+    if (NULL == jpg_file)
+    {
+        return;
+    }
 
     snap_recv_param.s32RecvPicNum = 1;
     ret = HI_MPI_VENC_StartRecvFrame(venc_chn, &snap_recv_param);
@@ -1182,95 +1185,90 @@ void board_get_snap_from_venc_chn()
 
     FD_ZERO(&read_fds);
     FD_SET(venc_fd, &read_fds);
-    timeout.tv_sec  = 10;
+    timeout.tv_sec  = 5;
     timeout.tv_usec = 0;
-    ret = select(venc_fd + 1, &read_fds, NULL, NULL, &timeout);
-    if (ret < 0)
+    int retry_count = 0;
+    while(retry_count < 3)
     {
-        utils_print("snap select failed!\n");
-        return;
-    }
-    else if (0 == ret)
-    {
-        utils_print("snap time out!\n");
-        return;
-    }
-    else
-    {
-        if (FD_ISSET(venc_fd, &read_fds))
+        ret = select(venc_fd + 1, &read_fds, NULL, NULL, &timeout);
+        if (ret < 0)
         {
-            ret = HI_MPI_VENC_QueryStatus(venc_chn, &venc_chn_stat);
-            if (ret != HI_SUCCESS)
+            utils_print("snap select failed!\n");
+            return;
+        }
+        else if (0 == ret)
+        {
+            utils_print("snap time out!\n");
+            retry_count ++;
+            continue;
+        }
+        else
+        {
+            if (FD_ISSET(venc_fd, &read_fds))
             {
-                utils_print("HI_MPI_VENC_QueryStatus failed with %#x!\n", ret);
-                return;
-            }
+                ret = HI_MPI_VENC_QueryStatus(venc_chn, &venc_chn_stat);
+                if (ret != HI_SUCCESS)
+                {
+                    utils_print("HI_MPI_VENC_QueryStatus failed with %#x!\n", ret);
+                    return;
+                }
 
-            if (0 == venc_chn_stat.u32CurPacks)
-            {
-                utils_print("NOTE: Current  frame is NULL!\n");
-                return;
-            }
-            stream.pstPack = (VENC_PACK_S*)malloc(sizeof(VENC_PACK_S) * venc_chn_stat.u32CurPacks);
-            if (NULL == stream.pstPack)
-            {
-                utils_print("malloc memory failed!\n");
-                return;
-            }
-            stream.u32PackCount = venc_chn_stat.u32CurPacks;
-            ret = HI_MPI_VENC_GetStream(venc_chn, &stream, -1);
-            if (HI_SUCCESS != ret)
-            {
-                utils_print("HI_MPI_VENC_GetStream failed with %#x!\n", ret);
+                if (0 == venc_chn_stat.u32CurPacks)
+                {
+                    utils_print("NOTE: Current  frame is NULL!\n");
+                    return;
+                }
+                stream.pstPack = (VENC_PACK_S*)malloc(sizeof(VENC_PACK_S) * venc_chn_stat.u32CurPacks);
+                if (NULL == stream.pstPack)
+                {
+                    utils_print("malloc memory failed!\n");
+                    return;
+                }
+                stream.u32PackCount = venc_chn_stat.u32CurPacks;
+                ret = HI_MPI_VENC_GetStream(venc_chn, &stream, -1);
+                if (HI_SUCCESS != ret)
+                {
+                    utils_print("HI_MPI_VENC_GetStream failed with %#x!\n", ret);
+
+                    free(stream.pstPack);
+                    stream.pstPack = NULL;
+                    return;
+                }
+              
+                FILE* pFile = fopen(jpg_file, "wb");
+                if (pFile == NULL)
+                {
+                    utils_print("open file err\n");
+                    free(stream.pstPack);
+                    stream.pstPack = NULL;
+                    return;
+                }
+                for (int i = 0; i < stream.u32PackCount; i++)
+                {
+                    fwrite(stream.pstPack[i].pu8Addr + stream.pstPack[i].u32Offset,
+                            stream.pstPack[i].u32Len - stream.pstPack[i].u32Offset, 1, pFile);
+
+                    fflush(pFile);
+                }
+                fclose(pFile);
+                
+                ret = HI_MPI_VENC_ReleaseStream(venc_chn, &stream);
+                if (HI_SUCCESS != ret)
+                {
+                    utils_print("HI_MPI_VENC_ReleaseStream failed with %#x!\n", ret);
+
+                    free(stream.pstPack);
+                    stream.pstPack = NULL;
+                    return;
+                }
 
                 free(stream.pstPack);
                 stream.pstPack = NULL;
-                return;
             }
-
-            char jpg_file[FILE_NAME_LEN]    = {0};
-            struct tm * tm;
-            time_t now = time(0);
-            tm = localtime(&now);
-            snprintf(jpg_file, 128, "/user/%04d%02d%02d%02d%02d%02d.jpg",
-                                    tm->tm_year + 1900,
-                                    tm->tm_mon + 1,
-                                    tm->tm_mday,
-                                    tm->tm_hour,
-                                    tm->tm_min,
-                                    tm->tm_sec);
-	         
-            FILE* pFile = fopen(jpg_file, "wb");
-            if (pFile == NULL)
-            {
-                utils_print("open file err\n");
-                free(stream.pstPack);
-                stream.pstPack = NULL;
-                return;
-            }
-            for (int i = 0; i < stream.u32PackCount; i++)
-            {
-                fwrite(stream.pstPack[i].pu8Addr + stream.pstPack[i].u32Offset,
-                        stream.pstPack[i].u32Len - stream.pstPack[i].u32Offset, 1, pFile);
-
-                fflush(pFile);
-            }
-            fclose(pFile);
-            
-            ret = HI_MPI_VENC_ReleaseStream(venc_chn, &stream);
-            if (HI_SUCCESS != ret)
-            {
-                utils_print("HI_MPI_VENC_ReleaseStream failed with %#x!\n", ret);
-
-                free(stream.pstPack);
-                stream.pstPack = NULL;
-                return;
-            }
-
-            free(stream.pstPack);
-            stream.pstPack = NULL;
+            break;
         }
     }
+    retry_count = 0;
 
     ret = HI_MPI_VENC_StopRecvFrame(venc_chn);
     if (ret != HI_SUCCESS)
@@ -1304,9 +1302,9 @@ pthread_t start_sample_voice()
 }
 
 
-void start_video_recording()
+void start_video_recording(const char* filename)
 {
-    board_create_mp4_file();
+    board_create_mp4_file(filename);
     g_start_record = TRUE;
 }
 

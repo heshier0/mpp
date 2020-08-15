@@ -142,7 +142,7 @@ static HI_S32 cmos_get_ae_default(VI_PIPE ViPipe, AE_SENSOR_DEFAULT_S *pstAeSnsD
 {
 	ISP_SNS_STATE_S *pstSnsState = HI_NULL;
 	
-	printf( ">> cmos_get_ae_default()\n" );
+	// printf( ">> cmos_get_ae_default()\n" );
 	
 	CMOS_CHECK_POINTER( pstAeSnsDft );
 	SOI_SENSOR_GET_CTX( ViPipe, pstSnsState );
@@ -251,7 +251,7 @@ static HI_S32 cmos_get_ae_default(VI_PIPE ViPipe, AE_SENSOR_DEFAULT_S *pstAeSnsD
 			break;
 	}
 	
-	printf( "<< cmos_get_ae_default()\n" );
+	// printf( "<< cmos_get_ae_default()\n" );
 	return HI_SUCCESS;
 }
 
@@ -584,7 +584,7 @@ static HI_S32 cmos_get_isp_default(VI_PIPE ViPipe, ISP_CMOS_DEFAULT_S *pstDef)
 {
 	ISP_SNS_STATE_S *pstSnsState = HI_NULL;
 	
-	printf( ">> cmos_get_isp_default()\n" );
+	// printf( ">> cmos_get_isp_default()\n" );
 	
 	CMOS_CHECK_POINTER( pstDef );
 	SOI_SENSOR_GET_CTX( ViPipe, pstSnsState );
@@ -667,7 +667,7 @@ static HI_S32 cmos_get_isp_default(VI_PIPE ViPipe, ISP_CMOS_DEFAULT_S *pstDef)
 	pstDef->stSensorMode.stDngRawFormat.au8CfaPattern[3]	= 2;
 	pstDef->stSensorMode.bValidDngRawFormat					= HI_TRUE;
 	
-	printf( "<< cmos_get_isp_default()\n" );
+	// printf( "<< cmos_get_isp_default()\n" );
 	return HI_SUCCESS;
 }
 
@@ -723,7 +723,7 @@ static HI_S32 cmos_set_wdr_mode(VI_PIPE ViPipe, HI_U8 u8Mode)
 {
 	ISP_SNS_STATE_S *pstSnsState = HI_NULL;
 
-	printf( ">> cmos_set_wdr_mode(): %d\n", u8Mode );
+	// printf( ">> cmos_set_wdr_mode(): %d\n", u8Mode );
 	
 	SOI_SENSOR_GET_CTX( ViPipe, pstSnsState );
 	CMOS_CHECK_POINTER( pstSnsState );
@@ -736,7 +736,7 @@ static HI_S32 cmos_set_wdr_mode(VI_PIPE ViPipe, HI_U8 u8Mode)
 			pstSnsState->enWDRMode	= WDR_MODE_NONE;
 			pstSnsState->u8ImgMode	= SOI_SENSOR_1080P_30FPS_LINEAR_MODE;
 			pstSnsState->u32FLStd	= SOI_SENSOR_VMAX_1080P30_LINEAR;
-			ISP_TRACE(HI_DBG_ERR, "linear mode\n" );
+			//ISP_TRACE(HI_DBG_ERR, "linear mode\n" );
 			break;
 		case WDR_MODE_2To1_LINE:
 			pstSnsState->enWDRMode	= WDR_MODE_2To1_LINE;
@@ -744,7 +744,7 @@ static HI_S32 cmos_set_wdr_mode(VI_PIPE ViPipe, HI_U8 u8Mode)
 			pstSnsState->u32FLStd	= SOI_SENSOR_VMAX_1080P30_2wdr1 << 1;
 			pstSnsState->au32FL[0]	= SOI_SENSOR_VMAX_1080P30_2wdr1 << 1;
 			memset( pstSnsState->au32WDRIntTime, 0, sizeof(pstSnsState->au32WDRIntTime) );	///
-		ISP_TRACE(HI_DBG_ERR, "2to1 line WDR mode\n" );
+		// ISP_TRACE(HI_DBG_ERR, "2to1 line WDR mode\n" );
 			break;
 		default:
 			ISP_TRACE(HI_DBG_ERR, "NOT support this mode!\n" );
@@ -755,7 +755,7 @@ static HI_S32 cmos_set_wdr_mode(VI_PIPE ViPipe, HI_U8 u8Mode)
 	pstSnsState->au32FL[1] = pstSnsState->au32FL[0];
 	memset( pstSnsState->au32WDRIntTime, 0, sizeof(pstSnsState->au32WDRIntTime) );
 	
-	printf( "<< cmos_set_wdr_mode()\n" );
+	// printf( "<< cmos_set_wdr_mode()\n" );
 	return HI_SUCCESS;
 }
 
@@ -837,7 +837,7 @@ static HI_S32 cmos_set_image_mode(VI_PIPE ViPipe, ISP_CMOS_SENSOR_IMAGE_MODE_S *
 	HI_U8	u8SensorImageMode = 0;
 	ISP_SNS_STATE_S *pstSnsState = HI_NULL;
 	
-	printf( ">> cmos_set_image_mode()\n" );
+	// printf( ">> cmos_set_image_mode()\n" );
 	
 	CMOS_CHECK_POINTER( pstSensorImageMode );
 	SOI_SENSOR_GET_CTX( ViPipe, pstSnsState );
@@ -914,7 +914,7 @@ static HI_S32 cmos_set_image_mode(VI_PIPE ViPipe, ISP_CMOS_SENSOR_IMAGE_MODE_S *
 	pstSnsState->u8ImgMode = u8SensorImageMode;
 	memset( pstSnsState->au32WDRIntTime, 0, sizeof(pstSnsState->au32WDRIntTime) );
 	
-	printf( "<< cmos_set_image_mode()\n" );
+	// printf( "<< cmos_set_image_mode()\n" );
 	return HI_SUCCESS;
 }
 
@@ -922,7 +922,7 @@ static HI_VOID sensor_global_init(VI_PIPE ViPipe)
 {
 	ISP_SNS_STATE_S *pstSnsState = HI_NULL;
 	
-	printf( ">> sensor_global_init()\n" );
+	// printf( ">> sensor_global_init()\n" );
 	
 	SOI_SENSOR_GET_CTX( ViPipe, pstSnsState );
 	CMOS_CHECK_POINTER_VOID( pstSnsState );
@@ -936,7 +936,7 @@ static HI_VOID sensor_global_init(VI_PIPE ViPipe)
 	pstSnsState->au32FL[0]	= SOI_SENSOR_VMAX_1080P30_LINEAR;
 	pstSnsState->au32FL[1]	= SOI_SENSOR_VMAX_1080P30_LINEAR;
 	
-	printf( "<< sensor_global_init()\n" );
+	// printf( "<< sensor_global_init()\n" );
 }
 
 static HI_S32 cmos_init_sensor_exp_function(ISP_SENSOR_EXP_FUNC_S *pstSensorExpFunc)

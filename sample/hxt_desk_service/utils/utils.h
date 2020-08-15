@@ -75,8 +75,8 @@ void utils_link_wifi(const char* ssid, const char* pwd);
 void utils_generate_mp4_file_name(char* file_name);
 void utils_save_yuv_test(const char* yuv_data, const int width, const int height);
 
-int utils_send_msg(void* data, int length);
-int utils_recv_msg(void* data, int length);
+// int utils_send_msg(void* data, int length);
+// int utils_recv_msg(void* data, int length);
 
 
 #endif //__UTILS_H__

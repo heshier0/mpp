@@ -56,13 +56,15 @@ static char* hxt_get_api_url(const char* api)
     strcat(request_url, api);
 
     char* ret_value = (char*)utils_calloc(strlen(request_url) + 1);
+    memset(ret_value, 0, strlen(request_url) + 1);
     if(NULL == ret_value)
     {
-        utils_free(server_url);
-        utils_free(ver);
+        // utils_free(server_url);
+        // utils_free(ver);
         return NULL;
     }
     strcpy(ret_value, request_url);
+    ret_value[strlen(ret_value)] = '\0';
 
     return ret_value;
 }
@@ -149,10 +151,10 @@ static char* hxt_get_response_description(void *data)
     strcpy(desc, item->valuestring);
     desc[strlen(item->valuestring)] = '\0';
 
-    // if(root != NULL)
-    // {
-    //     cJSON_Delete(root);
-    // }
+    if(root != NULL)
+    {
+        cJSON_Delete(root);
+    }
 
     return desc; 
 }
@@ -176,7 +178,6 @@ static BOOL hxt_get_response_pass_status(void *data)
         status = FALSE;
     }
     
-
     // if(root != NULL)
     // {
     //     cJSON_Delete(root);
@@ -195,7 +196,7 @@ static void hxt_get_token_response(void* data)
 
     utils_print("response:[%s]\n", data);
     cJSON* root = cJSON_Parse(data);
-
+    
     //check return status,if not OK, get error msg
     cJSON *item1 = cJSON_GetObjectItem(root, "status");
     if (!item1)
@@ -213,10 +214,10 @@ static void hxt_get_token_response(void* data)
     //write response value into config file
     hxt_init_cfg(data);
 
-    // if(root != NULL)
-    // {
-    //     cJSON_Delete(root);
-    // }
+    if(root != NULL)
+    {
+        cJSON_Delete(root);
+    }
 
     return;
 }
@@ -237,7 +238,6 @@ static char* hxt_get_header_with_token()
     
     return header;
 }
-
 
 BOOL hxt_query_wifi_info(void *data)
 {
@@ -293,7 +293,7 @@ BOOL hxt_get_token_request()
     char* api_url = hxt_get_api_url(HXT_GET_TOKEN_URL);
     if(NULL == api_url)
     {
-        goto CLEANUP5;
+        goto CLEANUP4;
     }
 
     char* uuid = hxt_get_desk_uuid_cfg(); 
@@ -336,14 +336,11 @@ BOOL hxt_get_token_request()
 
 CLEANUP1:    
     utils_free(out);
-    // utils_free(json_data);
 CLEANUP2:    
     cJSON_Delete(root);
 CLEANUP3:
-    // utils_free(uuid);
-CLEANUP4:
     utils_free(api_url);
-CLEANUP5:
+CLEANUP4:
     return reported;
 }
 
@@ -407,32 +404,102 @@ CLEANUP5:
 BOOL hxt_file_upload_request(const char* filename, char* server_file_path)
 {
     BOOL uploaded = FALSE;
+    int retry_count = 0;
+    char* upload_url = NULL;
+    char* header = NULL;
+    char* out = NULL;
 
     if(NULL == filename || NULL == server_file_path)
     {
         return FALSE;
     }
-    utils_print("To upload %s ...\n", filename);
+    
+    int child_unid = hxt_get_child_unid();
+    char url[256] = {0};
+    sprintf(url, HXT_UPLOAD_FILE, child_unid);
 
-    char* upload_url = hxt_get_upload_url(HXT_UPLOAD_FILE);
-    if(NULL == upload_url)
+    utils_print("To upload %s ...\n", filename);
+    while((!uploaded) && (retry_count < 3))
+    {
+        upload_url = hxt_get_upload_url(url);
+        if(NULL == upload_url)
+        {
+            return FALSE;
+        }
+
+        header = hxt_get_header_with_token();
+        utils_print("[%s]\n", header);
+
+        out = (char*)utils_malloc(1024);
+        utils_upload_file(upload_url, header, filename, out, 1024);
+        utils_print("[%s]\n", out);
+
+        int status_code = hxt_get_reponse_status_code((void*)out);
+        if (status_code == RESPONSE_OK)
+        {
+            uploaded = TRUE;
+            server_file_path = hxt_get_response_description((void*)out);
+        }
+        else if (status_code == AUTH_FAILED)
+        {
+            uploaded = FALSE;
+            retry_count ++;
+            hxt_get_token_request();
+        }
+    }
+
+    utils_free(out);
+    utils_free(header);
+    utils_free(upload_url);
+
+    return uploaded;
+}
+
+BOOL hxt_sample_snap_upload_request(const char* filename, char* server_file_path)
+{
+    BOOL uploaded = FALSE;
+    int retry_count = 0;
+    char* upload_url = NULL;
+    char* header = NULL;
+    char* out = NULL;
+
+    if(NULL == filename || NULL == server_file_path)
     {
         return FALSE;
     }
-    utils_print("auth:%s\n", upload_url);   
+    
+    int child_unid = hxt_get_child_unid();
+    char url[256] = {0};
+    sprintf(url, HXT_UPLOAD_SAMPLE_SNAP, child_unid);
 
-    char* header = hxt_get_header_with_token();
-    utils_print("auth:%s\n", header);
-
-    char* out = (char*)utils_malloc(1024);
-    utils_upload_file(upload_url, header, filename, out, 1024);
-    utils_print("[%s]\n", out);
-
-    int status_code = hxt_get_reponse_status_code((void*)out);
-    if (status_code == RESPONSE_OK)
+    utils_print("To upload %s ...\n", filename);
+    while((!uploaded) && (retry_count < 3))
     {
-        uploaded = TRUE;
-        server_file_path = hxt_get_response_description((void*)out);
+        upload_url = hxt_get_upload_url(url);
+        if(NULL == upload_url)
+        {
+            return FALSE;
+        }
+
+        header = hxt_get_header_with_token();
+        utils_print("[%s]\n", header);
+
+        out = (char*)utils_malloc(1024);
+        utils_upload_file(upload_url, header, filename, out, 1024);
+        utils_print("[%s]\n", out);
+
+        int status_code = hxt_get_reponse_status_code((void*)out);
+        if (status_code == RESPONSE_OK)
+        {
+            uploaded = TRUE;
+            server_file_path = hxt_get_response_description((void*)out);
+        }
+        else if (status_code == AUTH_FAILED)
+        {
+            uploaded = FALSE;
+            retry_count ++;
+            hxt_get_token_request();
+        }
     }
 
     utils_free(out);
@@ -731,7 +798,7 @@ BOOL hxt_check_wifi_data_request()
 
 CLEANUP1:  
     utils_free(out);
-    utils_free(json_data);
+    // utils_free(json_data);
 CLEANUP3:   
     cJSON_Delete(root);
 CLEANUP4:
@@ -784,11 +851,31 @@ BOOL hxt_bind_desk_with_wifi_request()
 
 CLEANUP1:  
     utils_free(out);
-    utils_free(json_data);
+    // utils_free(json_data);
 CLEANUP2:   
     cJSON_Delete(root);
 CLEANUP3:
     utils_free(api_url);
 CLEANUP4:
     return reported;
+}
+
+BOOL hxt_check_token()
+{
+    BOOL token_required = TRUE;
+
+    long expire_time = hxt_get_token_expire_time_cfg();
+    time_t now = time(0);
+    
+    long valid_time = now - expire_time;
+    utils_print("now %ld - expire_time %ld = %ld\n", now, expire_time, valid_time);
+    
+
+    if ( (hxt_get_token_cfg() == NULL) || (valid_time >=0) )
+    {
+        utils_print("require token....\n");
+        token_required = hxt_get_token_request();
+    }
+
+    return token_required;
 }

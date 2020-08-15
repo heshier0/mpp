@@ -6,12 +6,14 @@
 #define HXT_STATUS_REPORT               "/Device/DeskStatusReport"
 #define HXT_STUDY_REPORT                "/User/StudyReport"
 #define HXT_STUDY_REPORT_BATCH          "/User/StudyReportBatch"
-#define HXT_UPLOAD_FILE                 "/Upload/UploadFileCustom?absoluteUrl=true"
+#define HXT_UPLOAD_FILE                 "/Upload/UploadFileCustom?childunid=%d"
 #define HXT_GETMAX_CHUNK                "/Upload/GetMaxChunk?md5=%s&ext=%s"
 #define HXT_UPLOAD_CHUNK                "/Upload/Chunkload?md5=%s&chunk=%d&chunks=%d"
 #define HXT_MERGE_FILES                 "/Upload/MergeFiles?md5=%s&ext=%s&fileTotalSize=%lu&typeString=%s"
 #define HXT_CHECK_WIFI_DATA             "/Device/CheckWifiData"
 #define HXT_BIND_DESK_WIFI              "/Device/BindDeskByWifi"
+
+#define HXT_UPLOAD_SAMPLE_SNAP          "/Upload/UploadPicsAsync?childunid=%d"
 
 #define HXT_RET_OK                      1
 #define HXT_STATUS_OK                   "S0001"

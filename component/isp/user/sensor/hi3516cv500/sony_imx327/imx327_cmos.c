@@ -1214,7 +1214,7 @@ static HI_S32 cmos_set_wdr_mode(VI_PIPE ViPipe, HI_U8 u8Mode)
     {
         case WDR_MODE_NONE:
             pstSnsState->enWDRMode = WDR_MODE_NONE;
-            printf("linear mode\n");
+            //printf("linear mode\n");
             break;
 
         case WDR_MODE_2To1_FRAME:
