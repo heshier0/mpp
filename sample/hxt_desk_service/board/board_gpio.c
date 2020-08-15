@@ -5,6 +5,8 @@
 
 #include "common.h"
 
+#define FLASH_TIMES         3
+#define LED_SLEEP_TIME      (200*1000)
 /*
 ** LED状态 **
 -----           ---------           ---------          ------ 
@@ -30,7 +32,6 @@
 */
 
 static struct gpiod_chip *gpio0 = NULL;
-static struct gpiod_chip *gpio1 = NULL;
 static struct gpiod_chip *gpio2 = NULL;
 static struct gpiod_chip *gpio5 = NULL;
 static struct gpiod_chip *gpio8 = NULL;
@@ -53,10 +54,12 @@ static struct gpiod_line *led_mute_blue = NULL;
 static struct gpiod_line *led_mute_red = NULL;
 
 static AUDIO_DEV ao_dev = 0;
+static int key_scanning = 1;
+static pthread_t gpio_scan_tid;
 
-static int g_led_running = 1;
 
-static int gpio_led(struct gpiod_line *line, int value)
+
+static int gpio_set_value(struct gpiod_line *line, int value)
 {
     int ret = 0;
     gpiod_line_set_value(line, value);
@@ -64,7 +67,7 @@ static int gpio_led(struct gpiod_line *line, int value)
     return ret;
 }
 
-static int gpio_getValue(struct gpiod_line *line)
+static int gpio_get_value(struct gpiod_line *line)
 {
     return gpiod_line_get_value(line);
 }
@@ -80,7 +83,7 @@ static void* check_reset__event(void *param)
         {
             continue;
         }
-        if(event.event_type != GPIOD_LINE_EVENT_FALLING_EDGE)
+        if(event.event_type != GPIOD_LINE_EVENT_RISING_EDGE)
         {
 
             continue;
@@ -103,7 +106,7 @@ static void* check_inc_vol_event(void *param)
         {
             continue;
         }
-        if(event.event_type != GPIOD_LINE_EVENT_FALLING_EDGE)
+        if(event.event_type != GPIOD_LINE_EVENT_RISING_EDGE)
         {
             continue;
         }
@@ -131,7 +134,7 @@ static void* check_dec_vol_event(void *param)
         {
             continue;
         }
-        if(event.event_type != GPIOD_LINE_EVENT_FALLING_EDGE)
+        if(event.event_type != GPIOD_LINE_EVENT_RISING_EDGE)
         {
             continue;
         }
@@ -154,18 +157,25 @@ static void* check_dec_vol_event(void *param)
 static void* check_mute_event(void *param)
 {
     struct gpiod_line_event event;
+    time_t start = 0, end = 0;
+    struct timespec timeout;
+    timeout.tv_sec = 5;
+    timeout.tv_nsec = 0;
     while(1)
     {
-        gpiod_line_event_wait(btn_mute, NULL);
+        gpiod_line_event_wait(btn_mute, &timeout);
+        printf("ssssssssssssss\n");
         if (gpiod_line_event_read(btn_mute, &event) != 0)
         {
             continue;
         }
-        if(event.event_type != GPIOD_LINE_EVENT_FALLING_EDGE)
+        if(event.event_type != GPIOD_LINE_EVENT_RISING_EDGE)
         {
             continue;
         }
-        HI_MPI_AO_Mute(ao_dev, HI_TRUE, NULL);
+        
+        //HI_MPI_AO_Mute(ao_dev, HI_TRUE, NULL);
+        printf("MUTE KEY pressed:%lds\n", end-start);
     }
     return NULL;
 }
@@ -204,10 +214,15 @@ static void* check_scan_qrcode_event(void *param)
     return NULL;
 }
 
+
+void* gpio_event_check_thread(void* args)
+{
+    return NULL;
+}
+
 int board_gpio_init()
 {
     gpio0 = gpiod_chip_open_by_name("gpiochip0");
-    gpio1 = gpiod_chip_open_by_name("gpiochip1");
     gpio2 = gpiod_chip_open_by_name("gpiochip2");
     gpio5 = gpiod_chip_open_by_name("gpiochip5");
     gpio8 = gpiod_chip_open_by_name("gpiochip8");
@@ -246,14 +261,16 @@ int board_gpio_init()
 
 
     /* button event */
-    pthread_t tid;
-    pthread_create(&tid, NULL, check_scan_qrcode_event, NULL);
+    pthread_create(&gpio_scan_tid, NULL, check_mute_event, NULL);
+    pthread_join(gpio_scan_tid, NULL);
 
     return 0;
 }
 
 void board_gpio_uninit()
 {
+    key_scanning = 0;
+
     gpiod_line_release(btn_reset);
     gpiod_line_release(btn_mute);
     gpiod_line_release(btn_vol_inc);
@@ -269,7 +286,6 @@ void board_gpio_uninit()
     gpiod_line_release(led_mute_red);
 
     gpiod_chip_close(gpio0);
-    gpiod_chip_close(gpio1);
     gpiod_chip_close(gpio2);
     gpiod_chip_close(gpio5);
     gpiod_chip_close(gpio8);
@@ -279,12 +295,193 @@ void board_gpio_uninit()
     return;
 }
 
-int board_led_blue_on()
+/* wifi led */
+int board_wifi_led_blue_on()
 {
-    gpio_led(led_wifi_blue, 0);
+    gpio_set_value(led_wifi_blue, 0);
 }
 
-int board_led_blue_off()
+int board_wifi_led_blue_off()
 {
-    gpio_led(led_wifi_blue, 1);
+    gpio_set_value(led_wifi_blue, 1);
+}
+
+int board_wifi_led_green_on()
+{
+    gpio_set_value(led_wifi_green, 0);
+}
+
+int board_wifi_led_green_off()
+{
+    gpio_set_value(led_wifi_green, 1);
+}
+
+int board_wifi_led_red_on()
+{
+    gpio_set_value(led_wifi_red, 0);
+}
+
+int board_wifi_led_red_off()
+{
+    gpio_set_value(led_wifi_red, 1);
+}
+
+int board_wifi_led_blue_flash()
+{
+    for (int i = 0; i < FLASH_TIMES; i++)
+    {
+        board_wifi_led_blue_on();
+        usleep(LED_SLEEP_TIME);
+        board_wifi_led_blue_off();
+        usleep(LED_SLEEP_TIME);
+    }
+}
+
+int board_wifi_led_green_flash()
+{
+    for (int i = 0; i < FLASH_TIMES; i++)
+    {
+        board_wifi_led_green_on();
+        usleep(LED_SLEEP_TIME);
+        board_wifi_led_green_off();
+        usleep(LED_SLEEP_TIME);
+    }    
+}
+
+int board_wifi_led_red_flash()
+{
+    for (int i = 0; i < FLASH_TIMES; i++)
+    {
+        board_wifi_led_red_on();
+        usleep(LED_SLEEP_TIME);
+        board_wifi_led_red_off();
+        usleep(LED_SLEEP_TIME);
+    }    
+}
+
+/* camera led*/
+int board_camera_led_blue_on()
+{
+    gpio_set_value(led_camera_blue, 0);
+}
+
+int board_camera_led_blue_off()
+{
+    gpio_set_value(led_camera_blue, 1);
+}
+
+int board_camera_led_green_on()
+{
+    gpio_set_value(led_camera_green, 0);
+}
+
+int board_camera_led_green_off()
+{
+    gpio_set_value(led_camera_green, 1);
+}
+
+int board_camera_led_red_on()
+{
+    gpio_set_value(led_camera_red, 0);
+}
+
+int board_camera_led_red_off()
+{
+    gpio_set_value(led_camera_red, 1);
+}
+
+int board_camera_led_blue_flash()
+{
+    for (int i = 0; i < FLASH_TIMES; i++)
+    {
+        board_camera_led_blue_on();
+        usleep(LED_SLEEP_TIME);
+        board_camera_led_blue_off();
+        usleep(LED_SLEEP_TIME);
+    }
+}
+
+int board_camera_led_green_flash()
+{
+    for (int i = 0; i < FLASH_TIMES; i++)
+    {
+        board_camera_led_green_on();
+        usleep(LED_SLEEP_TIME);
+        board_camera_led_green_off();
+        usleep(LED_SLEEP_TIME);
+    }
+}
+
+int board_camera_led_red_flash()
+{
+    for (int i = 0; i < FLASH_TIMES; i++)
+    {
+        board_camera_led_red_on();
+        usleep(LED_SLEEP_TIME);
+        board_camera_led_red_off();
+        usleep(LED_SLEEP_TIME);
+    }
+}
+/* mute led */
+int board_mute_led_blue_on()
+{
+    gpio_set_value(led_mute_blue, 0);
+}
+
+int board_mute_led_blue_off()
+{
+    gpio_set_value(led_mute_blue, 1);
+}
+
+int board_mute_led_green_on()
+{
+    gpio_set_value(led_mute_green, 0);
+}
+
+int board_mute_led_green_off()
+{
+    gpio_set_value(led_mute_green, 1);
+}
+
+int board_mute_led_red_on()
+{
+    gpio_set_value(led_mute_red, 0);
+}
+
+int board_mute_led_red_off()
+{
+    gpio_set_value(led_mute_red, 1);
+}
+
+int board_mute_led_blue_flash()
+{
+    for (int i = 0; i < FLASH_TIMES; i++)
+    {
+        board_mute_led_blue_on();
+        usleep(LED_SLEEP_TIME);
+        board_mute_led_blue_off();
+        usleep(LED_SLEEP_TIME);
+    }
+}
+
+int board_mute_led_green_flash()
+{
+    for (int i = 0; i < FLASH_TIMES; i++)
+    {
+        board_mute_led_green_on();
+        usleep(LED_SLEEP_TIME);
+        board_mute_led_green_off();
+        usleep(LED_SLEEP_TIME);
+    }
+}
+
+int board_mute_led_red_flash()
+{
+    for (int i = 0; i < FLASH_TIMES; i++)
+    {
+        board_mute_led_red_on();
+        usleep(LED_SLEEP_TIME);
+        board_mute_led_red_off();
+        usleep(LED_SLEEP_TIME);
+    }
 }

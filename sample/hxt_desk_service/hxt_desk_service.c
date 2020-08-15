@@ -43,7 +43,7 @@ int main(int argc, char **argv)
 #endif
 
     /* init gpio */
-    // board_gpio_init();
+    board_gpio_init();
 
     /* load config */
     hxt_load_cfg();
