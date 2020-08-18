@@ -363,14 +363,13 @@ static void* thread_proc_yuv_data_cb(void *param)
         /* 0 : Normal */
         /* 1 : bad posture */
         /* 2 : away */
-        one_check_result = run_sit_posture(g_recog_handle, yuv_buf, width, height, 3);
+        one_check_result = run_sit_posture(g_recog_handle, yuv_buf, width, height, 5);
         utils_print("%s -----> %d\n", utils_get_current_time(), one_check_result);
         if (init_check_status(&check_status, one_check_result))
         {
             continue;
         }
 
-        check_posture_changed(&check_status, one_check_result);
         if(check_posture_changed(&check_status, one_check_result))
         {
             utils_print("POSTURE CHANGED\n");
