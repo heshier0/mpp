@@ -430,15 +430,29 @@ BOOL hxt_file_upload_request(const char* filename, char* server_file_path)
         header = hxt_get_header_with_token();
         utils_print("[%s]\n", header);
 
+        if (out != NULL)
+        {
+            utils_free(out);
+        }
         out = (char*)utils_malloc(1024);
         utils_upload_file(upload_url, header, filename, out, 1024);
         utils_print("[%s]\n", out);
+        if (strlen(out) == 0)
+        {
+            retry_count ++;
+            continue;
+        }
 
         int status_code = hxt_get_reponse_status_code((void*)out);
         if (status_code == RESPONSE_OK)
         {
-            uploaded = TRUE;
-            server_file_path = hxt_get_response_description((void*)out);
+            char* file_path = hxt_get_response_description((void*)out);
+            if( file_path != NULL)
+            {
+                strcpy(server_file_path, file_path);
+                uploaded = TRUE;
+                free(file_path);
+            }
         }
         else if (status_code == AUTH_FAILED)
         {
@@ -451,7 +465,7 @@ BOOL hxt_file_upload_request(const char* filename, char* server_file_path)
     utils_free(out);
     utils_free(header);
     utils_free(upload_url);
-
+    
     return uploaded;
 }
 

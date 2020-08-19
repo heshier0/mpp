@@ -17,7 +17,7 @@
 #define VOICE_CONNECT_ERROR                     "/userdata/media/voice/V002.mp3"  
 #define VOICE_WIFI_BIND_OK                      "/userdata/media/voice/V003.mp3"  
 #define VOICE_WIFI_BIND_ERROR                   "/userdata/media/voice/V004.mp3"
-#define VOICE_FIND_NETWORK                      "/userdata/media/voice/V005.mp3"
+#define VOICE_SCAN_QRCODE                      "/userdata/media/voice/V005.mp3"
 #define VOICE_NORMAL_STATUS                     "/userdata/media/voice/V006.mp3"
 #define VOICE_WAKE_CAMERA                       "/userdata/media/voice/V007.mp3"
 #define VOICE_VOLUME_10                         "/userdata/media/voice/V008.mp3"

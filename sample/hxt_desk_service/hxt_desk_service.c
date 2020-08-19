@@ -24,9 +24,50 @@ static void handle_signal(int signo)
         g_play_status = 0;
         g_voice_status = 0;
         g_video_status = 0;
-
-        stop_video_recording();
    }
+}
+
+static void  deploy_network()
+{
+    BOOL first_notice = TRUE;
+
+    //utils_disconnect_wifi();
+    /* check if wifi info in cfg */
+    while (1)
+    {
+        while (hxt_get_wifi_ssid_cfg() == NULL || strlen(hxt_get_wifi_ssid_cfg()) == 0)
+        {
+            /* step into qrcode scan */
+            if(first_notice)
+            {
+                sleep(3);
+                utils_send_local_voice(VOICE_SCAN_QRCODE);
+                first_notice = FALSE;
+            }
+            continue;
+        }
+
+        /* to connect wifi */
+        utils_link_wifi(hxt_get_wifi_ssid_cfg(), hxt_get_wifi_pwd_cfg());
+
+        sleep(5);
+        
+        /*link ok, play voice*/
+        if (utils_check_wifi_state())
+        {
+            utils_send_local_voice(VOICE_WIFI_BIND_OK);
+            break;
+        }
+        else
+        {
+            utils_send_local_voice(VOICE_WIFI_BIND_ERROR);
+            utils_disconnect_wifi();
+        }
+    }
+    
+   
+    
+    return;
 }
 
 
@@ -43,7 +84,7 @@ int main(int argc, char **argv)
 #endif
 
     /* init gpio */
-    board_gpio_init();
+    // board_gpio_init();
 
     /* load config */
     hxt_load_cfg();
@@ -62,37 +103,14 @@ int main(int argc, char **argv)
     g_video_status = 1;
     video_tid = start_sample_video();
 
-    usleep(500);
+    sleep(3);
+
     utils_send_local_voice(VOICE_DEVICE_OPEN);
-    usleep(500);
 
-
-    // /* QRcode parse */
-    // // wifi_exist = (hxt_get_wifi_ssid_cfg() != NULL);
-#if 1    
-    int retry_count = 5;
-    while (retry_count > 0)
-    {
-       
-        printf("To scan QRcode....\n");    
-        if (!get_qrcode_yuv_buffer())
-        {
-            utils_send_local_voice(VOICE_CONNECT_ERROR);
-            retry_count --;
-            sleep(3);
-            continue;
-        }
-        retry_count = 0;
-    }
-
-    // /* connect to wifi */
-    utils_link_wifi(hxt_get_wifi_ssid_cfg(), hxt_get_wifi_pwd_cfg());
-#endif   
-
-#if 0
+    deploy_network();
+#if 1
     /* connect to hxt server */
     server_started = hxt_check_token();
-    
     if (server_started)
     {
         pid_t hxt_pid = fork();
@@ -102,8 +120,6 @@ int main(int argc, char **argv)
             return 0;
         }
 
-        // start_posture_recognize();
-
         // pid_t iflyos_pid = fork();
         // if (iflyos_pid == 0)
         // {
@@ -112,9 +128,9 @@ int main(int argc, char **argv)
         // }
 
         waitpid(hxt_pid, &st1, 0);
+        utils_print("child process hxt_websocket exit\n");
         // waitpid(iflyos_pid, &st2, 0);
-
-        utils_print("child process exit...\n");
+        
     }
 #endif
 
@@ -124,12 +140,12 @@ int main(int argc, char **argv)
 
     board_mpp_deinit();
 
-
 EXIT:
     utils_print("~~~~EXIT~~~~\n");
+    // board_gpio_uninit();
     hxt_unload_cfg();
 
-    // board_gpio_uninit();
+    
 
     return 0;
 }

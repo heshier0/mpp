@@ -19,10 +19,10 @@
 #define AWAY_STATUS             2
 
 #define DEPART_ALARM_TIMEVAL       (60) //(3*60)         
-#define ALARM_TIMEVAL              (30)//(3*60)          
+#define ALARM_TIMEVAL              (10)//(3*60)          
 #define BAD_ALARM_TIMEVAL           (10)
 #define CORRECT_JUDGE_TIMEVAL       (5)             
-#define MIN_DURATION_TIME         (5)
+#define MIN_DURATION_TIME         (3)
 
 typedef struct check_status_t
 {
@@ -33,9 +33,9 @@ typedef struct check_status_t
     int _last_posture;
 };
 
-static void* g_recog_handle = NULL;
+// static void* g_recog_handle = NULL;
 static pthread_t g_proc_yuv_tid = NULL;
-static BOOL g_keep_processing = TRUE;
+static BOOL g_keep_processing = FALSE;
 
 static BOOL g_is_recording = FALSE;
 static BOOL g_is_inited = FALSE;
@@ -173,15 +173,21 @@ static BOOL send_study_report_type(StudyInfo *info)
 static BOOL check_posture_changed(struct check_status_t *check_status, int check_result)
 {
     time_t now = time(NULL); 
-
+    
     if (check_status->_start_posture == check_result)
     {
         check_status->_last_posture = check_result;
         check_status->_last_time = now;
 
+        //防止中间有错误姿势晃过而开始录制的视频残留
         if (check_status->_start_posture != BAD_POSTURE_STATUS)
         {
             delete_recorded(); 
+        }
+        // 连续的错误姿势
+        if (check_status->_start_posture == BAD_POSTURE_STATUS)
+        {
+            begin_recording();
         }
 
         return FALSE;
@@ -328,6 +334,8 @@ static void* thread_proc_yuv_data_cb(void *param)
     BOOL first_bad_alarm = TRUE;
     BOOL recording = FALSE;
 
+    void *recog_handle = (void*)param;
+
     struct check_status_t check_status;
     memset(&check_status, 0, sizeof(struct check_status_t));
 
@@ -335,17 +343,18 @@ static void* thread_proc_yuv_data_cb(void *param)
     int height = hxt_get_video_width_cfg();
     int alarm_time = 10;// hxt_get_posture_judge_cfg();
 
-    g_msg_qid = msgget(STUDY_INFO_MQ_KEY, 0666 | IPC_CREAT);
+    g_msg_qid = msgget(STUDY_INFO_MQ_KEY, 0);
     if(g_msg_qid < 0)
     {
         utils_print("create message queue error\n");
         return -1;
     }
-
     StudyInfo info;
     memset(&info, 0, sizeof(StudyInfo));
     info.info_type = STUDY_BEGIN;
     send_study_report_type(&info);
+
+    // utils_send_local_voice(VOICE_NORMAL_STATUS);
 
     char *yuv_buf = NULL;
     utils_print("To process yuv data from vpss ....\n");
@@ -363,7 +372,8 @@ static void* thread_proc_yuv_data_cb(void *param)
         /* 0 : Normal */
         /* 1 : bad posture */
         /* 2 : away */
-        one_check_result = run_sit_posture(g_recog_handle, yuv_buf, width, height, 5);
+        // one_check_result = run_sit_posture(g_recog_handle, yuv_buf, width, height, 5);
+        one_check_result = run_sit_posture(recog_handle, yuv_buf, width, height, 3);
         utils_print("%s -----> %d\n", utils_get_current_time(), one_check_result);
         if (init_check_status(&check_status, one_check_result))
         {
@@ -386,13 +396,22 @@ static void* thread_proc_yuv_data_cb(void *param)
         
         take_rest(150); 
     }
-
-    if (g_recog_handle != NULL)
+    /* prevent some fragmentary video*/
+    delete_recorded();
+    /**/
+    if (recog_handle != NULL)
     {
-        uninit_sit_posture(&g_recog_handle);
+        uninit_sit_posture(&recog_handle);
+        recog_handle = NULL;
     }
-    g_keep_processing = FALSE;
-    msgctl(g_msg_qid, IPC_RMID, 0);
+
+    /* send msg to notify ending */
+    memset(&info, 0, sizeof(StudyInfo));
+    info.info_type = STUDY_END;
+    send_study_report_type(&info);
+
+    utils_send_local_voice(VOICE_CAMERA_SLEEP);
+
     utils_print("rocognize thread exit...\n");
 
     return NULL;
@@ -406,33 +425,26 @@ void start_posture_recognize()
     {
         return;
     }
-    // init 
-    g_recog_handle = init_sit_posture(model_path1, model_path2);
 
-    pthread_create(&g_proc_yuv_tid, NULL, thread_proc_yuv_data_cb, NULL);
+    // init 
+    if (!g_keep_processing)
+    {
+        g_keep_processing = TRUE;
+
+        // g_recog_handle = init_sit_posture(model_path1, model_path2);
+        void* recog_handle = init_sit_posture(model_path1, model_path2);
+        if (recog_handle == NULL)
+        {
+            utils_print("posture model init failed\n");
+        }
+        pthread_create(&g_proc_yuv_tid, NULL, thread_proc_yuv_data_cb, recog_handle);
+    }
+    
 
     return;
 }
 
 void stop_posture_recognize()
 {
-    if(g_keep_processing)
-    {
-        g_keep_processing = FALSE;
-
-        if(g_proc_yuv_tid != NULL)
-        {
-            pthread_join(g_proc_yuv_tid, NULL); 
-        }
-        
-        if (g_recog_handle != NULL)
-        {
-            uninit_sit_posture(&g_recog_handle);
-        }
-
-        StudyInfo info;
-        memset(&info, 0, sizeof(StudyInfo));
-        info.info_type = STUDY_END;
-        send_study_report_type(&info);
-    }
+    g_keep_processing = FALSE;
 }

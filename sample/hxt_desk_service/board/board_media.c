@@ -37,7 +37,9 @@ VI_VPSS_MODE_E  enMastPipeMode  = VI_OFFLINE_VPSS_OFFLINE;
 static SAMPLE_VI_CONFIG_S g_vi_configs;
 
 static BOOL g_start_record = FALSE;
-static BOOL g_start_snap = FALSE;
+static BOOL g_recording = FALSE;
+static BOOL g_stop_record = FALSE;
+static char s_file_name[255] = {0};
 
 static void stop_vi()
 {
@@ -325,7 +327,7 @@ static BOOL start_venc()
     VENC_GOP_MODE_E gop_mode  = VENC_GOPMODE_NORMALP;
     VENC_GOP_ATTR_S gop_attrs = {0};
     VENC_CHN venc_chn[4] = {0, 1, 2, 3};
-    SAMPLE_RC_E rc_mode = SAMPLE_RC_CBR;
+    SAMPLE_RC_E rc_mode = SAMPLE_RC_VBR;
     HI_BOOL rcn_ref_shared_buf = HI_TRUE;
     int gop_value = 0;
     
@@ -1063,6 +1065,12 @@ void board_get_stream_from_venc_chn()
         }
         else
         {
+            if (g_start_record)
+            {
+                board_create_mp4_file(s_file_name);
+                g_recording = TRUE;
+            }
+            
             if (FD_ISSET(venc_fd, &read_fds))
             {
                 /*******************************************************
@@ -1113,9 +1121,10 @@ void board_get_stream_from_venc_chn()
                 }
                 
                 /* to save mp4 */
-                if(g_start_record)
+                if(g_recording)
                 {   
                     board_write_mp4(&venc_stream);  
+                    g_start_record = FALSE;
                 }
 
                 if (HI_SUCCESS != ret_val)
@@ -1143,6 +1152,14 @@ void board_get_stream_from_venc_chn()
                 free(venc_stream.pstPack);
                 venc_stream.pstPack = NULL;
             }    
+
+            if (g_stop_record)
+            {
+                board_close_mp4_file();
+                g_recording = FALSE;
+                g_stop_record = FALSE;
+
+            }
         }
     }
 
@@ -1304,19 +1321,20 @@ pthread_t start_sample_voice()
 
 void start_video_recording(const char* filename)
 {
-    board_create_mp4_file(filename);
+    strcpy(s_file_name, filename);
     g_start_record = TRUE;
 }
 
 void stop_video_recording()
 {
-    g_start_record = FALSE;
-    board_close_mp4_file();
+    g_stop_record = TRUE;
 }
 
 void delete_posture_video()
 {
     g_start_record = FALSE;
+    g_recording = FALSE;
+    g_stop_record = FALSE;
     board_delete_current_mp4_file();
 }
 

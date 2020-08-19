@@ -78,7 +78,8 @@ BOOL get_qrcode_yuv_buffer()
         cJSON_Delete(root);
     }
 
-
+    hxt_reload_cfg();
+    
     return TRUE;
 }
 

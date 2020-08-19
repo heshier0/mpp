@@ -29,27 +29,26 @@ static BOOL init_study_info(ReportInfo *report_info, StudyInfo *study_info)
     {
         return FALSE;
     }
-
+    
     if(study_info->info_type < 1 || study_info->info_type > 5)
     {
         utils_print("Study info type ERROR\n");
         return FALSE;
     }
-
     memset(report_info, 0, sizeof(report_info));
 
     report_info->parent_unid = hxt_get_parent_unid_cfg();
+
     report_info->child_unid = hxt_get_child_unid();
 
     report_info->report_type = study_info->info_type;
-    
+
     char* study_date = utils_date_to_string();
     if(report_info->study_date == NULL)
     {
         report_info->study_date = utils_malloc(strlen(study_date) + 1);
     }
     strcpy(report_info->study_date, study_date);
-    report_info->study_date[strlen(study_date)] = '\0';
 
     char* report_time = utils_time_to_string();
     if (report_info->report_time == NULL)
@@ -57,23 +56,25 @@ static BOOL init_study_info(ReportInfo *report_info, StudyInfo *study_info)
         report_info->report_time = utils_malloc(strlen(report_time) + 1);
     }
     strcpy(report_info->report_time, report_time);
-    
+
     report_info->study_mode = hxt_get_study_mode_cfg(report_info->child_unid);
-   
+
     if (report_info->report_type == BAD_POSTURE)
     {
         report_info->duration = 10;
         
         /* send video */        
-        if (hxt_file_upload_request(study_info->file, report_info->video_url))
+        if (report_info->video_url == NULL)
         {
-            
+            report_info->video_url = utils_malloc(255);
         }
+        hxt_file_upload_request(study_info->file, report_info->video_url);
 
-        if (hxt_file_upload_request(study_info->snap, report_info->snap_url))
+        if (report_info->snap_url == NULL)
         {
-            
+            report_info->snap_url = utils_malloc(255);
         }
+        hxt_file_upload_request(study_info->snap, report_info->snap_url);
 
     }
     report_info->camera_status = hxt_get_camera_status();
@@ -175,8 +176,8 @@ static void* send_study_info_cb(void *params)
             continue;
         }
         utils_print("study report type is %d\n", info.info_type);
+        memset(&report_info, 0, sizeof(report_info));
         init_study_info(&report_info, &info);
-        utils_print("inited report info....\n");
         //post json data to server
         cJSON *root = cJSON_CreateObject();    
         if (NULL == root)
@@ -195,7 +196,7 @@ static void* send_study_info_cb(void *params)
         cJSON_AddStringToObject(data_item, "studyDate", report_info.study_date);
         cJSON_AddStringToObject(data_item, "reportTime", report_info.report_time);
         cJSON_AddNumberToObject(data_item, "studyMode", report_info.study_mode);
-        if (report_info.study_mode == BAD_POSTURE)
+        if (report_info.report_type == BAD_POSTURE)
         {
             cJSON_AddNumberToObject(data_item, "duration", report_info.duration);
             cJSON_AddStringToObject(data_item, "videoUrl", report_info.video_url);
@@ -210,8 +211,7 @@ static void* send_study_info_cb(void *params)
             goto CLEAR;
         }
         utils_print("STUDY-INFO: %s\n", json_data);
-        int send_count = cl->send(cl, json_data, strlen(json_data), UWSC_OP_TEXT);
-        utils_print("websocket %d bytes sent ok\n", send_count);
+        cl->send(cl, json_data, strlen(json_data), UWSC_OP_TEXT);
 CLEAR:
         if(root != NULL)
         {
@@ -391,7 +391,7 @@ static void signal_cb(struct ev_loop *loop, ev_signal *w, int revents)
 
 int hxt_websocket_start()
 {
-    // struct ev_loop *loop = EV_DEFAULT;
+    struct ev_loop *loop = EV_DEFAULT;
     struct ev_signal signal_watcher;
 	int ping_interval = 120;	        /* second */
     struct uwsc_client *cl;
@@ -404,8 +404,8 @@ int hxt_websocket_start()
     strcat(extra_header, token);
     strcat(extra_header, "\r\n");
 
-    g_hxt_wsc_loop = EV_DEFAULT;
-    cl = uwsc_new(g_hxt_wsc_loop, hxt_url, ping_interval, extra_header);
+    //g_hxt_wsc_loop = EV_DEFAULT;
+    cl = uwsc_new(loop, hxt_url, ping_interval, extra_header);
     if (!cl)
     {
         utils_print("hxt init failed\n");
@@ -422,9 +422,9 @@ int hxt_websocket_start()
 
     /* for test */
     ev_signal_init(&signal_watcher, signal_cb, SIGINT);
-    ev_signal_start(g_hxt_wsc_loop, &signal_watcher);
+    ev_signal_start(loop, &signal_watcher);
 
-    ev_run(g_hxt_wsc_loop, 0);
+    ev_run(loop, 0);
 
     utils_print("hxt websocket exit.\n");
 
@@ -435,7 +435,3 @@ int hxt_websocket_start()
     return 0;
 }
 
-int hxt_websockt_stop()
-{
-    ev_break(g_hxt_wsc_loop, EVBREAK_ALL);
-}

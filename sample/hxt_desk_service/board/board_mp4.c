@@ -14,16 +14,16 @@
 
 typedef struct media_context
 {
-	AVFormatContext* format_ctx;		//每个通道的AVFormatContext
-	int video_idx;								//视频流索引号
-	BOOL first_IDR;						//第一帧是I帧标志	
-	long vpts_inc;						//用于视频帧递增计数
+	AVFormatContext* format_ctx;			//每个通道的AVFormatContext
+	int video_idx;							//视频流索引号
+	int first_IDR;							//第一帧是I帧标志	
+	long vpts_inc;							//用于视频帧递增计数
 	unsigned long long video_pts;			//视频PTS
 	unsigned long long first_video;			//视频第一帧标志
-	long moov_pos;					//moov的pos，未使用		
-	int moov_flags;						//moov前置标志，未使用
+	long moov_pos;							//moov的pos，未使用		
+	int moov_flags;							//moov前置标志，未使用
 	int file_flags;
-	char filename[128];					//视频绝对路径
+	char filename[128];						//视频绝对路径
 }MediaCtx;
 MediaCtx g_media_ctx;
 
@@ -34,6 +34,7 @@ static BOOL init_video_codec_params()
 	AVCodecParameters *av_codec_params = NULL;
 	AVStream *v_stream = NULL;		//video stream 
 	AVCodec *v_codec = NULL;		//video codec
+
 
 	out_fmt = g_media_ctx.format_ctx->oformat;
 	v_codec = avcodec_find_encoder(out_fmt->video_codec);
@@ -53,18 +54,21 @@ static BOOL init_video_codec_params()
 	v_stream->id = g_media_ctx.format_ctx->nb_streams - 1;
 	
 	g_media_ctx.video_idx = v_stream->index;
+
 	av_codec_params = v_stream->codecpar;
+
 	if (v_codec->type == AVMEDIA_TYPE_VIDEO)
 	{
 		av_codec_params->codec_type = AVMEDIA_TYPE_VIDEO;
 		av_codec_params->codec_id = AV_CODEC_ID_H264;
-		av_codec_params->bit_rate = 2000;
-		av_codec_params->width = 1280;
-		av_codec_params->height = 720;
+		av_codec_params->bit_rate = 0;
+		av_codec_params->width = hxt_get_video_height_cfg();
+		av_codec_params->height = hxt_get_video_width_cfg();
 		av_codec_params->format = AV_PIX_FMT_YUV420P;
 		
 		v_stream->time_base = (AVRational){1, STREAM_FRAME_RATE};
 	}
+
 
 	return TRUE;
 }
@@ -79,9 +83,13 @@ static BOOL add_sps_pps(unsigned char* buf, unsigned int size)
 		goto INIT_VIDEO_CODEC_PARAMS_FAILED;
 	}
 
+
 	g_media_ctx.format_ctx->streams[g_media_ctx.video_idx]->codecpar->extradata_size = size;
 	g_media_ctx.format_ctx->streams[g_media_ctx.video_idx]->codecpar->extradata = (unsigned char*)av_malloc(size + AV_INPUT_BUFFER_PADDING_SIZE);
 	memcpy(g_media_ctx.format_ctx->streams[g_media_ctx.video_idx]->codecpar->extradata, buf, size);
+
+	// AVDictionary *opt = 0;
+	// av_dict_set_int(&opt, "video_track_timescale", STREAM_FRAME_RATE, 0);
 
 	ret = avformat_write_header(g_media_ctx.format_ctx, NULL);
 	if (ret < 0)
@@ -106,7 +114,6 @@ INIT_VIDEO_CODEC_PARAMS_FAILED:
 	g_media_ctx.video_idx = -1;
 	g_media_ctx.vpts_inc = 0;
 	g_media_ctx.first_IDR = 0;	//sps,pps flags cleared
-
 	return FALSE;
 }
 
@@ -115,6 +122,8 @@ BOOL board_create_mp4_file(const char* filename)
 {
 	int ret = 0;
 	AVOutputFormat *output_fmt = NULL;
+
+	memset(&g_media_ctx, 0, sizeof(g_media_ctx));
 
 	if (NULL == filename)
 	{
@@ -125,8 +134,12 @@ BOOL board_create_mp4_file(const char* filename)
 	avformat_alloc_output_context2(&(g_media_ctx.format_ctx), NULL, NULL, g_media_ctx.filename);
 	if(NULL == g_media_ctx.format_ctx)
 	{
-		utils_print("Muxing: avformat_alloc_output_context2 fialed\n");
-		return FALSE;
+		avformat_alloc_output_context2(&(g_media_ctx.format_ctx), NULL, "mp4", g_media_ctx.filename);
+		if(NULL == g_media_ctx.format_ctx)
+		{
+			utils_print("Muxing: avformat_alloc_output_context2 fialed\n");
+			return FALSE;
+		}
 	}
 
 	output_fmt = g_media_ctx.format_ctx->oformat;
@@ -208,9 +221,9 @@ BOOL board_close_mp4_file()
 BOOL board_write_mp4(VENC_STREAM_S *venc_stream)
 {
 	int ret = 0;
-	int i = 0;
+	unsigned int i = 0;
 	unsigned char* pack_virt_addr = NULL;
-	int pack_len = 0;
+	unsigned int pack_len = 0;
 	
 	AVStream *video_stream = NULL;
 	AVPacket pkt;
@@ -218,8 +231,8 @@ BOOL board_write_mp4(VENC_STREAM_S *venc_stream)
 	unsigned char sps_buf[32];
 	unsigned char pps_buf[32];
 	unsigned char sps_pps_buf[64];
-	int pps_len = 0;
-	int sps_len = 0;
+	unsigned int pps_len = 0;
+	unsigned int sps_len = 0;
 
 	if(NULL == venc_stream)
 	{
@@ -284,7 +297,7 @@ BOOL board_write_mp4(VENC_STREAM_S *venc_stream)
 		case H264E_NALU_IDRSLICE:			//I frame
 			if (g_media_ctx.first_IDR != 2)
 			{
-				continue;					//discard
+				continue;					//ignore
 			}
 			break;
 		default:
@@ -299,6 +312,7 @@ BOOL board_write_mp4(VENC_STREAM_S *venc_stream)
 
 		if (g_media_ctx.first_video == 0)
 		{
+			g_media_ctx.first_video = 1;
 			#ifdef USING_SEQ
 				g_media_ctx.video_pts = venc_stream->u32Seq;
 			#else
@@ -317,18 +331,19 @@ BOOL board_write_mp4(VENC_STREAM_S *venc_stream)
 									video_stream->time_base, 
 									video_stream->time_base, 
 							(enum AVRounding)(AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX));
-#endif	
+#else
 		#ifdef USING_SEQ
 			pkt.pts = av_rescale_q_rnd(venc_stream->u32Seq - g_media_ctx.video_pts, 
-										(AVRational){1, STREAM_FRAME_RATE}, 
+										(AVRational){1, STREAM_FRAME_RATE},
 										video_stream->time_base, 
 										(enum AVRounding)(AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX));
 			pkt.dts = pkt.pts;
 		#else
 			pkt.pts = pkt.dts = (long long int)((venc_stream->pstPack[i].u64PTS - g_media_ctx.video_pts) * 0.09 + 0.5);
 		#endif	
+#endif		
 		pkt.duration = 40;
-		pkt.duration = av_rescale_q(pkt.duration, video_stream->time_base, video_stream->time_base);
+		pkt.duration = av_rescale_q(pkt.duration, (AVRational){1, STREAM_FRAME_RATE}, video_stream->time_base);
 		pkt.pos = -1;
 		pkt.data = pack_virt_addr;
 		pkt.size = pack_len;
@@ -340,7 +355,6 @@ BOOL board_write_mp4(VENC_STREAM_S *venc_stream)
 			return FALSE;
 		}						
 	}
-
 	return TRUE;
 }
 

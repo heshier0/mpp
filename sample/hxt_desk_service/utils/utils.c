@@ -788,6 +788,43 @@ void utils_link_wifi(const char* ssid, const char* pwd)
     return;
 }
 
+void utils_disconnect_wifi()
+{
+    system("kill -9 $(pidof udhcpc)");
+    system("kill -9 $(pidof wpa_supplicant)");
+}
+
+BOOL utils_check_wifi_state()
+{
+    char line[64] = {0};
+    FILE *fp = NULL;
+    int link_mode = 0;
+    
+    fp = popen("cat /sys/class/net/wlan0/link_mode", "r");
+    if(NULL != fp)
+    {
+        if(fgets(line, sizeof(line), fp) == NULL)
+        {
+            pclose(fp);
+            return FALSE;
+        }
+        link_mode = atoi(line);
+    }
+    pclose(fp);
+
+    if(link_mode == 1)
+    {
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+void utils_system_reboot()
+{
+    system("reboot");
+}
+
 void utils_generate_mp4_file_name(char* file_name)
 {
     if( NULL == file_name)
