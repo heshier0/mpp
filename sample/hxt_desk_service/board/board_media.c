@@ -305,7 +305,7 @@ static BOOL start_vpss()
     vpss_chn_attrs[vpss_chn0].enPixelFormat               = PIXEL_FORMAT_YVU_SEMIPLANAR_420;
     vpss_chn_attrs[vpss_chn0].stFrameRate.s32SrcFrameRate = -1;
     vpss_chn_attrs[vpss_chn0].stFrameRate.s32DstFrameRate = -1;
-    vpss_chn_attrs[vpss_chn0].u32Depth                    = 1;
+    vpss_chn_attrs[vpss_chn0].u32Depth                    = 0;
     vpss_chn_attrs[vpss_chn0].bMirror                     = HI_FALSE;
     vpss_chn_attrs[vpss_chn0].bFlip                       = HI_FALSE;
     vpss_chn_attrs[vpss_chn0].stAspectRatio.enMode        = ASPECT_RATIO_NONE;
@@ -1117,12 +1117,12 @@ void board_mpp_deinit()
 void board_get_yuv_from_vpss_chn(char **yuv_buf)
 {
     HI_S32 ret_val;
-    VPSS_GRP vpss_grp[2] = {0, 1};
+    VPSS_GRP vpss_grp = 0;
     HI_S32 time_out = 2000;
     VPSS_CHN vpss_chn = 2;
     VIDEO_FRAME_INFO_S  video_frame;
 
-    ret_val = HI_MPI_VPSS_GetChnFrame(vpss_grp[1], vpss_chn, &video_frame, time_out);
+    ret_val = HI_MPI_VPSS_GetChnFrame(vpss_grp, vpss_chn, &video_frame, time_out);
     if (HI_SUCCESS != ret_val)
     {
         SAMPLE_PRT("vpss get frame failed, ret:0x%08x\n", ret_val);
@@ -1132,7 +1132,7 @@ void board_get_yuv_from_vpss_chn(char **yuv_buf)
     /* to change to yuv picture */
     sample_yuv_8bit_dump(&video_frame.stVFrame, (void *)yuv_buf);
 
-    ret_val = HI_MPI_VPSS_ReleaseChnFrame(vpss_grp[1], vpss_chn, &video_frame);
+    ret_val = HI_MPI_VPSS_ReleaseChnFrame(vpss_grp, vpss_chn, &video_frame);
     if ( HI_SUCCESS != ret_val )
     {
         SAMPLE_PRT("vpss release frame failed, ret:0x%08x\n", ret_val);
