@@ -202,7 +202,7 @@ static BOOL start_vi()
 static BOOL rotate_picture()
 {
     HI_S32 ret_val = HI_FAILURE;
-    ROTATION_E rotate =  ROTATION_90;  //ROTATION_270;
+    ROTATION_E rotate =  ROTATION_270;
     // VI_PIPE vi_pipe[4] = {0, 1, 2, 3};
     // VI_CHN vi_chn = 0;
 

@@ -20,8 +20,8 @@
 #define DEPART_ALARM_TIMEVAL       (60) //(3*60)         
 #define ALARM_TIMEVAL              1//(30)//(3*60)          
 #define BAD_ALARM_TIMEVAL           1//(10)
-#define CORRECT_JUDGE_TIMEVAL       (5)             
-#define MIN_DURATION_TIME         (5)
+#define CORRECT_JUDGE_TIMEVAL       (3)             
+#define MIN_DURATION_TIME         (2)
 
 typedef struct check_status_t
 {
