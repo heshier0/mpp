@@ -233,7 +233,7 @@ char*  iflyos_create_audio_in_request()
     cJSON_AddNumberToObject(payload_wakeup, "score", 666);
     cJSON_AddNumberToObject(payload_wakeup, "start_index_in_samples", 50);
     cJSON_AddNumberToObject(payload_wakeup, "end_index_in_samples", 150);
-    cJSON_AddStringToObject(payload_wakeup, "word", "蓝小飞");
+    cJSON_AddStringToObject(payload_wakeup, "word", "小童小童");
     cJSON_AddStringToObject(payload_wakeup, "prompt", "我在");
 
     char* request = cJSON_Print(root);

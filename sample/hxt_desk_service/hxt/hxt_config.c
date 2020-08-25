@@ -12,7 +12,6 @@
 static cJSON* g_cfg_root  = NULL;     //指向配置文件的Object
 
 static int g_children_unid = 1;
-static char g_desk_sn_code[64] = {0};
 
 static int g_video_width = 0;
 static int g_video_height = 0;
@@ -42,20 +41,6 @@ void hxt_set_child_unid(const int unid)
 int hxt_get_child_unid()
 {
     return g_children_unid;
-}
-
-void hxt_set_desk_sn_code(const char* desk_code)
-{
-    if(desk_code != NULL)
-    {
-        strcpy(g_desk_sn_code, desk_code);
-    }
-    
-}
-
-char* hxt_get_desk_sn_code()
-{
-    return g_desk_sn_code;
 }
 
 //data must json formatted data
@@ -92,6 +77,9 @@ void hxt_init_cfg(void* data)
 
     item = cJSON_GetObjectItem(returnObject, "iflyosToken");
     utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "server", "iflyosToken", item->valuestring);
+
+    // item = cJSON_GetObjectItem(returnObject, "iflyosSN");
+    // utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "server", "iflyosSN", item->valuestring);
 
     item = cJSON_GetObjectItem(returnObject, "upgradePackUrl");
     utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "server", "upgradePackUrl", item->valuestring);
@@ -181,6 +169,11 @@ char* hxt_get_posture_detect_model_path()
 char* hxt_get_posture_class_model_path()
 {
     return utils_get_cfg_str_value(g_cfg_root, "model", "class_model");
+}
+
+char* hxt_get_iflyos_cae_sn()
+{
+    return utils_get_cfg_str_value(g_cfg_root, "server", "iflyosSN");
 }
 
 //get
@@ -335,10 +328,7 @@ char* hxt_get_wifi_check_code_cfg()
     return utils_get_cfg_str_value(g_cfg_root, "wifi", "checkCode");
 }
 
-char* hxt_get_desk_code_cfg()
-{
-    return utils_get_cfg_str_value(g_cfg_root, "desk", "deskCode");
-}
+
 //set 
 
 BOOL hxt_set_posture_detect_model_path(const char* value)
@@ -552,16 +542,6 @@ BOOL hxt_set_wifi_check_code_cfg(const char* value)
     return utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "wifi", "checkCode", value);
 }
 
-BOOL hxt_set_desk_code_cfg(const char* value)
-{
-    if(NULL == value)
-    {
-        return FALSE;
-    }
-
-    return utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "desk", "deskCode", value);
-}
-
 BOOL hxt_set_camera_status(int status)
 {
     if(status < 1 || status > 3)
@@ -578,4 +558,12 @@ int hxt_get_camera_status()
     return g_camera_status;
 }
 
+int hxt_get_desk_bind_status_cfg()
+{
+    return utils_get_cfg_number_value(g_cfg_root, "desk", "bind");
+}
 
+BOOL hxt_set_desk_bind_status_cfg(int status)
+{
+    return utils_set_cfg_number_value(g_cfg_root, HXT_CFG, "desk", "bind", status);
+}

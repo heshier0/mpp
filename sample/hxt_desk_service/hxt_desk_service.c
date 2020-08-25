@@ -31,7 +31,7 @@ static void  deploy_network()
 {
     BOOL first_notice = TRUE;
 
-    //utils_disconnect_wifi();
+    // utils_disconnect_wifi();
     /* check if wifi info in cfg */
     while (1)
     {
@@ -48,14 +48,25 @@ static void  deploy_network()
         }
 
         /* to connect wifi */
-        utils_link_wifi(hxt_get_wifi_ssid_cfg(), hxt_get_wifi_pwd_cfg());
-
+        if (!utils_check_wifi_state())
+        {
+            utils_link_wifi(hxt_get_wifi_ssid_cfg(), hxt_get_wifi_pwd_cfg());
+        }
+        
         sleep(5);
         
         /*link ok, play voice*/
         if (utils_check_wifi_state())
         {
             utils_send_local_voice(VOICE_WIFI_BIND_OK);
+
+            //check desk bind status 
+            if (hxt_get_desk_bind_status_cfg() == 0)
+            {
+                hxt_bind_desk_with_wifi_request();
+                hxt_set_desk_bind_status_cfg(1);
+            }
+
             break;
         }
         else
@@ -83,13 +94,13 @@ int main(int argc, char **argv)
     signal(SIGTERM, handle_signal);   
 #endif
 
-    /* init gpio */
-    // board_gpio_init();
-
     /* load config */
     hxt_load_cfg();
 
-    /* init board */
+    /* init gpio */
+    board_gpio_init();
+
+    /* init board media process */
     if (!board_mpp_init())
     {
         utils_print("board mpp init error...\n");
@@ -130,7 +141,7 @@ int main(int argc, char **argv)
         waitpid(hxt_pid, &st1, 0);
         utils_print("child process hxt_websocket exit\n");
         // waitpid(iflyos_pid, &st2, 0);
-        
+        // utils_print("child process iflyos_websocket exit\n");
     }
 #endif
 
@@ -142,7 +153,7 @@ int main(int argc, char **argv)
 
 EXIT:
     utils_print("~~~~EXIT~~~~\n");
-    // board_gpio_uninit();
+    board_gpio_uninit();
     hxt_unload_cfg();
 
     

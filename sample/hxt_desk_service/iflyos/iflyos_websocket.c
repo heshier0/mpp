@@ -68,6 +68,11 @@ static void thread_send_pcm_cb(void *data)
     BOOL requested = FALSE;
     struct uwsc_client *cl = (struct uwsc_client *)data;
 
+
+#ifdef DEBUG
+    FILE* pfd = fopen("iflyos_test.pcm", "wb");
+#endif
+
     while(g_sampling)
     {
         if (g_stop_capture)
@@ -88,19 +93,24 @@ static void thread_send_pcm_cb(void *data)
         {
             char *req = iflyos_create_audio_in_request();
             cl->send(cl, req, strlen(req), UWSC_OP_TEXT);
-            // printf("%s: [%.*s]\n", get_cur_time(), (int)strlen(req), (char *)req);
             free(req);
             requested = TRUE;
-            // test, send wakeup bin
-
-
         }
 
+#ifdef DEBUG
+        fwrite(ptr, 1, PCM_LENGTH, pfd);
+        fflush(pfd);
+#endif
+
         // send data
-        cl->send(cl, ptr, PCM_LENGTH, UWSC_OP_BINARY);
+        // cl->send(cl, ptr, PCM_LENGTH, UWSC_OP_BINARY);
+        // iflyos_write_audio(ptr, PCM_LENGTH);
 
         release_buffer(&g_voice_buffer, PCM_LENGTH);
     }
+#ifdef DEBUG    
+    fclose(pfd);
+#endif    
     utils_print("send pcm thread exit...\n");
     
     return;
@@ -119,7 +129,8 @@ static void uwsc_onmessage(struct uwsc_client *cl,
 	void *data, size_t len, bool binary)
 {
     printf("iflyos recv:\n");
-
+    printf("%s: [%.*s]\n", utils_get_current_time(), (int)len, (char *)data);
+    
     if (binary) {
         //文件
     } 
@@ -130,6 +141,7 @@ static void uwsc_onmessage(struct uwsc_client *cl,
         {
             return;
         }
+        
         if(strcmp(name, aplayer_audio_out) == 0)
         {
             iflyos_play_response_audio(data);
@@ -140,7 +152,7 @@ static void uwsc_onmessage(struct uwsc_client *cl,
         }
         else
         {
-            printf("%s: [%.*s]\n", utils_get_current_time(), (int)len, (char *)data);
+            //printf("%s: [%.*s]\n", utils_get_current_time(), (int)len, (char *)data);
         }
         
         free(name);
@@ -196,10 +208,15 @@ int iflyos_websocket_start()
     char* token = iflyos_get_token();
     sprintf(ifly_url, "wss://ivs.iflyos.cn/embedded/v1?token=%s&device_id=%s", token, device_id); 
 
-    
     cl = uwsc_new(loop, ifly_url, ping_interval, NULL);
     if (!cl)
+    {
+        utils_print("iflyos websocket client init failed...\n");
         return -1;
+    }
+        
+
+    // iflyos_init_cae_lib((void*)cl);
 
 	utils_print("iflyos connect...\n");
 
@@ -213,10 +230,11 @@ int iflyos_websocket_start()
 
     ev_run(loop, 0);
    
-    // free(cl);       
     iflyos_unload_cfg();
     
     destroy_buffer(&g_voice_buffer);
+
+    // iflyos_deinit_cae_lib();
 
     return 0;
 }

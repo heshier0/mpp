@@ -16,15 +16,27 @@ CHIP_TYPE=hi3516dv300;      # chip type
 #DDR start:0x80000000,   kernel start:0x80000000,  OS(128M); MMZ start:0x88000000
 mem_total=1024                # 512M, total mem
 mem_start=0x80000000          # phy mem start
-os_mem_size=512				# 128M, os mem
+os_mem_size=640				# 128M, os mem
 mmz_start=0xa0000000;         # mmz start addr
-mmz_size=512M;               # 384M, mmz size
+mmz_size=384M;               # 384M, mmz size
 ##################################################################
 
 report_error()
 {
 	echo "******* Error: There's something wrong, please check! *****"
 	exit 1
+}
+
+insert_wifi()
+{
+	insmod rtl8192eu.ko
+	echo "insert wifi module"
+}
+
+remove_wifi()
+{
+	rmmod rtl8192eu.ko
+	echo "remove wifi module"
 }
 
 insert_audio()
@@ -128,10 +140,13 @@ insert_ko()
 #	insmod hi_user.ko
 
 #	insert_gyro
+	
+	insert_wifi
 }
 
 remove_ko()
 {
+	remove_wifi
 #	rmmod_gyro
 #	rmmod hi_user
 	remove_audio

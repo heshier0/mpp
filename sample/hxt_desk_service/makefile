@@ -35,7 +35,8 @@ INCS = -I$(ROOT_DIR)/. \
        -I/mnt/g/workspace/plugins/ffmpeg/include \
        -I/mnt/g/workspace/plugins/libgpiod/include \
        -I/mnt/g/workspace/plugins/opencv4/include/opencv4 \
-       -I/mnt/g/workspace/plugins/libsitposture/include 
+       -I/mnt/g/workspace/plugins/libsitposture/include \
+       -I/mnt/g/workspace/plugins/iflyos/include
  
 LIBS = -L/mnt/g/workspace/plugins/libev/lib -lev \
        -L/mnt/g/workspace/plugins/cjson/lib -lcjson \
@@ -49,7 +50,8 @@ LIBS = -L/mnt/g/workspace/plugins/libev/lib -lev \
        -L/mnt/g/workspace/plugins/x264/lib -lx264 \
        -L/mnt/g/workspace/plugins/libgpiod/lib -lgpiod \
        -L/mnt/g/workspace/plugins/libsitposture/lib -lsitposture \
-       -L/mnt/g/workspace/plugins/libsitPostrecog/lib -lsitPostrecog 
+       -L/mnt/g/workspace/plugins/libsitPostrecog/lib -lsitPostrecog \
+       -L/mnt/g/workspace/plugins/iflyos/lib -lhlw
 
 LIBS +=  -L$(REL_LIB) -lsecurec -lnnie
 LIBS += -L/mnt/g/workspace/plugins/opencv4/lib -lopencv_core -lopencv_calib3d -lopencv_dnn -lopencv_features2d -lopencv_flann -lopencv_highgui -lopencv_imgcodecs -lopencv_imgproc -lopencv_ml -lopencv_objdetect

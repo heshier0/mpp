@@ -8,7 +8,7 @@
 #include "utils.h"
 #include "iflyos_common_def.h"
 
-#define IFLYOS_CFG          "/userdata/config/iflyos_config.json"
+#define IFLYOS_CFG          "/userdata/config/iflyos/iflyos_config.json"
 #define DEVICE_PARAMS       "device_params"
 #define DEVICE_AUTH         "device_auth"
 #define PLATFORM_PARAMS     "platform_params"

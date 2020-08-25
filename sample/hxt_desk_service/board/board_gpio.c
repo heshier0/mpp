@@ -198,24 +198,30 @@ static void* check_posture_event(void *param)
         {
             continue;
         }
+        
         if (event.event_type == GPIOD_LINE_EVENT_FALLING_EDGE)
         {
             printf("camera btn pressed down\n");
             start = time(0);
         }
+
         if(event.event_type == GPIOD_LINE_EVENT_RISING_EDGE)
         {
             end = time(0);   
             if (end - start >= 3)
             {
-                stop_posture_recognize();   
-                posture_running = FALSE;  
+                if (posture_running)
+                {
+                    stop_posture_recognize();   
+                    posture_running = FALSE;  
+                }
             }
             else
             {
                 if (!posture_running)
                 {
                     posture_running = TRUE;
+                    utils_send_local_voice(VOICE_NORMAL_STATUS);
                     start_posture_recognize();   
                 }
             }
@@ -258,7 +264,7 @@ static void* booting_led_status_thread(void* param)
         gpio_set_value(led_camera_blue, 0);
         gpio_set_value(led_wifi_blue, 0);
         usleep(200 * 1000);
-        gpio_set_value(led_camera_blue, 1);
+        gpio_set_value(led_camera_red, 1);
         gpio_set_value(led_wifi_blue, 1);
         usleep(200 * 1000);
     }

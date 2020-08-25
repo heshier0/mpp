@@ -180,7 +180,7 @@ static unsigned long get_register_4bytes(unsigned long reg_addr)
     return *(unsigned long*)mem;
 }
 
-const char* board_get_sn()
+char* board_get_sn()
 {
     static char sn[64] = {0};
     unsigned long code1, code2, code3, code4, code5, code6;

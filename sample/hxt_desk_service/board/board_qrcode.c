@@ -58,27 +58,29 @@ BOOL get_qrcode_yuv_buffer()
     }
 
     /* write wifi info into hxt config file */
-    cJSON* root = cJSON_Parse(qrcode_info);
-    if (root == NULL)
-    {
-        utils_print("parse qrcode info to json failed\n");
-        return FALSE;
-    }
-    cJSON *item = cJSON_GetObjectItem(root, "ssid");
-    char* wifi_ssid = item->valuestring;
-    utils_print("ssid:%s\n", wifi_ssid);
-    hxt_set_wifi_ssid_cfg(wifi_ssid);
-    item = cJSON_GetObjectItem(root, "password");
-    char* wifi_password = item->valuestring;
-    utils_print("password:%s\n", wifi_password);
-    hxt_set_wifi_pwd_cfg(wifi_password);
+    // cJSON* root = cJSON_Parse(qrcode_info);
+    // if (root == NULL)
+    // {
+    //     utils_print("parse qrcode info to json failed\n");
+    //     return FALSE;
+    // }
+    // cJSON *item = cJSON_GetObjectItem(root, "ssid");
+    // char* wifi_ssid = item->valuestring;
+    // utils_print("ssid:%s\n", wifi_ssid);
+    // hxt_set_wifi_ssid_cfg(wifi_ssid);
+    // item = cJSON_GetObjectItem(root, "password");
+    // char* wifi_password = item->valuestring;
+    // utils_print("password:%s\n", wifi_password);
+    // hxt_set_wifi_pwd_cfg(wifi_password);
 
-    if (root != NULL)
-    {
-        cJSON_Delete(root);
-    }
+    // if (root != NULL)
+    // {
+    //     cJSON_Delete(root);
+    // }
 
-    hxt_reload_cfg();
+    // hxt_reload_cfg();
+
+    hxt_query_wifi_info((void*)qrcode_info);
     
     return TRUE;
 }

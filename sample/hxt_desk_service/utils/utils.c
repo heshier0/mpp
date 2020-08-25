@@ -868,3 +868,24 @@ void utils_save_yuv_test(const char* yuv_data, const int width, const int height
     fclose(pfd);
 }
 
+void utils_save_pcm_test(const char* pcm_data, int length)
+{
+    struct tm * tm;
+	time_t now = time(0);
+	tm = localtime(&now);
+	char file_name[128] = {0};
+
+	snprintf(file_name, 128, "%04d%02d%02d-%02d%02d%02d.pcm", 
+    	     tm->tm_year + 1900,
+	         tm->tm_mon + 1,
+	         tm->tm_mday,
+	         tm->tm_hour,
+	         tm->tm_min,
+	         tm->tm_sec);
+
+    FILE* pfd = fopen(file_name, "wb");
+    fwrite(pcm_data, 1, length, pfd);
+    fflush(pfd);
+    fclose(pfd);
+}
+

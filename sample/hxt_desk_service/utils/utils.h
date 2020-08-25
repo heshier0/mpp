@@ -76,7 +76,10 @@ BOOL utils_check_wifi_state();
 void utils_system_reboot();
 
 void utils_generate_mp4_file_name(char* file_name);
+
+
 void utils_save_yuv_test(const char* yuv_data, const int width, const int height);
+void utils_save_pcm_test(const char* pcm_data, int length);
 
 // int utils_send_msg(void* data, int length);
 // int utils_recv_msg(void* data, int length);

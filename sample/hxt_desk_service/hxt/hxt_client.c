@@ -194,7 +194,6 @@ static void hxt_get_token_response(void* data)
         return;
     }
 
-    utils_print("response:[%s]\n", data);
     cJSON* root = cJSON_Parse(data);
     
     //check return status,if not OK, get error msg
@@ -280,8 +279,11 @@ BOOL hxt_query_wifi_info(void *data)
     }
     hxt_set_wifi_check_code_cfg(checkCode_node->valuestring);
 
-    cJSON_Delete(root);
-
+    if (root != NULL)
+    {
+        cJSON_Delete(root);
+    }
+    
     hxt_reload_cfg();
     
     return TRUE;
@@ -806,8 +808,8 @@ BOOL hxt_check_wifi_data_request()
     {
         reported = TRUE;
         
-        char* desc = hxt_get_response_description(out);
-        hxt_set_desk_sn_code(desc);
+        // char* desc = hxt_get_response_description(out);
+        // hxt_set_desk_sn_code(desc);
     } 
 
 CLEANUP1:  
@@ -830,17 +832,16 @@ BOOL hxt_bind_desk_with_wifi_request()
         goto CLEANUP4;
     }
 
+    char *sn = board_get_sn();
+
     //post json data to server
     cJSON *root = cJSON_CreateObject();    
     if (NULL == root)
     {
         goto CLEANUP3;
     }
-    cJSON_AddNumberToObject(root, "ssid", hxt_get_wifi_ssid_cfg());
-    cJSON_AddNumberToObject(root, "bssid", hxt_get_wifi_bssid_cfg());
-    cJSON_AddNumberToObject(root, "pwd", hxt_get_wifi_pwd_cfg());
-    cJSON_AddNumberToObject(root, "checkCode", hxt_get_wifi_check_code_cfg());
-    cJSON_AddNumberToObject(root, "deskCode", hxt_get_desk_sn_code());
+    cJSON_AddStringToObject(root, "checkCode", hxt_get_wifi_check_code_cfg());
+    cJSON_AddStringToObject(root, "snCode", sn);
     
     char* json_data = cJSON_PrintUnformatted(root);
     if (NULL == json_data)
@@ -865,7 +866,6 @@ BOOL hxt_bind_desk_with_wifi_request()
 
 CLEANUP1:  
     utils_free(out);
-    // utils_free(json_data);
 CLEANUP2:   
     cJSON_Delete(root);
 CLEANUP3:
