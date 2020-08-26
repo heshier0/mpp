@@ -77,7 +77,6 @@ static void  deploy_network()
     }
     
    
-    
     return;
 }
 

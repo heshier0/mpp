@@ -87,14 +87,14 @@ static void* check_reset_event(void *param)
         {
             continue;
         }
-        if(event.event_type == GPIOD_LINE_EVENT_RISING_EDGE)
-        {
-            printf("reset btn pressed down\n");
-            start = time(0);
-        }
         if(event.event_type == GPIOD_LINE_EVENT_FALLING_EDGE)
         {
             printf("reset btn pressed up\n");
+            start = time(0);
+        }
+        if(event.event_type == GPIOD_LINE_EVENT_RISING_EDGE)
+        {
+            printf("reset btn pressed down\n");
             end = time(0);
             printf("inteval is %ld\n", end - start);
             if (end - start > 5)
@@ -207,6 +207,7 @@ static void* check_posture_event(void *param)
 
         if(event.event_type == GPIOD_LINE_EVENT_RISING_EDGE)
         {
+            printf("camera btn pressed up\n");
             end = time(0);   
             if (end - start >= 3)
             {
@@ -225,9 +226,7 @@ static void* check_posture_event(void *param)
                     start_posture_recognize();   
                 }
             }
-            
         }
-
     }
     return NULL;
 }
