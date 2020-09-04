@@ -540,7 +540,6 @@ void* SAMPLE_COMM_AUDIO_AiProc(void* parg)
                 continue;
 #endif
             }
-
             /* send frame to encoder */
             if (HI_TRUE == pstAiCtl->bSendAenc)
             {
@@ -846,7 +845,7 @@ HI_S32 SAMPLE_COMM_AUDIO_CreatTrdAiAo(AUDIO_DEV AiDev, AI_CHN AiChn, AUDIO_DEV A
 
     pstAi = &gs_stSampleAi[AiDev * AI_MAX_CHN_NUM + AiChn];
     pstAi->bSendAenc = HI_FALSE;
-    pstAi->bSendAo = HI_TRUE;
+    pstAi->bSendAo = HI_FALSE;
     pstAi->bStart = HI_TRUE;
     pstAi->AiDev = AiDev;
     pstAi->AiChn = AiChn;
@@ -1171,9 +1170,11 @@ HI_S32 SAMPLE_COMM_AUDIO_StartAi(AUDIO_DEV AiDevId, HI_S32 s32AiChnCnt,
                     s32Ret = HI_MPI_AI_SetRecordVqeAttr(AiDevId, i, (AI_RECORDVQE_CONFIG_S *)pstAiVqeAttr);
                     break;
                 case 2:
-                    s32Ret = HI_MPI_AI_SetTalkVqeAttr(AiDevId, i, 0, 0, (AI_TALKVQE_CONFIG_S *)pstAiVqeAttr);    
+                    s32Ret = HI_MPI_AI_SetTalkVqeAttr(AiDevId, i, 0, 0, (AI_TALKVQE_CONFIG_S *)pstAiVqeAttr);   
+                    break; 
                 default:
-                    s32Ret = HI_FAILURE;                    break;
+                    s32Ret = HI_FAILURE;                    
+                    break;
             }
 
             if (s32Ret)

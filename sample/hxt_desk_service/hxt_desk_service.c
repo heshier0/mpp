@@ -16,14 +16,63 @@
 #include "file_utils.h"
 
 static pthread_t play_tid, voice_tid, video_tid;
+static pid_t iflyos_pid = -1, hxt_pid = -1;
+static BOOL g_processing = TRUE;
+
+static void start_hxt_process()
+{
+    hxt_pid = fork();
+    if (hxt_pid == 0)
+    {
+        hxt_websocket_start();
+        return 0;
+    }
+}
+
+static void start_iflyos_process()
+{
+    iflyos_pid = fork();
+    if (iflyos_pid == 0)
+    {
+        iflyos_websocket_start();
+        return 0;
+    }
+}
+
+static void main_process_cycle()
+{
+    pid_t child;
+    while(g_processing)
+    {
+        child = waitpid(hxt_pid, NULL, WNOHANG);
+        if (child == hxt_pid)
+        {
+            sleep(120);
+            utils_print("hxt child process exit, restart it\n");
+            start_hxt_process();
+        }
+        
+        child = waitpid(iflyos_pid, NULL, WNOHANG);
+        if (child == iflyos_pid)
+        {
+            sleep(120);
+            utils_print("iflyos child process exit, restart it\n");
+            start_iflyos_process();
+        }
+
+        sleep(5);
+    }
+}
 
 static void handle_signal(int signo)
 {
     if (SIGINT == signo || SIGTERM == signo)
     {
-        g_play_status = 0;
-        g_voice_status = 0;
-        g_video_status = 0;
+        g_processing = FALSE;
+
+        // g_play_status = 0;
+        // g_voice_status = 0;
+        // g_video_status = 0;
    }
 }
 
@@ -38,12 +87,8 @@ static void  deploy_network()
         while (hxt_get_wifi_ssid_cfg() == NULL || strlen(hxt_get_wifi_ssid_cfg()) == 0)
         {
             /* step into qrcode scan */
-            if(first_notice)
-            {
-                sleep(3);
-                utils_send_local_voice(VOICE_SCAN_QRCODE);
-                first_notice = FALSE;
-            }
+            sleep(3);
+            // utils_send_local_voice(VOICE_SCAN_QRCODE);
             continue;
         }
 
@@ -58,36 +103,52 @@ static void  deploy_network()
         /*link ok, play voice*/
         if (utils_check_wifi_state())
         {
-            utils_send_local_voice(VOICE_WIFI_BIND_OK);
-
             //check desk bind status 
-            if (hxt_get_desk_bind_status_cfg() == 0)
+            if(hxt_get_desk_bind_status_cfg() == 1)
             {
-                hxt_bind_desk_with_wifi_request();
-                hxt_set_desk_bind_status_cfg(1);
+                break;
             }
+            else
+            {
+                if(!board_get_qrcode_scan_status())
+                {
+                    if (hxt_bind_desk_with_wifi_request())
+                    {
+                        board_stop_connect_led_blinking();
 
-            break;
+                        hxt_confirm_desk_bind_request();
+
+                        utils_send_local_voice(VOICE_WIFI_BIND_OK);
+                        hxt_set_desk_bind_status_cfg(1);
+
+                        break;
+                    }
+                    else
+                    {
+                        utils_send_local_voice(VOICE_WIFI_BIND_ERROR);
+                        sleep(5);
+                    }
+                }
+            }
         }
         else
         {
-            utils_send_local_voice(VOICE_WIFI_BIND_ERROR);
             utils_disconnect_wifi();
         }
     }
     
-   
     return;
 }
-
 
 int main(int argc, char **argv)
 {
     int st1, st2, st3;
     BOOL server_started = TRUE;
+    BOOL config_get = FALSE;
     BOOL wifi_exist = FALSE;
     utils_print("HXT V1.0.0\n");
 
+    // signal(SIGCHLD, child_process_signal_handle);
 #ifdef DEBUG
     signal(SIGINT, handle_signal);
     signal(SIGTERM, handle_signal);   
@@ -106,50 +167,50 @@ int main(int argc, char **argv)
         goto EXIT;
     }
 
-    g_play_status = 1;
+    g_play_status = TRUE;
     play_tid = start_play_mp3();
-    g_voice_status = 1;
+    g_voice_status = TRUE;
     voice_tid = start_sample_voice();
-    g_video_status = 1;
+    g_video_status = TRUE;
     video_tid = start_sample_video();
 
     sleep(3);
 
     utils_send_local_voice(VOICE_DEVICE_OPEN);
 
+    board_stop_boot_led_blinking();
+
     deploy_network();
+
 #if 1
     /* connect to hxt server */
     server_started = hxt_check_token();
-    if (server_started)
+    if(server_started)
     {
-        pid_t hxt_pid = fork();
-        if (hxt_pid == 0)
+        config_get = hxt_get_desk_cfg_request();
+        if (config_get)
         {
-            hxt_websocket_start();
-            return 0;
+            start_hxt_process();
         }
 
-        // pid_t iflyos_pid = fork();
-        // if (iflyos_pid == 0)
-        // {
-        //     iflyos_websocket_start();
-        //     return 0;
-        // }
-
-        waitpid(hxt_pid, &st1, 0);
-        utils_print("child process hxt_websocket exit\n");
-        // waitpid(iflyos_pid, &st2, 0);
-        // utils_print("child process iflyos_websocket exit\n");
+        // start_iflyos_process();
     }
+    main_process_cycle();
 #endif
+    while(g_processing)
+    {
+        sleep(5);
+    }
 
-    pthread_join(play_tid, NULL);
-    pthread_join(voice_tid, NULL);
-    pthread_join(video_tid, NULL);
+    
+    g_play_status = FALSE;
+    g_voice_status = FALSE;
+    g_video_status = FALSE;
+
+    unlink(PCM_FIFO);
+    unlink(MP3_FIFO);
 
     board_mpp_deinit();
-
 EXIT:
     utils_print("~~~~EXIT~~~~\n");
     board_gpio_uninit();

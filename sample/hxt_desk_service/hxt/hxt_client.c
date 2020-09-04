@@ -49,6 +49,7 @@ static char* hxt_get_api_url(const char* api)
         return NULL;
     }
 
+    /* should be optimization */
     char request_url[256] = {0};
     strcpy(request_url, server_url);
     strcat(request_url, "/api/");
@@ -59,8 +60,6 @@ static char* hxt_get_api_url(const char* api)
     memset(ret_value, 0, strlen(request_url) + 1);
     if(NULL == ret_value)
     {
-        // utils_free(server_url);
-        // utils_free(ver);
         return NULL;
     }
     strcpy(ret_value, request_url);
@@ -178,10 +177,10 @@ static BOOL hxt_get_response_pass_status(void *data)
         status = FALSE;
     }
     
-    // if(root != NULL)
-    // {
-    //     cJSON_Delete(root);
-    // }
+    if(root != NULL)
+    {
+        cJSON_Delete(root);
+    }
 
     return status; 
 }
@@ -210,9 +209,6 @@ static void hxt_get_token_response(void* data)
         return;
     }
 
-    //write response value into config file
-    hxt_init_cfg(data);
-
     if(root != NULL)
     {
         cJSON_Delete(root);
@@ -238,6 +234,7 @@ static char* hxt_get_header_with_token()
     return header;
 }
 
+
 BOOL hxt_query_wifi_info(void *data)
 {
     if (NULL == data)
@@ -257,13 +254,6 @@ BOOL hxt_query_wifi_info(void *data)
         return FALSE;
     }
     hxt_set_wifi_ssid_cfg(ssid_node->valuestring);
-
-    cJSON *bssid_node = cJSON_GetObjectItem(root, "bssid");
-    if(NULL == bssid_node)
-    {
-        return FALSE;
-    }
-    hxt_set_wifi_bssid_cfg(bssid_node->valuestring);
 
     cJSON *pwd_node = cJSON_GetObjectItem(root, "pwd");
     if(NULL == pwd_node)
@@ -292,7 +282,7 @@ BOOL hxt_query_wifi_info(void *data)
 BOOL hxt_get_token_request()
 {
     BOOL reported = FALSE;
-    char* api_url = hxt_get_api_url(HXT_GET_TOKEN_URL);
+    char* api_url = hxt_get_api_url(HXT_GET_TOKEN);
     if(NULL == api_url)
     {
         goto CLEANUP4;
@@ -309,7 +299,8 @@ BOOL hxt_get_token_request()
     {
         goto CLEANUP3;
     }
-    cJSON_AddStringToObject(root, "code", uuid);
+    cJSON_AddStringToObject(root, "deskCode", uuid);
+    cJSON_AddStringToObject(root, "snCode", board_get_sn());
 
     char* json_data = cJSON_PrintUnformatted(root);
     if (NULL == json_data)
@@ -317,8 +308,8 @@ BOOL hxt_get_token_request()
         goto CLEANUP2;
     }
     //save response data
-    char *out = (char*)utils_malloc(1024*2);
-    if(!utils_post_json_data(api_url, NULL, json_data, out, 2048))
+    char *out = (char*)utils_malloc(1024);
+    if(!utils_post_json_data(api_url, NULL, json_data, out, 1024))
     {
         utils_print("post data send failed\n");
         goto CLEANUP1;
@@ -327,7 +318,8 @@ BOOL hxt_get_token_request()
     int status_code = hxt_get_reponse_status_code((void*)out);
     if (status_code == RESPONSE_OK)
     {
-        hxt_get_token_response((void*)out);
+        /* write token into cfg */   
+        hxt_init_token(out);
         reported = TRUE;
     }
     else if(status_code == NO_REGISTER)
@@ -343,6 +335,48 @@ CLEANUP2:
 CLEANUP3:
     utils_free(api_url);
 CLEANUP4:
+    return reported;
+}
+
+BOOL hxt_get_desk_cfg_request()
+{
+    BOOL reported = FALSE;
+    char* api_url = hxt_get_api_url(HXT_GET_DESK_CONFIG);
+    if(NULL == api_url)
+    {
+        return FALSE;
+    }
+
+    char* header = hxt_get_header_with_token();
+    if(NULL == header)
+    {
+        utils_free(api_url);
+        return FALSE;
+    }
+
+    //save response data
+    char *out = (char*)utils_malloc(1024*2);
+    if(!utils_post_json_data(api_url, header, NULL, out, 1024*2))
+    {
+        utils_print("post data send failed\n");
+        utils_free(header);
+        utils_free(api_url);
+        return FALSE;
+    } 
+    utils_print("response length is [%s]\n", out);
+
+    int status_code = hxt_get_reponse_status_code((void *)out);
+    if (status_code == RESPONSE_OK)
+    {
+        /* init hxt config */
+        hxt_init_cfg((void*)out);
+        reported = TRUE;
+    }
+
+    utils_free(out);
+    utils_free(header);
+    utils_free(api_url);
+    
     return reported;
 }
 
@@ -374,7 +408,7 @@ BOOL hxt_report_info_request(int reportType, int cameraStatus)
     utils_print("%s\n", json_data);
     //save response data
     char *out = (char*)utils_malloc(1024);
-    if(!utils_post_json_data(api_url, json_data, header, out, 1024))
+    if(!utils_post_json_data(api_url, header, json_data, out, 1024))
     {
         utils_print("post data send failed\n");
         goto CLEANUP1;
@@ -564,7 +598,7 @@ BOOL hxt_study_report_request(int unid, ReportType type, int duration, const cha
     utils_print("%s\n", json_data);
     //save response data
     char *out = (char*)utils_malloc(1024);
-    if(!utils_post_json_data(api_url, json_data, header, out, 1024))
+    if(!utils_post_json_data(api_url, header, json_data, out, 1024))
     {
         utils_print("post data send failed\n");
         goto CLEANUP1;
@@ -632,7 +666,7 @@ int hxt_get_max_chunk_request(const char* file_md5, const ExtType type)
 
     //save response data
     char *out = (char*)utils_malloc(1024);
-    if(!utils_post_json_data(api_url, NULL, header, out, 1024))
+    if(!utils_post_json_data(api_url, header, NULL, out, 1024))
     {
         utils_print("post data send failed\n");
         goto EXIT;
@@ -743,7 +777,7 @@ BOOL hxt_merge_chunks_request(const char* file_path, ExtType type)
 
     //save response data
     char *out = (char*)utils_malloc(1024);
-    if(!utils_post_json_data(api_url, "", header, out, 1024))
+    if(!utils_post_json_data(api_url, header, "", out, 1024))
     {
         utils_print("post data send failed\n");
         goto EXIT;
@@ -797,7 +831,7 @@ BOOL hxt_check_wifi_data_request()
     utils_print("%s\n", json_data);
     //save response data
     char* out = (char*)utils_malloc(1024);
-    if(!utils_post_json_data(api_url, json_data, "", out, 1024))
+    if(!utils_post_json_data(api_url, "", json_data, out, 1024))
     {
         utils_print("post data send failed\n");
         goto CLEANUP1;
@@ -823,16 +857,14 @@ CLEANUP5:
     return reported;
 }
 
-BOOL hxt_bind_desk_with_wifi_request()
+BOOL hxt_confirm_desk_bind_request()
 {
     BOOL reported = FALSE;
-    char* api_url = hxt_get_api_url(HXT_BIND_DESK_WIFI);
+    char* api_url = hxt_get_api_url(HXT_CONFIRM_DESK_BIND);
     if(NULL == api_url)
     {
         goto CLEANUP4;
     }
-
-    char *sn = board_get_sn();
 
     //post json data to server
     cJSON *root = cJSON_CreateObject();    
@@ -840,8 +872,8 @@ BOOL hxt_bind_desk_with_wifi_request()
     {
         goto CLEANUP3;
     }
-    cJSON_AddStringToObject(root, "checkCode", hxt_get_wifi_check_code_cfg());
-    cJSON_AddStringToObject(root, "snCode", sn);
+    cJSON_AddStringToObject(root, "deskCode", hxt_get_desk_uuid_cfg());
+    cJSON_AddStringToObject(root, "snCode", board_get_sn());
     
     char* json_data = cJSON_PrintUnformatted(root);
     if (NULL == json_data)
@@ -851,7 +883,7 @@ BOOL hxt_bind_desk_with_wifi_request()
     utils_print("%s\n", json_data);
     //save response data
     char* out = (char*)utils_malloc(1024);
-    if(!utils_post_json_data(api_url, json_data, "", out, 1024))
+    if(!utils_post_json_data(api_url, "", json_data, out, 1024))
     {
         utils_print("post data send failed\n");
         goto CLEANUP1;
@@ -861,7 +893,59 @@ BOOL hxt_bind_desk_with_wifi_request()
     if (status_code == RESPONSE_OK)
     {
         reported = TRUE;
+    } 
 
+CLEANUP1:  
+    utils_free(out);
+CLEANUP2:   
+    cJSON_Delete(root);
+CLEANUP3:
+    utils_free(api_url);
+CLEANUP4:
+    return reported;
+}
+
+BOOL hxt_bind_desk_with_wifi_request()
+{
+    BOOL reported = FALSE;
+    char* api_url = hxt_get_api_url(HXT_BIND_DESK_WIFI);
+    if(NULL == api_url)
+    {
+        goto CLEANUP4;
+    }
+
+    //post json data to server
+    cJSON *root = cJSON_CreateObject();    
+    if (NULL == root)
+    {
+        goto CLEANUP3;
+    }
+    cJSON_AddStringToObject(root, "checkCode", hxt_get_wifi_check_code_cfg());
+    cJSON_AddStringToObject(root, "snCode", board_get_sn());
+    
+    char* json_data = cJSON_PrintUnformatted(root);
+    if (NULL == json_data)
+    {
+        goto CLEANUP2;
+    }
+    utils_print("%s\n", json_data);
+    //save response data
+    char* out = (char*)utils_malloc(1024);
+    if(!utils_post_json_data(api_url, "", json_data, out, 1024))
+    {
+        utils_print("post data send failed\n");
+        goto CLEANUP1;
+    } 
+    utils_print("response length is [%s]\n", out);
+    int status_code = hxt_get_reponse_status_code(out);
+    if (status_code == RESPONSE_OK)
+    {
+        /* store desk unid */
+        char *uuid = hxt_get_response_description(out);
+        hxt_set_desk_uuid_cfg(uuid);
+        free(uuid);
+
+        reported = TRUE;
     } 
 
 CLEANUP1:  
@@ -884,7 +968,6 @@ BOOL hxt_check_token()
     long valid_time = now - expire_time;
     utils_print("now %ld - expire_time %ld = %ld\n", now, expire_time, valid_time);
     
-
     if ( (hxt_get_token_cfg() == NULL) || (valid_time >=0) )
     {
         utils_print("require token....\n");

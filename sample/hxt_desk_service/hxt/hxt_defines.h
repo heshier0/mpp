@@ -2,7 +2,8 @@
 #define __HXT_DEFINES_H__
 
 
-#define HXT_GET_TOKEN_URL               "/Authorize/GetDeskToken"
+#define HXT_GET_TOKEN                  "/Authorize/GetDeskToken"
+#define HXT_GET_DESK_CONFIG             "/Device/GetDeskConfig"
 #define HXT_STATUS_REPORT               "/Device/DeskStatusReport"
 #define HXT_STUDY_REPORT                "/User/StudyReport"
 #define HXT_STUDY_REPORT_BATCH          "/User/StudyReportBatch"
@@ -12,6 +13,7 @@
 #define HXT_MERGE_FILES                 "/Upload/MergeFiles?md5=%s&ext=%s&fileTotalSize=%lu&typeString=%s"
 #define HXT_CHECK_WIFI_DATA             "/Device/CheckWifiData"
 #define HXT_BIND_DESK_WIFI              "/Device/BindDeskByWifi"
+#define HXT_CONFIRM_DESK_BIND            "/Device/BindDeskConfirm"
 
 #define HXT_UPLOAD_SAMPLE_SNAP          "/Upload/UploadPicsAsync?childunid=%d"
 

@@ -420,18 +420,12 @@ int hxt_websocket_start()
     cl->onclose = hxt_wsc_onclose;
     cl->ping = hxt_wsc_ping;
 
-    /* for test */
-    ev_signal_init(&signal_watcher, signal_cb, SIGINT);
-    ev_signal_start(loop, &signal_watcher);
 
     ev_run(loop, 0);
-
-    utils_print("hxt websocket exit.\n");
-
-    hxt_send_desk_status(cl, POWER_OFF, UWSC_OP_TEXT);
+    //hxt_send_desk_status(cl, POWER_OFF, UWSC_OP_TEXT);
 
     free(cl);
        
-    return 0;
+    return 0;  
 }
 

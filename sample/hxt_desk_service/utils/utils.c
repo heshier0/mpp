@@ -185,6 +185,7 @@ BOOL utils_reload_cfg(const char* cfg, cJSON* root)
     }
     
     fwrite(content, strlen(content), 1, fp);
+    fflush(fp);
     fclose(fp);
   
     utils_free(content);
@@ -525,9 +526,14 @@ BOOL utils_post_json_data(const char *url, const char* header_content, const cha
     {
         extra_header = "";
     }
+    char* data = (char*)json_data;
+    if(NULL == data)
+    {
+        data = "";
+    }
 #ifdef DEBUG
     sprintf(CMD_POST_JSON, "curl --insecure -X POST -H \"Content-Type:application/json;charset=UTF-8\" -H \"%s\" -d \'%s\' %s", 
-                                extra_header, json_data, url);
+                                extra_header, data, url);
 #else 
     sprintf(CMD_POST_JSON, "curl --insecure -s -X POST -H \"Content-Type:application/json;charset=UTF-8\" -H \"%s\" -d \'%s\' %s", 
                                 header_content, json_data, url);
@@ -543,8 +549,7 @@ BOOL utils_post_json_data(const char *url, const char* header_content, const cha
             pclose(fp);
             return FALSE;
         }
-        utils_print("%s\n", out);
-        out[out_length-1] = '\0';
+        // out[out_length-1] = '\0';
     }
     pclose(fp);
 
@@ -823,6 +828,11 @@ BOOL utils_check_wifi_state()
 void utils_system_reboot()
 {
     system("reboot");
+}
+
+void utils_system_reset()
+{
+    
 }
 
 void utils_generate_mp4_file_name(char* file_name)

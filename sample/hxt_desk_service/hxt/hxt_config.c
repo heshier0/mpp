@@ -1,36 +1,56 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-
+#include <pthread.h>
 #include <cJSON.h>
 
 #include "utils.h"
 
 #define HXT_CFG          "/userdata/config/hxt_config.json"
 
+const int g_video_width[3] = {1280, 960, 640};
+const int g_video_height[3] = {720, 540, 360};
 
 static cJSON* g_cfg_root  = NULL;     //指向配置文件的Object
-
+pthread_mutex_t g_hxt_cfg_lock =  PTHREAD_MUTEX_INITIALIZER;
 static int g_children_unid = 1;
-
-static int g_video_width = 0;
-static int g_video_height = 0;
-
 static int g_camera_status = 1;
+
+static void hxt_mk_private_doc(int child_unid)
+{
+    char mk_dir_cmd[256] = {0};
+    sprintf(mk_dir_cmd, "mkdir -p child_%d/video", child_unid);
+    system(mk_dir_cmd);
+
+    memset(mk_dir_cmd, 0, 256);
+    sprintf(mk_dir_cmd, "mkdir -p child_%d/snap", child_unid);
+    system(mk_dir_cmd);
+
+    return;
+}
 
 void hxt_load_cfg()
 {
+    pthread_mutex_lock(&g_hxt_cfg_lock);
     g_cfg_root = utils_load_cfg(HXT_CFG);
+    pthread_mutex_unlock(&g_hxt_cfg_lock);
 }
 
 BOOL hxt_reload_cfg()
 {
-    return utils_reload_cfg(HXT_CFG, g_cfg_root);
+    int ret = FALSE;
+    pthread_mutex_lock(&g_hxt_cfg_lock);
+    ret =  utils_reload_cfg(HXT_CFG, g_cfg_root);
+    pthread_mutex_unlock(&g_hxt_cfg_lock);
+
+    return ret;
 }
 
 void hxt_unload_cfg()
 {
+    pthread_mutex_lock(&g_hxt_cfg_lock);
     utils_unload_cfg(g_cfg_root);
+    pthread_mutex_unlock(&g_hxt_cfg_lock);
 }
 
 void hxt_set_child_unid(const int unid)
@@ -43,7 +63,6 @@ int hxt_get_child_unid()
     return g_children_unid;
 }
 
-//data must json formatted data
 void hxt_init_cfg(void* data)
 {
     if (NULL == data)
@@ -63,17 +82,18 @@ void hxt_init_cfg(void* data)
         return;
     }
 
+    pthread_mutex_lock(&g_hxt_cfg_lock);
+    // cJSON* item = cJSON_GetObjectItem(returnObject, "token");
+    // utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "server", "token", item->valuestring);
+    
+    // item = cJSON_GetObjectItem(returnObject, "tokenExpireTime");
+    // utils_set_cfg_number_value(g_cfg_root, HXT_CFG, "server", "tokenExpireTime", item->valuedouble);
+ #if 1   
     cJSON* item = cJSON_GetObjectItem(returnObject, "websocketUrl");
     utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "server", "websocketUrl", item->valuestring);
 
     item = cJSON_GetObjectItem(returnObject, "uploadHostUrl");
     utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "server", "uploadHostUrl", item->valuestring);
-
-    item = cJSON_GetObjectItem(returnObject, "tokenExpireTime");
-    utils_set_cfg_number_value(g_cfg_root, HXT_CFG, "server", "tokenExpireTime", item->valuedouble);
-
-    item = cJSON_GetObjectItem(returnObject, "token");
-    utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "server", "token", item->valuestring);
 
     item = cJSON_GetObjectItem(returnObject, "iflyosToken");
     utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "server", "iflyosToken", item->valuestring);
@@ -81,10 +101,6 @@ void hxt_init_cfg(void* data)
     // item = cJSON_GetObjectItem(returnObject, "iflyosSN");
     // utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "server", "iflyosSN", item->valuestring);
 
-    item = cJSON_GetObjectItem(returnObject, "upgradePackUrl");
-    utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "server", "upgradePackUrl", item->valuestring);
-    item = cJSON_GetObjectItem(returnObject, "alarmFileUrl");
-    utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "server", "alarmFileUrl", item->valuestring);
     item = cJSON_GetObjectItem(returnObject, "postureCountDuration");
     utils_set_cfg_number_value(g_cfg_root, HXT_CFG, "device", "judgeTime", item->valueint);
 
@@ -94,40 +110,32 @@ void hxt_init_cfg(void* data)
     item = cJSON_GetObjectItem(returnObject, "videoRecordRatio");
     utils_set_cfg_number_value(g_cfg_root, HXT_CFG, "device", "vidoeRatio", item->valueint);
    
-    switch(item->valueint)
-    {
-    case 3:
-        g_video_width = 1280;
-        g_video_height =720;
-    break;
-    case 2:
-        g_video_width = 960;
-        g_video_height = 540;
-    break;
-    case 1:
-        g_video_width = 640;
-        g_video_height = 360;  
-    break;
-    default:
-        g_video_width = 960;
-        g_video_height = 540;        
-    break;
-    }
-
     item = cJSON_GetObjectItem(returnObject, "videoRecordCount");
     utils_set_cfg_number_value(g_cfg_root, HXT_CFG, "device", "videoCount", item->valueint);
 
     item = cJSON_GetObjectItem(returnObject, "photoRecordCount");
     utils_set_cfg_number_value(g_cfg_root, HXT_CFG, "device", "photoCount", item->valueint);
 
-    item = cJSON_GetObjectItem(returnObject, "alarmUnid");
-    utils_set_cfg_number_value(g_cfg_root, HXT_CFG, "device", "alarmUnid", item->valueint);
+    // item = cJSON_GetObjectItem(returnObject, "alarmFileUrl");
+    // utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "server", "alarmFileUrl", item->valuestring);
+
+    // item = cJSON_GetObjectItem(returnObject, "alarmUnid");
+    // utils_set_cfg_number_value(g_cfg_root, HXT_CFG, "device", "alarmUnid", item->valueint);
+
+    item = cJSON_GetObjectItem(returnObject, "offlineStorage");
+    utils_set_cfg_number_value(g_cfg_root, HXT_CFG, "device", "offlineStorage", item->valueint);
+
+    item = cJSON_GetObjectItem(returnObject, "attachRatio");
+    utils_set_cfg_number_value(g_cfg_root, HXT_CFG, "device", "attachRatio", item->valueint);
 
     item = cJSON_GetObjectItem(returnObject, "newVersionId");
     utils_set_cfg_number_value(g_cfg_root, HXT_CFG, "version", "versionId", item->valueint);
 
     item = cJSON_GetObjectItem(returnObject, "newVersionNo");
     utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "version", "versionNo", item->valuestring);
+
+    item = cJSON_GetObjectItem(returnObject, "upgradePackUrl");
+    utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "version", "upgradePackUrl", item->valuestring);
 
     item = cJSON_GetObjectItem(returnObject, "parentUnid");
     utils_set_cfg_number_value(g_cfg_root, HXT_CFG, "user", "parentId", item->valueint);
@@ -148,7 +156,12 @@ void hxt_init_cfg(void* data)
         utils_set_cfg_number_value(g_cfg_root, HXT_CFG, children_unid, "alarmType", node_item->valueint);
         node_item = cJSON_GetObjectItem(node, "studyMode");
         utils_set_cfg_number_value(g_cfg_root, HXT_CFG, children_unid, "studyMode", node_item->valueint);
+
+        /* create documents for save mp4 and snap file */
+        hxt_mk_private_doc(node_item->valueint);
     }
+ #endif   
+    pthread_mutex_unlock(&g_hxt_cfg_lock);
 
     hxt_reload_cfg();
 
@@ -161,6 +174,39 @@ void hxt_init_cfg(void* data)
     return;
 }
 
+void hxt_init_token(void* data)
+{
+    if (NULL == data)
+    {
+        return;
+    }
+    
+    cJSON* root = cJSON_Parse(data);
+    if(NULL == root)
+    {
+        return;
+    }
+    cJSON* returnObject = cJSON_GetObjectItem(root, "returnObject");
+    if (NULL == returnObject)
+    {
+        utils_print("No return objects\n");
+        return;
+    }
+    cJSON* item = cJSON_GetObjectItem(returnObject, "token");
+    utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "server", "token", item->valuestring);
+    
+    item = cJSON_GetObjectItem(returnObject, "tokenExpireTime");
+    utils_set_cfg_number_value(g_cfg_root, HXT_CFG, "server", "tokenExpireTime", item->valuedouble);
+
+    hxt_reload_cfg();
+
+    if (root != NULL)
+    {
+        cJSON_Delete(root);
+        root = NULL;
+    }
+}
+
 char* hxt_get_posture_detect_model_path()
 {
     return utils_get_cfg_str_value(g_cfg_root, "model", "detect_model");
@@ -171,10 +217,6 @@ char* hxt_get_posture_class_model_path()
     return utils_get_cfg_str_value(g_cfg_root, "model", "class_model");
 }
 
-char* hxt_get_iflyos_cae_sn()
-{
-    return utils_get_cfg_str_value(g_cfg_root, "server", "iflyosSN");
-}
 
 //get
 char* hxt_get_desk_uuid_cfg()
@@ -195,6 +237,11 @@ char* hxt_get_api_version_cfg()
 char* hxt_get_iflyos_token_cfg()
 {
     return utils_get_cfg_str_value(g_cfg_root, "server", "iflyosToken");
+}
+
+char* hxt_get_iflyos_cae_sn()
+{
+    return utils_get_cfg_str_value(g_cfg_root, "server", "iflyosSN");
 }
 
 char* hxt_get_token_cfg()
@@ -220,7 +267,7 @@ char* hxt_get_upload_host_url_cfg()
 
 char* hxt_get_upgrade_pack_url_cfg()
 {
-    return utils_get_cfg_str_value(g_cfg_root, "server", "upgradePackUrl");
+    return utils_get_cfg_str_value(g_cfg_root, "version", "upgradePackUrl");
 }
 
 char* hxt_get_alarm_file_url_cfg()
@@ -245,21 +292,48 @@ int hxt_get_video_ratio_cfg()
 
 int hxt_get_video_width_cfg()
 {
-    if(g_video_width == 0)
+    int video_width = 0;
+    int video_ratio = hxt_get_video_ratio_cfg();
+    switch (video_ratio)
     {
-        g_video_width = 640;
+    case 1:
+        video_width = 1280;
+        break;
+    case 2:
+        video_width = 960;
+        break;
+    case 3:
+        video_width = 640;
+        break;    
+    default:
+        video_width = 640;
+        break;
     }
 
-    return g_video_width;
+    return video_width;
 }
 
 int hxt_get_video_height_cfg()
 {
-    if(g_video_height == 0)
+    int video_height =0;
+    int video_ratio = hxt_get_video_ratio_cfg();
+    switch (video_ratio)
     {
-        g_video_height = 360; 
+    case 1:
+        video_height = 720;
+    break;
+    case 2:
+        video_height = 540;
+    break;
+    case 3:
+        video_height = 360;
+    break;
+    default:
+        video_height = 360;
+    break;
     }
-    return g_video_height;
+
+    return video_height;
 }
 
 int hxt_get_video_count_cfg()
@@ -328,6 +402,15 @@ char* hxt_get_wifi_check_code_cfg()
     return utils_get_cfg_str_value(g_cfg_root, "wifi", "checkCode");
 }
 
+char* hxt_get_offline_storage_cfg()
+{
+    return utils_get_cfg_str_value(g_cfg_root, "device", "offlineStorage");
+}
+
+char* hxt_get_attach_ratio_cfg()
+{
+    return utils_get_cfg_str_value(g_cfg_root, "device", "attachRatio");
+}
 
 //set 
 
@@ -386,13 +469,27 @@ BOOL hxt_set_iflyos_token_cfg(const char* value)
     return utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "server", "iflyosToken", value);  
 }
 
+BOOL hxt_set_iflyos_sn_cfg(const char* value)
+{
+    if(NULL == value)
+    {
+        return FALSE;
+    }
+    return utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "server", "ilfyosSN", value);
+}
+
 BOOL hxt_set_token_cfg(const char* value)
 {
     if (NULL == value)
     {
         return FALSE;
     }       
-    return utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "server", "token", value);
+    utils_print("To set token ...\n");
+    BOOL ret_val = utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "server", "token", value);
+    utils_print("To reload config...\n");
+    hxt_reload_cfg();
+
+    return ret_val;
 }
 
 BOOL hxt_set_token_expire_time_cfg(const double value)
@@ -431,7 +528,7 @@ BOOL hxt_set_upgrade_pack_url_cfg(const char* value)
         return FALSE;
     }
 
-    return utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "server", "upgradePackUrl", value);
+    return utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "version", "upgradePackUrl", value);
 }
 
 BOOL hxt_set_alarm_file_url_cfg(const  char* value)
@@ -565,5 +662,26 @@ int hxt_get_desk_bind_status_cfg()
 
 BOOL hxt_set_desk_bind_status_cfg(int status)
 {
-    return utils_set_cfg_number_value(g_cfg_root, HXT_CFG, "desk", "bind", status);
+    int ret_val = utils_set_cfg_number_value(g_cfg_root, HXT_CFG, "desk", "bind", status);
+    hxt_reload_cfg();
+}
+
+BOOL hxt_set_offline_storage_cfg(const char* value)
+{
+    if(NULL == value)
+    {
+        return FALSE;
+    }
+
+    return utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "device", "offlineStorage", value);
+}
+
+BOOL hxt_set_attach_ratio_cfg(const char* value)
+{
+    if(NULL == value)
+    {
+        return FALSE;
+    }
+
+    return utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "device", "attachRatio", value);
 }

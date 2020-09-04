@@ -1402,13 +1402,15 @@ HI_S32 SAMPLE_COMM_VENC_Stop(VENC_CHN VencChn)
     /******************************************
      step 1:  Stop Recv Pictures
     ******************************************/
+    // marked by hekai,for exit error
     s32Ret = HI_MPI_VENC_StopRecvFrame(VencChn);
     if (HI_SUCCESS != s32Ret)
     {
         SAMPLE_PRT("HI_MPI_VENC_StopRecvPic vechn[%d] failed with %#x!\n", \
                    VencChn, s32Ret);
         return HI_FAILURE;
-    }    /******************************************
+    }    
+    /******************************************
      step 2:  Distroy Venc Channel
     ******************************************/
     s32Ret = HI_MPI_VENC_DestroyChn(VencChn);

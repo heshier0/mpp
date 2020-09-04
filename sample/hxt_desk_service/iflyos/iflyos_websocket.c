@@ -22,7 +22,7 @@
 DATABUFFER g_voice_buffer;
 
 static BOOL g_sampling = TRUE;
-static BOOL g_stop_capture = FALSE;
+BOOL g_stop_capture = FALSE;
 
 static pthread_t read_pcm_tid;
 static pthread_t send_pcm_tid;
@@ -67,11 +67,7 @@ static void thread_send_pcm_cb(void *data)
 
     BOOL requested = FALSE;
     struct uwsc_client *cl = (struct uwsc_client *)data;
-
-
-#ifdef DEBUG
-    FILE* pfd = fopen("iflyos_test.pcm", "wb");
-#endif
+    unsigned char * out_buffer = NULL;
 
     while(g_sampling)
     {
@@ -88,29 +84,11 @@ static void thread_send_pcm_cb(void *data)
         {
             continue;
         }
-        //send request
-        if(!requested)
-        {
-            char *req = iflyos_create_audio_in_request();
-            cl->send(cl, req, strlen(req), UWSC_OP_TEXT);
-            free(req);
-            requested = TRUE;
-        }
-
-#ifdef DEBUG
-        fwrite(ptr, 1, PCM_LENGTH, pfd);
-        fflush(pfd);
-#endif
-
         // send data
-        // cl->send(cl, ptr, PCM_LENGTH, UWSC_OP_BINARY);
-        // iflyos_write_audio(ptr, PCM_LENGTH);
-
+        iflyos_write_audio(ptr, PCM_LENGTH);
+        
         release_buffer(&g_voice_buffer, PCM_LENGTH);
     }
-#ifdef DEBUG    
-    fclose(pfd);
-#endif    
     utils_print("send pcm thread exit...\n");
     
     return;
@@ -118,18 +96,19 @@ static void thread_send_pcm_cb(void *data)
 
 static void uwsc_onopen(struct uwsc_client *cl)
 {
-    printf("iflyos onopen\n");
+    utils_print("iflyos onopen\n");
 
     /* sample voice to iflyos */
     pthread_create(&read_pcm_tid, NULL, thread_read_pcm_cb, NULL);
     pthread_create(&send_pcm_tid, NULL, thread_send_pcm_cb, (void*)cl);
+   
 }
 
 static void uwsc_onmessage(struct uwsc_client *cl,
 	void *data, size_t len, bool binary)
 {
-    printf("iflyos recv:\n");
-    printf("%s: [%.*s]\n", utils_get_current_time(), (int)len, (char *)data);
+    utils_print("iflyos recv:\n");
+    utils_print("%s: [%.*s]\n", utils_get_current_time(), (int)len, (char *)data);
     
     if (binary) {
         //文件
@@ -152,7 +131,7 @@ static void uwsc_onmessage(struct uwsc_client *cl,
         }
         else
         {
-            //printf("%s: [%.*s]\n", utils_get_current_time(), (int)len, (char *)data);
+            /**/
         }
         
         free(name);
@@ -162,42 +141,30 @@ static void uwsc_onmessage(struct uwsc_client *cl,
 static void uwsc_onerror(struct uwsc_client *cl, int err, const char *msg)
 {
     utils_print("iflyos onerror:%d: %s\n", err, msg);
-    // ev_break(cl->loop, EVBREAK_ALL);
+    if (g_sampling)
+    {
+        g_sampling = FALSE;
+        pthread_join(read_pcm_tid, NULL);
+        pthread_join(send_pcm_tid, NULL);
+    }
+
+    ev_break(cl->loop, EVBREAK_ALL);
 }
 
 static void uwsc_onclose(struct uwsc_client *cl, int code, const char *reason)
 {
     utils_print("iflyos onclose:%d: %s\n", code, reason);
-    //added by hekai
+
     g_sampling = FALSE;
-
-    pthread_join(read_pcm_tid, 0);
-    pthread_join(send_pcm_tid, 0);
-    //end added
-    
+  
     ev_break(cl->loop, EVBREAK_ALL);
-}
-
-static void signal_cb(struct ev_loop *loop, ev_signal *w, int revents)
-
-{
-    if (w->signum == SIGINT) {
-
-        g_sampling = FALSE;
-        pthread_join(read_pcm_tid, 0);
-        pthread_join(send_pcm_tid, 0);
-
-        ev_break(loop, EVBREAK_ALL);
-
-        utils_print("Normal quit\n");
-    }
 }
 
 int iflyos_websocket_start()
 {
     struct ev_loop *loop = EV_DEFAULT;
-    struct ev_signal signal_watcher;
-	int ping_interval = 10;	/* second */
+    // struct ev_signal signal_watcher;
+	int ping_interval = -1;	/* second */
     struct uwsc_client *cl;
 
     create_buffer(&g_voice_buffer, BUFFER_SIZE);
@@ -214,9 +181,8 @@ int iflyos_websocket_start()
         utils_print("iflyos websocket client init failed...\n");
         return -1;
     }
-        
-
-    // iflyos_init_cae_lib((void*)cl);
+    
+    iflyos_init_cae_lib((void*)cl);
 
 	utils_print("iflyos connect...\n");
 
@@ -225,16 +191,13 @@ int iflyos_websocket_start()
     cl->onerror = uwsc_onerror;
     cl->onclose = uwsc_onclose;
     
-    ev_signal_init(&signal_watcher, signal_cb, SIGINT);
-    ev_signal_start(loop, &signal_watcher);
-
     ev_run(loop, 0);
    
+    free(cl);
     iflyos_unload_cfg();
-    
     destroy_buffer(&g_voice_buffer);
-
-    // iflyos_deinit_cae_lib();
+    iflyos_deinit_cae_lib();
 
     return 0;
 }
+

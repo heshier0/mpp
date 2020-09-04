@@ -27,7 +27,7 @@ BOOL get_qrcode_yuv_buffer()
     char *yuv_data = NULL;
     int width = hxt_get_video_height_cfg();
     int height = hxt_get_video_width_cfg();
-    int size = width * height * 3 / 2;
+    
     board_get_yuv_from_vpss_chn(&yuv_data);
     if(NULL == yuv_data)
     {
@@ -56,29 +56,6 @@ BOOL get_qrcode_yuv_buffer()
         utils_free(yuv_data);
         yuv_data = NULL;
     }
-
-    /* write wifi info into hxt config file */
-    // cJSON* root = cJSON_Parse(qrcode_info);
-    // if (root == NULL)
-    // {
-    //     utils_print("parse qrcode info to json failed\n");
-    //     return FALSE;
-    // }
-    // cJSON *item = cJSON_GetObjectItem(root, "ssid");
-    // char* wifi_ssid = item->valuestring;
-    // utils_print("ssid:%s\n", wifi_ssid);
-    // hxt_set_wifi_ssid_cfg(wifi_ssid);
-    // item = cJSON_GetObjectItem(root, "password");
-    // char* wifi_password = item->valuestring;
-    // utils_print("password:%s\n", wifi_password);
-    // hxt_set_wifi_pwd_cfg(wifi_password);
-
-    // if (root != NULL)
-    // {
-    //     cJSON_Delete(root);
-    // }
-
-    // hxt_reload_cfg();
 
     hxt_query_wifi_info((void*)qrcode_info);
     
