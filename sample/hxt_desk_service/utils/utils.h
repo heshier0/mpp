@@ -38,9 +38,6 @@ typedef enum
 
 char *utils_get_current_time();
 
-void init_plugins();
-void deinit_plugins();
-
 cJSON* utils_load_cfg(const char* cfg);
 void utils_unload_cfg(cJSON* root);
 BOOL utils_reload_cfg(const char* cfg, cJSON* root);

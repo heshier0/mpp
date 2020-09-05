@@ -255,6 +255,10 @@ static void parse_server_config_data(void *data)
         hxt_set_video_count_cfg(sub_item->valueint);
         sub_item = cJSON_GetObjectItem(item, "photoRecordCount");       //照片记录张数
         hxt_set_photo_count_cfg(sub_item->valueint);
+        sub_item = cJSON_GetObjectItem(item, "offlineStorage");         //离线存储时长
+        hxt_set_offline_storage_cfg(sub_item->valueint);
+        sub_item = cJSON_GetObjectItem(item, "attachRatio");            //抽帧频次
+        hxt_set_attach_ratio_cfg(sub_item->valueint);
         hxt_reload_cfg();
     break;
     case 2:
@@ -267,7 +271,7 @@ static void parse_server_config_data(void *data)
         hxt_set_upgrade_pack_url_cfg(sub_item->valuestring);
         hxt_reload_cfg();
         //to upgrade
-
+        
     break;    
     case 3:
         //to wake camera
@@ -316,14 +320,15 @@ static void parse_server_config_data(void *data)
         stop_posture_recognize();
     break;
     case 15:
-        /* disconnect */
-
+        /* device deregister */
+        utils_system_reset();
     break;
     case 16:
         /* power off */
     break;
     case 17:
         /* restart */
+        utils_system_reboot();
     break;
     case 0:
     default:

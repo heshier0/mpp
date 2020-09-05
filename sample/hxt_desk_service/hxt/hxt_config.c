@@ -5,8 +5,10 @@
 #include <cJSON.h>
 
 #include "utils.h"
+#include "common.h"
 
 #define HXT_CFG          "/userdata/config/hxt_config.json"
+#define HXT_INIT_CFG     "/userdata/config/.hxt_init_config.json"
 
 const int g_video_width[3] = {1280, 960, 640};
 const int g_video_height[3] = {720, 540, 360};
@@ -18,13 +20,24 @@ static int g_camera_status = 1;
 
 static void hxt_mk_private_doc(int child_unid)
 {
+    /* posture video */
     char mk_dir_cmd[256] = {0};
-    sprintf(mk_dir_cmd, "mkdir -p child_%d/video", child_unid);
+    sprintf(mk_dir_cmd, "mkdir -p /user/child_%d/video", child_unid);
+    system(mk_dir_cmd);
+    /* posture snap */
+    memset(mk_dir_cmd, 0, 256);
+    sprintf(mk_dir_cmd, "mkdir -p /user/child_%d/snap", child_unid);
     system(mk_dir_cmd);
 
+    /* self define voice */
     memset(mk_dir_cmd, 0, 256);
-    sprintf(mk_dir_cmd, "mkdir -p child_%d/snap", child_unid);
+    sprintf(mk_dir_cmd, "mkdir -p /user/child_%d/voice", child_unid);
     system(mk_dir_cmd);
+
+    /* sample frame */
+    memset(mk_dir_cmd, 0, 256);
+    sprintf(mk_dir_cmd, "mkdir -p /user/sample", child_unid);
+    system(mk_dir_cmd);  
 
     return;
 }

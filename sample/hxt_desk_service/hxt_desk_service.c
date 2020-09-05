@@ -6,6 +6,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <signal.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <errno.h>
 
 #include <sitting_posture.h>
 
@@ -18,6 +21,30 @@
 static pthread_t play_tid, voice_tid, video_tid;
 static pid_t iflyos_pid = -1, hxt_pid = -1;
 static BOOL g_processing = TRUE;
+
+static int g_client_fd = -1;
+
+static void connect_to_mpp_service()
+{
+    struct sockaddr_in server;
+    bzero(&server, sizeof(server));
+    server.sin_family = AF_INET;
+    server.sin_port = htons(10086);
+    server.sin_addr.s_addr = inet_addr("127.0.0.1");
+    
+    int size = sizeof(struct sockaddr_in);
+    g_client_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if(connect(g_client_fd, (struct sockaddr*)&server, size) < 0)
+    {
+        utils_print("connect to mpp service failed:%s\n", strerror(errno));
+        return;
+    }
+    
+    /*test*/
+    write(g_client_fd, "Hello,world\n", 12);
+
+    return;
+} 
 
 static void start_hxt_process()
 {
@@ -161,18 +188,18 @@ int main(int argc, char **argv)
     board_gpio_init();
 
     /* init board media process */
-    if (!board_mpp_init())
-    {
-        utils_print("board mpp init error...\n");
-        goto EXIT;
-    }
+    // if (!board_mpp_init())
+    // {
+    //     utils_print("board mpp init error...\n");
+    //     goto EXIT;
+    // }
 
-    g_play_status = TRUE;
-    play_tid = start_play_mp3();
-    g_voice_status = TRUE;
-    voice_tid = start_sample_voice();
-    g_video_status = TRUE;
-    video_tid = start_sample_video();
+    // g_play_status = TRUE;
+    // play_tid = start_play_mp3();
+    // g_voice_status = TRUE;
+    // voice_tid = start_sample_voice();
+    // g_video_status = TRUE;
+    // video_tid = start_sample_video();
 
     sleep(3);
 
@@ -180,9 +207,12 @@ int main(int argc, char **argv)
 
     board_stop_boot_led_blinking();
 
-    deploy_network();
+    // deploy_network();
 
-#if 1
+
+    connect_to_mpp_service();
+
+#if 0
     /* connect to hxt server */
     server_started = hxt_check_token();
     if(server_started)
@@ -203,14 +233,11 @@ int main(int argc, char **argv)
     }
 
     
-    g_play_status = FALSE;
-    g_voice_status = FALSE;
-    g_video_status = FALSE;
+    // g_play_status = FALSE;
+    // g_voice_status = FALSE;
+    // g_video_status = FALSE;
 
-    unlink(PCM_FIFO);
-    unlink(MP3_FIFO);
-
-    board_mpp_deinit();
+    // board_mpp_deinit();
 EXIT:
     utils_print("~~~~EXIT~~~~\n");
     board_gpio_uninit();

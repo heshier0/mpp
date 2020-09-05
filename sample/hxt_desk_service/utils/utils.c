@@ -832,7 +832,14 @@ void utils_system_reboot()
 
 void utils_system_reset()
 {
-    
+    /* remove child study data, include video and snap */
+    system("rm -rf /user/*");
+    /* remove wifi config */
+    system("rm /userdata/config/wifi.conf");
+    /* reset cfg */
+    system("cp /userdata/config/.hxt_init_config.json /userdata/config/hxt_config.json");
+
+    return;
 }
 
 void utils_generate_mp4_file_name(char* file_name)
