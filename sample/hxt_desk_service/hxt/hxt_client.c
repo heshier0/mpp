@@ -6,10 +6,6 @@
 #include "utils.h"
 #include "hxt_defines.h"
 
-#define RES_OK      "S0001"
-#define AUTH_FAIL   "S0401"
-#define NO_REG      "S0000"
-
 typedef enum report_type
 {
     START = 1,
@@ -24,13 +20,6 @@ typedef enum ext_type
     JPEG = 1,
     MP4
 }ExtType;
-
-typedef enum response_err_code
-{
-    NO_REGISTER = 0,
-    RESPONSE_OK = 1,
-    AUTH_FAILED = 401
-}ResponseErrCode;
 
 static char* hxt_get_api_url(const char* api)
 {
@@ -115,17 +104,17 @@ static int hxt_get_reponse_status_code(void* data)
 
     cJSON* root = cJSON_Parse(data);
     cJSON *item = cJSON_GetObjectItem(root, "statusCode");
-    if (strcmp(item->valuestring, RES_OK) == 0)
+    if (strcmp(item->valuestring, HXT_RES_STATUS_OK) == 0)
     {
-        status_code = RESPONSE_OK;
+        status_code = HXT_OK;
     }
-    else if (strcmp(item->valuestring, NO_REG) == 0)
+    else if (strcmp(item->valuestring, HXT_RES_NO_REG) == 0)
     {
-        status_code = NO_REGISTER;
+        status_code = HXT_NO_REGISTER;
     } 
-    else if (strcmp(item->valuestring, AUTH_FAIL) == 0)
+    else if (strcmp(item->valuestring, HXT_RES_AUTH_FAIL) == 0)
     {
-        status_code = AUTH_FAILED;
+        status_code = HXT_AUTH_FAILED;
     }
 
     if(root != NULL)
@@ -202,7 +191,7 @@ static void hxt_get_token_response(void* data)
         return;            
     }
     int status = item1->valueint;
-    if(status != HXT_RET_OK)
+    if(status != HXT_OK)
     {
         cJSON *item2 = cJSON_GetObjectItem(root, "desc");
         utils_print("getToken request failed, err_code:%d, err_msg:%s\n", status, item2->valuestring);
@@ -316,13 +305,13 @@ BOOL hxt_get_token_request()
     } 
 
     int status_code = hxt_get_reponse_status_code((void*)out);
-    if (status_code == RESPONSE_OK)
+    if (status_code == HXT_OK)
     {
         /* write token into cfg */   
         hxt_init_token(out);
         reported = TRUE;
     }
-    else if(status_code == NO_REGISTER)
+    else if(status_code == HXT_NO_REGISTER)
     {
         //clear wifi info, to prevent user connect to server
 
@@ -366,7 +355,7 @@ BOOL hxt_get_desk_cfg_request()
     utils_print("response length is [%s]\n", out);
 
     int status_code = hxt_get_reponse_status_code((void *)out);
-    if (status_code == RESPONSE_OK)
+    if (status_code == HXT_OK)
     {
         /* init hxt config */
         hxt_init_cfg((void*)out);
@@ -415,11 +404,11 @@ BOOL hxt_report_info_request(int reportType, int cameraStatus)
     } 
     utils_print("response length is [%s]\n", out);
     int status_code = hxt_get_reponse_status_code((void *)out);
-    if (status_code == RESPONSE_OK)
+    if (status_code == HXT_OK)
     {
         reported = TRUE;
     }
-    else if(status_code == AUTH_FAILED)
+    else if(status_code == HXT_AUTH_FAILED)
     {
         hxt_get_token_request();
     }    
@@ -480,7 +469,7 @@ BOOL hxt_file_upload_request(const char* filename, char* server_file_path)
         }
 
         int status_code = hxt_get_reponse_status_code((void*)out);
-        if (status_code == RESPONSE_OK)
+        if (status_code == HXT_OK)
         {
             char* file_path = hxt_get_response_description((void*)out);
             if( file_path != NULL)
@@ -490,7 +479,7 @@ BOOL hxt_file_upload_request(const char* filename, char* server_file_path)
                 free(file_path);
             }
         }
-        else if (status_code == AUTH_FAILED)
+        else if (status_code == HXT_AUTH_FAILED)
         {
             uploaded = FALSE;
             retry_count ++;
@@ -539,12 +528,12 @@ BOOL hxt_sample_snap_upload_request(const char* filename, char* server_file_path
         utils_print("[%s]\n", out);
 
         int status_code = hxt_get_reponse_status_code((void*)out);
-        if (status_code == RESPONSE_OK)
+        if (status_code == HXT_OK)
         {
             uploaded = TRUE;
             server_file_path = hxt_get_response_description((void*)out);
         }
-        else if (status_code == AUTH_FAILED)
+        else if (status_code == HXT_AUTH_FAILED)
         {
             uploaded = FALSE;
             retry_count ++;
@@ -605,11 +594,11 @@ BOOL hxt_study_report_request(int unid, ReportType type, int duration, const cha
     } 
     utils_print("response length is [%s]\n", out);
     int status_code = hxt_get_reponse_status_code(out);
-    if (status_code == RESPONSE_OK)
+    if (status_code == HXT_OK)
     {
         reported = TRUE;
     }
-    else if(status_code == AUTH_FAILED)
+    else if(status_code == HXT_AUTH_FAILED)
     {
         hxt_get_token_request();
     }    
@@ -674,7 +663,7 @@ int hxt_get_max_chunk_request(const char* file_md5, const ExtType type)
     utils_print("response length is [%s]\n", out);
     int status_code = hxt_get_reponse_status_code(out);
     BOOL passed = hxt_get_response_pass_status(out);
-    if (status_code == RESPONSE_OK && passed)
+    if (status_code == HXT_OK && passed)
     {
         char* desc = hxt_get_response_description(out);
         if(NULL == desc)
@@ -685,7 +674,7 @@ int hxt_get_max_chunk_request(const char* file_md5, const ExtType type)
 
         utils_free(desc);
     }
-    else if(status_code == AUTH_FAILED)
+    else if(status_code == HXT_AUTH_FAILED)
     {
         hxt_get_token_request();
     }    
@@ -728,7 +717,7 @@ char* hxt_send_chunk_request(const char* file_md5, int chunk_idx, int max_chunk)
     utils_print("[%s]\n", out);
 
     int status_code = hxt_get_reponse_status_code((void*)out);
-    if (status_code == RESPONSE_OK)
+    if (status_code == HXT_OK)
     {
         server_file_path = hxt_get_response_description((void*)out);
     }
@@ -785,12 +774,12 @@ BOOL hxt_merge_chunks_request(const char* file_path, ExtType type)
     utils_print("response length is [%s]\n", out);
     int status_code = hxt_get_reponse_status_code(out);
     hxt_get_response_pass_status(out);
-    if (status_code == RESPONSE_OK)
+    if (status_code == HXT_OK)
     {
         //
         reported = TRUE;
     }
-    else if(status_code == AUTH_FAILED)
+    else if(status_code == HXT_AUTH_FAILED)
     {
         hxt_get_token_request();
     }    
@@ -838,7 +827,7 @@ BOOL hxt_check_wifi_data_request()
     } 
     utils_print("response length is [%s]\n", out);
     int status_code = hxt_get_reponse_status_code(out);
-    if (status_code == RESPONSE_OK)
+    if (status_code == HXT_OK)
     {
         reported = TRUE;
         
@@ -890,7 +879,7 @@ BOOL hxt_confirm_desk_bind_request()
     } 
     utils_print("response length is [%s]\n", out);
     int status_code = hxt_get_reponse_status_code(out);
-    if (status_code == RESPONSE_OK)
+    if (status_code == HXT_OK)
     {
         reported = TRUE;
     } 
@@ -907,6 +896,7 @@ CLEANUP4:
 
 BOOL hxt_bind_desk_with_wifi_request()
 {
+    BOOL uuid_exist = FALSE;
     BOOL reported = FALSE;
     char* api_url = hxt_get_api_url(HXT_BIND_DESK_WIFI);
     if(NULL == api_url)
@@ -922,6 +912,17 @@ BOOL hxt_bind_desk_with_wifi_request()
     }
     cJSON_AddStringToObject(root, "checkCode", hxt_get_wifi_check_code_cfg());
     cJSON_AddStringToObject(root, "snCode", board_get_sn());
+    char* desk_uunid_tmp = hxt_get_init_desk_uuid();
+    if(desk_uunid_tmp != NULL)
+    {
+        cJSON_AddStringToObject(root, "deskCode", desk_uunid_tmp);
+        uuid_exist = TRUE;
+    }
+    else
+    {
+        cJSON_AddStringToObject(root, "deskCode", "");
+        uuid_exist = FALSE;
+    }
     
     char* json_data = cJSON_PrintUnformatted(root);
     if (NULL == json_data)
@@ -938,13 +939,18 @@ BOOL hxt_bind_desk_with_wifi_request()
     } 
     utils_print("response length is [%s]\n", out);
     int status_code = hxt_get_reponse_status_code(out);
-    if (status_code == RESPONSE_OK)
+    if (status_code == HXT_OK)
     {
         /* store desk unid */
-        char *uuid = hxt_get_response_description(out);
-        hxt_set_desk_uuid_cfg(uuid);
-        free(uuid);
-
+        if (!uuid_exist)
+        {
+            char *uuid = hxt_get_response_description(out);
+            hxt_set_desk_uuid_cfg(uuid);
+            /* write into init config,and never erase it*/
+            hxt_store_desk_uuid(uuid);
+            free(uuid);
+        }
+        
         reported = TRUE;
     } 
 
@@ -958,7 +964,7 @@ CLEANUP4:
     return reported;
 }
 
-BOOL hxt_check_token()
+BOOL hxt_refresh_token_request()
 {
     BOOL token_required = TRUE;
 
@@ -975,4 +981,17 @@ BOOL hxt_check_token()
     }
 
     return token_required;
+}
+
+BOOL hxt_get_new_version_request(int new_ver_id, const char* new_ver_no, const char* update_url)
+{
+    if (NULL == update_url || new_ver_id <= 0)
+    {
+        return FALSE;
+    }
+
+    /*download file*/
+    utils_download_file(update_url, UPDATE_BIN_FILE);
+
+    return TRUE;
 }

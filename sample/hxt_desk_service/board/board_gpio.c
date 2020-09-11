@@ -5,6 +5,8 @@
 
 #include "common.h"
 
+#include "server_comm.h"
+
 #define FLASH_TIMES         3
 #define LED_SLEEP_TIME      (200*1000)
 /*
@@ -145,20 +147,25 @@ static void* check_inc_vol_event(void *param)
             {
                 inc_vol_pressed = 1;
             }
-        }
-        else
-        {
-            int current_vol = 0;
-            HI_MPI_AO_GetVolume(ao_dev, &current_vol);
-            if(current_vol == 5)
-            {
-                /*already max*/
-            }
             else
             {
-                HI_MPI_AO_SetVolume(ao_dev, current_vol+14);
+                // int current_vol = 0;
+                // HI_MPI_AO_GetVolume(ao_dev, &current_vol);
+                // if(current_vol == 5)
+                // {
+                //     /*already max*/
+                // }
+                // else
+                // {
+                //     HI_MPI_AO_SetVolume(ao_dev, current_vol+14);
+                // }
+                int width[3] = {1280, 640, 320};
+                int height[3] = {720, 360, 180};
+                int idx = rand() % 3;
+                send_setup_video_ratio_cmd(width[idx], height[idx]);
             }
         }
+
      }
     return NULL;
 }
@@ -223,16 +230,18 @@ static void* check_posture_event(void *param)
         
         if (event.event_type == GPIOD_LINE_EVENT_FALLING_EDGE)
         {
+            start = time(NULL);
+            usleep(50*1000);
             printf("camera btn pressed down\n");
-            start = time(0);
         }
+
         if(event.event_type == GPIOD_LINE_EVENT_RISING_EDGE)
         {
             printf("camera btn pressed up\n");
-            end = time(0);   
-            printf("inteval is %ld\n", end - start);
+            end = time(NULL); 
+            printf("inteval: %ld - %ld = %ld\n", end, start, (end-start));
 
-            if (end - start >= 3)
+            if (end - start > 3)
             {
                 /* standby */
                 board_led_all_off();
@@ -272,7 +281,7 @@ static void* check_scan_qrcode_event(void *param)
             }
 
             board_start_connect_led_blinking();
-
+            
             printf("To scan qrcode....\n");
             inc_vol_pressed = dec_vol_pressed = FALSE;
             while (!get_qrcode_yuv_buffer())

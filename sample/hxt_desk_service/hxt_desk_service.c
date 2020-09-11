@@ -6,17 +6,12 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <signal.h>
-#include <sys/socket.h>
-#include <arpa/inet.h>
-#include <errno.h>
 
 #include <sitting_posture.h>
 
-#include "yuv2mp4.h"
 #include "utils.h"
 #include "common.h"
-
-#include "file_utils.h"
+#include "server_comm.h"
 
 static pthread_t play_tid, voice_tid, video_tid;
 static pid_t iflyos_pid = -1, hxt_pid = -1;
@@ -24,27 +19,7 @@ static BOOL g_processing = TRUE;
 
 static int g_client_fd = -1;
 
-static void connect_to_mpp_service()
-{
-    struct sockaddr_in server;
-    bzero(&server, sizeof(server));
-    server.sin_family = AF_INET;
-    server.sin_port = htons(10086);
-    server.sin_addr.s_addr = inet_addr("127.0.0.1");
-    
-    int size = sizeof(struct sockaddr_in);
-    g_client_fd = socket(AF_INET, SOCK_STREAM, 0);
-    if(connect(g_client_fd, (struct sockaddr*)&server, size) < 0)
-    {
-        utils_print("connect to mpp service failed:%s\n", strerror(errno));
-        return;
-    }
-    
-    /*test*/
-    write(g_client_fd, "Hello,world\n", 12);
 
-    return;
-} 
 
 static void start_hxt_process()
 {
@@ -211,10 +186,18 @@ int main(int argc, char **argv)
 
 
     connect_to_mpp_service();
-
-#if 0
+#if 1
     /* connect to hxt server */
-    server_started = hxt_check_token();
+    int connect_count = 1;
+    while(1)
+    {
+        server_started = hxt_refresh_token_request();
+        if (server_started)
+        {
+            break;
+        }
+        sleep(10*connect_count);
+    }
     if(server_started)
     {
         config_get = hxt_get_desk_cfg_request();
@@ -222,15 +205,15 @@ int main(int argc, char **argv)
         {
             start_hxt_process();
         }
+        start_iflyos_process();
 
-        // start_iflyos_process();
-    }
-    main_process_cycle();
+        main_process_cycle();
+    }  
 #endif
-    while(g_processing)
-    {
-        sleep(5);
-    }
+    // while(g_processing)
+    // {
+    //     sleep(5);
+    // }
 
     
     // g_play_status = FALSE;

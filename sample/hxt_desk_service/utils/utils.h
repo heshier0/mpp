@@ -1,40 +1,9 @@
 #ifndef __UTILS_H__
 #define __UTILS_H__
 
+#include "hxt_defines.h"
+
 #include <cJSON.h>
-
-#define DEBUG 
-
-#ifdef DEBUG
-#define utils_print(format, ...) printf("%s>>>%d: " format "\n", __FUNCTION__, __LINE__, ##__VA_ARGS__)
-// #define malloc_print(__ptr__,size) printf("[ALLOC] %32s:%4d | addr= %p, size= %lu, expr= `%s`\n", __FUNCTION__, __LINE__ , __ptr__, size, #size)
-// #define free_print(ptr)	printf("[ FREE] %32s:%4d | addr= %p, expr= `%s`\n", __FUNCTION__, __LINE__, ptr, #ptr)
-#else
-// #define malloc_print(__ptr__,size)
-// #define free_print(ptr)
-#define utils_print(format, ...)
-#endif 
-
-#define utils_malloc(size) ({ \
-	void *__ptr__ = malloc(size); \
-	memset(__ptr__, 0, size); \
-	__ptr__; \
-	})
-
-#define utils_calloc(size) ({ \
-	void *__ptr__ = calloc(size, 1); \
-	__ptr__; \
-	})
-
-#define utils_free(ptr) ({ \
-	free(ptr); \
-	})
-
-typedef enum
-{
-    TRUE  = 1, 
-    FALSE  = 0
-}BOOL;
 
 char *utils_get_current_time();
 
@@ -51,11 +20,9 @@ char* utils_get_response_value(const char* json_data, const char* root_name, con
 BOOL utils_send_mp3_voice(const char *url);
 BOOL utils_send_local_voice(const char *path);
 
-BOOL utils_download_file(const char *url, char *out_buffer, int buffer_length);
+BOOL utils_download_file(const char *url, const char* save_file_path);
 BOOL utils_upload_file(const char* url, const char* header, const char* local_file_path, char* out_buffer, int buffer_length);
 BOOL utils_post_json_data(const char *url, const char* header_content, const char* json_data, char* out, int out_length);
-unsigned long utils_get_file_size(const char* file_name);
-
 
 int utils_open_fifo(const char* name, int mode);
 /*use linux shell cmd and linux pipe to achieve*/

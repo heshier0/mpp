@@ -438,44 +438,44 @@ BOOL utils_send_mp3_voice(const char *url)
     return check_system_cmd_result(status);
 }
 
-BOOL utils_download_file(const char *url, char *out_buffer, int buffer_length)
+BOOL utils_download_file(const char *url, const char* save_file_path)
 {
-    if (NULL == url || NULL == out_buffer)
+    if (NULL == url || NULL == save_file_path)
     {
         return FALSE;
     }
 
-    char * filename = separate_filename(url);
-    if(filename == NULL)
-    {
-        return FALSE;
-    }
+    // char * filename = separate_filename(url);
+    // if(filename == NULL)
+    // {
+    //     return FALSE;
+    // }
 
     char CMD_DOWNLOAD_FILE[512] = {0};
 #ifdef DEBUG
-    sprintf(CMD_DOWNLOAD_FILE, "curl --insecure -o %s %s", filename, url);
+    sprintf(CMD_DOWNLOAD_FILE, "curl --insecure -o %s %s", save_file_path, url);
 #else
     sprintf(CMD_DOWNLOAD_FILE, "curl --insecure -s -o %s %s", filename, url);
 #endif    
 
-    FILE *fp = NULL;
-    fp = popen(CMD_DOWNLOAD_FILE, "r");
-    if(NULL != fp)
-    {
-        if(fgets(out_buffer, buffer_length, fp) == NULL)
-        {
-            pclose(fp);
-            return FALSE;
-        }
-        out_buffer[buffer_length-1] = '\0';
-    }
-    pclose(fp);
+    // FILE *fp = NULL;
+    // fp = popen(CMD_DOWNLOAD_FILE, "r");
+    // if(NULL != fp)
+    // {
+    //     if(fgets(out_buffer, buffer_length, fp) == NULL)
+    //     {
+    //         pclose(fp);
+    //         return FALSE;
+    //     }
+    //     out_buffer[buffer_length-1] = '\0';
+    // }
+    // pclose(fp);
 
-    if(filename != NULL)
-    {
-        utils_free(filename);
-        filename = NULL;
-    }
+    // if(filename != NULL)
+    // {
+    //     utils_free(filename);
+    //     filename = NULL;
+    // }
 
     return TRUE;
 }

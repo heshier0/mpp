@@ -1,57 +1,15 @@
 #ifndef __board_mpp_h__
 #define __board_mpp_h__
 
+#include "defines.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-
-#define utils_print(format, ...) printf("%s>>>%d: " format "\n", __FUNCTION__, __LINE__, ##__VA_ARGS__)
-// #define malloc_print(__ptr__,size) printf("[ALLOC] %32s:%4d | addr= %p, size= %lu, expr= `%s`\n", __FUNCTION__, __LINE__ , __ptr__, size, #size)
-// #define free_print(ptr)	printf("[ FREE] %32s:%4d | addr= %p, expr= `%s`\n", __FUNCTION__, __LINE__, ptr, #ptr)
-
-// #define malloc_print(__ptr__,size)
-// #define free_print(ptr)
-// #define utils_print(format, ...)
-
-
-#define utils_malloc(size) ({ \
-	void *__ptr__ = malloc(size); \
-	memset(__ptr__, 0, size); \
-	__ptr__; \
-	})
-
-#define utils_calloc(size) ({ \
-	void *__ptr__ = calloc(size, 1); \
-	__ptr__; \
-	})
-
-#define utils_free(ptr) ({ \
-	free(ptr); \
-	})
-
-typedef enum
-{
-    TRUE  = 1, 
-    FALSE  = 0
-}BOOL;
-
 #define MP3_FIFO                "/tmp/mp3_fifo"
 #define PCM_FIFO                "/tmp/pcm_fifo"
 
-
-
-// BOOL start_vi();
-// void stop_vi();
-// BOOL start_vpss(int width, int height);
-// void stop_all_vpss();
-// BOOL start_venc(int width, int height);
-// void stop_all_venc();
-// BOOL bind_vi_vpss();
-// void unbind_vi_vpss();
-// BOOL bind_vpss_venc();
-// void unbind_vpss_venc();
 
 BOOL create_pcm_fifo();
 void delete_pcm_fifo();
@@ -70,8 +28,19 @@ BOOL init_mpp();
 void deinit_mpp();
 
 void start_play_mp3_thread();
+void stop_play_mp3_thread();
 
+void start_sample_video_thread(void* data);
+void stop_sample_video_thread();
 
+void start_sample_voice_thread();
+void stop_sample_void_thread();
+
+void board_get_snap_from_venc_chn(const char* jpg_file);
+
+void start_video_recording(const char* filename);
+void stop_video_recording();
+void delete_video();
 
 #ifdef __cplusplus
 }

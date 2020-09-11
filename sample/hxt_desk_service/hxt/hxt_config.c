@@ -6,9 +6,18 @@
 
 #include "utils.h"
 #include "common.h"
+#include "hxt_defines.h"
 
-#define HXT_CFG          "/userdata/config/hxt_config.json"
-#define HXT_INIT_CFG     "/userdata/config/.hxt_init_config.json"
+
+#define PERSONAL_ALARM_VOICE_COUNT      (5)
+
+typedef enum 
+{
+    MUTE = 0, 
+    BEEP = 1, 
+    ORIGNAL = 2,
+    PERSONAL = 3
+ };
 
 const int g_video_width[3] = {1280, 960, 640};
 const int g_video_height[3] = {720, 540, 360};
@@ -31,7 +40,7 @@ static void hxt_mk_private_doc(int child_unid)
 
     /* self define voice */
     memset(mk_dir_cmd, 0, 256);
-    sprintf(mk_dir_cmd, "mkdir -p /user/child_%d/voice", child_unid);
+    sprintf(mk_dir_cmd, "mkdir -p /user/child_%d/alarm", child_unid);
     system(mk_dir_cmd);
 
     /* sample frame */
@@ -40,6 +49,48 @@ static void hxt_mk_private_doc(int child_unid)
     system(mk_dir_cmd);  
 
     return;
+}
+
+/* init config file */
+BOOL hxt_store_desk_uuid(const char* uuid)
+{
+    cJSON *root = utils_load_cfg(HXT_INIT_CFG);
+    if (!root)
+    {
+        return FALSE;
+    }
+    if (uuid == NULL)
+    {
+        utils_set_cfg_str_value(root, HXT_INIT_CFG, "desk", "deskCode", "");
+    }
+    utils_set_cfg_str_value(root, HXT_INIT_CFG, "desk", "deskCode", uuid);
+
+    utils_reload_cfg(HXT_INIT_CFG, root);
+
+    cJSON_Delete(root);
+
+    return TRUE;
+}
+
+char* hxt_get_init_desk_uuid()
+{
+    static char uuid[64] = {0};
+    cJSON *root = utils_load_cfg(HXT_INIT_CFG);
+    if (!root)
+    {
+        return NULL;
+    }
+    char* tmp = utils_get_cfg_str_value(root, "desk", "deskCode");
+    if (tmp == NULL)
+    {
+        return NULL;
+    }
+    strcpy(uuid, tmp);
+    uuid[strlen(uuid)] = '\0';
+
+    cJSON_Delete(root);
+
+    return uuid;
 }
 
 void hxt_load_cfg()
@@ -71,6 +122,91 @@ void hxt_set_child_unid(const int unid)
     g_children_unid = unid;
 }
 
+BOOL hxt_update_children_alarm_files(void* data)
+{
+    if (NULL == data)
+    {
+        return FALSE;
+    }
+    cJSON *node = (cJSON*)data;
+    cJSON *node_item = cJSON_GetObjectItem(node, "childrenUnid");
+    /* get child personal config */
+    char children_unid[64] = {0};
+    sprintf(children_unid, "child_%d", node_item->valueint);
+    int child_unid = node_item->valueint;
+    /* create documents for save mp4 and snap file */
+    hxt_mk_private_doc(child_unid);
+
+    node_item = cJSON_GetObjectItem(node, "studyMode");
+    if (node_item)
+    {
+        utils_set_cfg_number_value(g_cfg_root, HXT_CFG, children_unid, "studyMode", node_item->valueint);       
+    }
+
+    node_item = cJSON_GetObjectItem(node, "alarmType");
+    utils_set_cfg_number_value(g_cfg_root, HXT_CFG, children_unid, "alarmType", node_item->valueint);
+    int alarm_type = node_item->valueint;
+    
+    /* self defines alarm voice */
+    if (alarm_type == PERSONAL)
+    {
+        char alarm_file[128] = {0};
+        char old_alarm_file[128] = {0};
+        char replace_cmd[256] = {0};
+
+        cJSON *alarm_file_node = cJSON_GetObjectItem(node, "filePaths");
+        int alarm_file_count = cJSON_GetArraySize(alarm_file_node);
+        for (int count = 0; count < PERSONAL_ALARM_VOICE_COUNT; count ++)
+        {
+            cJSON *file_item = cJSON_GetArrayItem(alarm_file_node, count);
+            if (!file_item)
+            {
+                continue;
+            }
+            node_item = cJSON_GetObjectItem(file_item, "priority");
+            int idx = node_item->valueint;
+            bzero(alarm_file, 128);
+            sprintf(alarm_file, HXT_CHILD_ALARM_FILE_TMP, child_unid, idx);
+            node_item = cJSON_GetObjectItem(file_item, "filePath");
+            utils_download_file(node_item->valuestring, alarm_file);
+            
+            /*replace old file*/
+            bzero(old_alarm_file, 128);
+            sprintf(old_alarm_file, HXT_CHILD_ALARM_FILE, child_unid, idx);
+            sprintf(replace_cmd, "mv %s %s", alarm_file, old_alarm_file);
+            system(replace_cmd);    
+        }
+    }   
+    return TRUE;
+}
+
+BOOL hxt_parse_user_data(void* data)
+{
+    BOOL result = FALSE;
+    if(NULL == data)
+    {
+        return FALSE;
+    }
+    cJSON* returnObject = (cJSON*)data;
+
+    cJSON* item = cJSON_GetObjectItem(returnObject, "parentUnid");
+    utils_set_cfg_number_value(g_cfg_root, HXT_CFG, "user", "parentId", item->valueint);
+    
+    item = cJSON_GetObjectItem(returnObject, "childrenData");
+    int item_count = cJSON_GetArraySize(item);
+    for(int i = 0; i < item_count; i ++)
+    {
+        cJSON *node = cJSON_GetArrayItem(item, i);
+        if (!node)
+        {
+            continue;
+        }
+        hxt_update_children_alarm_files((void*)node);
+    }
+  
+    return result;
+}
+
 int hxt_get_child_unid()
 {
     return g_children_unid;
@@ -96,12 +232,7 @@ void hxt_init_cfg(void* data)
     }
 
     pthread_mutex_lock(&g_hxt_cfg_lock);
-    // cJSON* item = cJSON_GetObjectItem(returnObject, "token");
-    // utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "server", "token", item->valuestring);
-    
-    // item = cJSON_GetObjectItem(returnObject, "tokenExpireTime");
-    // utils_set_cfg_number_value(g_cfg_root, HXT_CFG, "server", "tokenExpireTime", item->valuedouble);
- #if 1   
+ 
     cJSON* item = cJSON_GetObjectItem(returnObject, "websocketUrl");
     utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "server", "websocketUrl", item->valuestring);
 
@@ -150,30 +281,8 @@ void hxt_init_cfg(void* data)
     item = cJSON_GetObjectItem(returnObject, "upgradePackUrl");
     utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "version", "upgradePackUrl", item->valuestring);
 
-    item = cJSON_GetObjectItem(returnObject, "parentUnid");
-    utils_set_cfg_number_value(g_cfg_root, HXT_CFG, "user", "parentId", item->valueint);
+    hxt_parse_user_data((void*)returnObject);
 
-    item = cJSON_GetObjectItem(returnObject, "childrenData");
-    int item_count = cJSON_GetArraySize(item);
-    for(int i = 0; i < item_count; i ++)
-    {
-        cJSON *node = cJSON_GetArrayItem(item, i);
-        if (!node)
-        {
-            continue;
-        }
-        cJSON *node_item = cJSON_GetObjectItem(node, "childrenUnid");
-        char children_unid[64] = {0};
-        sprintf(children_unid, "child_%d", node_item->valueint);
-        node_item = cJSON_GetObjectItem(node, "alarmType");
-        utils_set_cfg_number_value(g_cfg_root, HXT_CFG, children_unid, "alarmType", node_item->valueint);
-        node_item = cJSON_GetObjectItem(node, "studyMode");
-        utils_set_cfg_number_value(g_cfg_root, HXT_CFG, children_unid, "studyMode", node_item->valueint);
-
-        /* create documents for save mp4 and snap file */
-        hxt_mk_private_doc(node_item->valueint);
-    }
- #endif   
     pthread_mutex_unlock(&g_hxt_cfg_lock);
 
     hxt_reload_cfg();
@@ -697,4 +806,79 @@ BOOL hxt_set_attach_ratio_cfg(const char* value)
     }
 
     return utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "device", "attachRatio", value);
+}
+
+int hxt_get_selfdef_voice_count()
+{
+    int file_count = 0;
+    int child_unid = hxt_get_child_unid();
+    char CMD_GET_VOICE_COUNT[256] = {0};
+    sprintf(CMD_GET_VOICE_COUNT, "ls /user/child_%d/alarm/ | wc -l", child_unid);
+    system(CMD_GET_VOICE_COUNT);
+
+    char line[64] = {0};
+    FILE *fp = NULL;
+    fp = popen(CMD_GET_VOICE_COUNT, "r");
+    if(NULL != fp)
+    {
+        if(fgets(line, sizeof(line), fp) == NULL)
+        {
+            pclose(fp);
+            return 0;
+        }
+        file_count = atoi(line);
+    }
+    pclose(fp);
+
+    return file_count;
+}
+
+BOOL hxt_get_snap_count()
+{
+    int file_count = 0;
+    int child_unid = hxt_get_child_unid();
+    char CMD_GET_SNAP_COUNT[256] = {0};
+    sprintf(CMD_GET_SNAP_COUNT, "ls /user/child_%d/snap/ | wc -l", child_unid);
+    system(CMD_GET_SNAP_COUNT);
+
+    char line[64] = {0};
+    FILE *fp = NULL;
+    fp = popen(CMD_GET_SNAP_COUNT, "r");
+    if(NULL != fp)
+    {
+        if(fgets(line, sizeof(line), fp) == NULL)
+        {
+            pclose(fp);
+            return 0;
+        }
+        file_count = atoi(line);
+    }
+    pclose(fp);
+
+    return file_count;
+}
+
+BOOL hxt_get_video_count()
+{
+    int file_count = 0;
+    int child_unid = hxt_get_child_unid();
+    char CMD_GET_VIDEO_COUNT[256] = {0};
+    sprintf(CMD_GET_VIDEO_COUNT, "ls /user/child_%d/video/ | wc -l", child_unid);
+    system(CMD_GET_VIDEO_COUNT);
+
+    char line[64] = {0};
+    FILE *fp = NULL;
+    fp = popen(CMD_GET_VIDEO_COUNT, "r");
+    if(NULL != fp)
+    {
+        if(fgets(line, sizeof(line), fp) == NULL)
+        {
+            pclose(fp);
+            return 0;
+        }
+        file_count = atoi(line);
+    }
+    pclose(fp);
+
+    return file_count;
 }

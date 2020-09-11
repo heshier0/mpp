@@ -66,13 +66,13 @@ static BOOL init_study_info(ReportInfo *report_info, StudyInfo *study_info)
         /* send video */        
         if (report_info->video_url == NULL)
         {
-            report_info->video_url = utils_malloc(255);
+            report_info->video_url = utils_malloc(256);
         }
         hxt_file_upload_request(study_info->file, report_info->video_url);
 
         if (report_info->snap_url == NULL)
         {
-            report_info->snap_url = utils_malloc(255);
+            report_info->snap_url = utils_malloc(256);
         }
         hxt_file_upload_request(study_info->snap, report_info->snap_url);
 
@@ -237,19 +237,17 @@ static void parse_server_config_data(void *data)
     }
     
     cJSON *sub_item = NULL;
-    cJSON *item = cJSON_GetObjectItem(root, "senderId");
-    item = cJSON_GetObjectItem(root, "targetId");
-    item = cJSON_GetObjectItem(root, "dataType");
+    cJSON *item = cJSON_GetObjectItem(root, "dataType");
     int data_type = item->valueint;
     switch(data_type)
     {
-     case 1:
+     case HXT_BASIC_CFG:
         item = cJSON_GetObjectItem(root, "data");
         sub_item = cJSON_GetObjectItem(item, "postureCountDuration");   //不良坐姿时长判定值
         hxt_set_posture_judge_cfg(sub_item->valueint);
         sub_item = cJSON_GetObjectItem(item, "videoRecordDuration");    //视频记录时长
         hxt_set_video_length_cfg(sub_item->valueint);
-        sub_item = cJSON_GetObjectItem(item, "videoRecordRatio");       //视频记录时长
+        sub_item = cJSON_GetObjectItem(item, "videoRecordRatio");       //视频分辨率
         hxt_set_video_ratio_cfg(sub_item->valueint);
         sub_item = cJSON_GetObjectItem(item, "videoRecordCount");       //视频记录个数
         hxt_set_video_count_cfg(sub_item->valueint);
@@ -261,7 +259,7 @@ static void parse_server_config_data(void *data)
         hxt_set_attach_ratio_cfg(sub_item->valueint);
         hxt_reload_cfg();
     break;
-    case 2:
+    case HXT_UPDATE_REMIND:
         item = cJSON_GetObjectItem(root, "data");
         sub_item = cJSON_GetObjectItem(item, "newVersionId");           //新版本id，大于0时有效
         hxt_set_version_id_cfg(sub_item->valueint);
@@ -271,37 +269,33 @@ static void parse_server_config_data(void *data)
         hxt_set_upgrade_pack_url_cfg(sub_item->valuestring);
         hxt_reload_cfg();
         //to upgrade
-        
+        hxt_get_new_version_request();
     break;    
-    case 3:
+    case HXT_WAKE_CAMERA:
         //to wake camera
     break;
-    case 4:
+    case HXT_USER_DATA:
         item = cJSON_GetObjectItem(root, "data");
-        sub_item = cJSON_GetObjectItem(item, "alarmUnid");          //书桌提示音ID
-        hxt_set_alarm_unid_cfg(sub_item->valueint); 
-        sub_item = cJSON_GetObjectItem(item, "alarmFileUrl");       //自定义语音时文件地址
-        hxt_set_alarm_file_url_cfg(sub_item->valuestring);
+        hxt_parse_user_data((void*)item);
         hxt_reload_cfg();
     break;       
     case 5:
         item = cJSON_GetObjectItem(root, "data");
-        cJSON *sub_item1 = cJSON_GetObjectItem(item, "childrenUnid");       //孩子ID
-        cJSON *sub_item2 = cJSON_GetObjectItem(item, "alarmType");          //提醒方式 ：0-静音 1-蜂鸣 2-语音
-        hxt_set_alarm_type_cfg(sub_item1->valueint, sub_item2->valueint);
+        hxt_update_children_alarm_files((void*)item);
         hxt_reload_cfg();
     break;
     case 6:
-        //check code to sound
+        //new studyMode
         item = cJSON_GetObjectItem(root, "data");                           
-        sub_item = cJSON_GetObjectItem(item, "checkCode");                  //验证码内容
-        /* play check code */
+        sub_item = cJSON_GetObjectItem(item, "studyMode");               
+        hxt_set_study_mode_cfg(hxt_get_child_unid(), sub_item->valueint);
+        hxt_reload_cfg();
     break;
     case 7:
         // child unid
         item = cJSON_GetObjectItem(root, "data");
-        sub_item = cJSON_GetObjectItem(item, "childrenUnid");              //书桌新关联孩子
-        hxt_set_child_unid(sub_item->valueint);
+        hxt_update_children_alarm_files((void*)item);
+        hxt_reload_cfg();
     break;
     case 8:
         //
@@ -312,8 +306,15 @@ static void parse_server_config_data(void *data)
     case 10:
         item = cJSON_GetObjectItem(root, "data");
         sub_item = cJSON_GetObjectItem(item, "iflyosToken");
-        hxt_set_iflyos_token_cfg(sub_item->valuestring);
-        // iflyos_set_token(sub_item->valuestring);
+        if (sub_item)
+        {
+            hxt_set_iflyos_token_cfg(sub_item->valuestring);
+        }
+        sub_item = cJSON_GetObjectItem(item, "iflosID");
+        if (sub_item)
+        {
+            hxt_set_iflyos_sn_cfg(sub_item->valuestring);
+        }
     break;
     case 14:
         /* stop studying */
@@ -336,7 +337,7 @@ static void parse_server_config_data(void *data)
         utils_print("websocket connect ok\n");
     break;  
     }
-   
+    
     if(root != NULL)
     {
         cJSON_Delete(root);

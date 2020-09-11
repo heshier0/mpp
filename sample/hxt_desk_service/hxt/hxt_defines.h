@@ -1,32 +1,78 @@
 #ifndef __HXT_DEFINES_H__
 #define __HXT_DEFINES_H__
 
+#define DEBUG 
 
-#define HXT_GET_TOKEN                  "/Authorize/GetDeskToken"
-#define HXT_GET_DESK_CONFIG             "/Device/GetDeskConfig"
-#define HXT_STATUS_REPORT               "/Device/DeskStatusReport"
-#define HXT_STUDY_REPORT                "/User/StudyReport"
-#define HXT_STUDY_REPORT_BATCH          "/User/StudyReportBatch"
-#define HXT_UPLOAD_FILE                 "/Upload/UploadFileCustom?childunid=%d"
-#define HXT_GETMAX_CHUNK                "/Upload/GetMaxChunk?md5=%s&ext=%s"
-#define HXT_UPLOAD_CHUNK                "/Upload/Chunkload?md5=%s&chunk=%d&chunks=%d"
-#define HXT_MERGE_FILES                 "/Upload/MergeFiles?md5=%s&ext=%s&fileTotalSize=%lu&typeString=%s"
-#define HXT_CHECK_WIFI_DATA             "/Device/CheckWifiData"
-#define HXT_BIND_DESK_WIFI              "/Device/BindDeskByWifi"
-#define HXT_CONFIRM_DESK_BIND            "/Device/BindDeskConfirm"
+#ifdef DEBUG
+    #define utils_print(format, ...) printf("%s>>>%d: " format "\n", __FUNCTION__, __LINE__, ##__VA_ARGS__)
+    #define malloc_print(__ptr__,size) printf("[ALLOC] %32s:%4d | addr= %p, size= %lu, expr= `%s`\n", __FUNCTION__, __LINE__ , __ptr__, size, #size)
+    #define free_print(ptr)	printf("[ FREE] %32s:%4d | addr= %p, expr= `%s`\n", __FUNCTION__, __LINE__, ptr, #ptr)
+#else
+    #define malloc_print(__ptr__,size)
+    #define free_print(ptr)
+    #define utils_print(format, ...)
+#endif 
 
-#define HXT_UPLOAD_SAMPLE_SNAP          "/Upload/UploadPicsAsync?childunid=%d"
+#define utils_malloc(size) ({ \
+	void *__ptr__ = malloc(size); \
+	memset(__ptr__, 0, size); \
+	__ptr__; \
+	})
 
-#define HXT_RET_OK                      1
-#define HXT_STATUS_OK                   "S0001"
+#define utils_calloc(size) ({ \
+	void *__ptr__ = calloc(size, 1); \
+	__ptr__; \
+	})
 
+#define utils_free(ptr) ({ \
+	free(ptr); \
+	})
 
+typedef enum
+{
+    TRUE  = 1, 
+    FALSE  = 0
+}BOOL;
+
+typedef enum 
+{
+    OFFLINE = 0,
+    ONLINE = 1
+}WORK_MODE;
+
+#define MAX_UPLOAD_COUNT                    50
+#define MAX_STRORE_TIME                     (7*24*60*60)
+
+/* http request url */
+#define HXT_GET_TOKEN                       "/Authorize/GetDeskToken"
+#define HXT_GET_DESK_CONFIG                 "/Device/GetDeskConfig"
+#define HXT_STATUS_REPORT                   "/Device/DeskStatusReport"
+#define HXT_STUDY_REPORT                    "/User/StudyReport"
+#define HXT_STUDY_REPORT_BATCH              "/User/StudyReportBatch"
+#define HXT_UPLOAD_FILE                     "/Upload/UploadFileCustom?childunid=%d"
+#define HXT_GETMAX_CHUNK                    "/Upload/GetMaxChunk?md5=%s&ext=%s"
+#define HXT_UPLOAD_CHUNK                    "/Upload/Chunkload?md5=%s&chunk=%d&chunks=%d"
+#define HXT_MERGE_FILES                     "/Upload/MergeFiles?md5=%s&ext=%s&fileTotalSize=%lu&typeString=%s"
+#define HXT_CHECK_WIFI_DATA                 "/Device/CheckWifiData"
+#define HXT_BIND_DESK_WIFI                  "/Device/BindDeskByWifi"
+#define HXT_CONFIRM_DESK_BIND               "/Device/BindDeskConfirm"
+#define HXT_UPLOAD_SAMPLE_SNAP              "/Upload/UploadPicsAsync?childunid=%d"
+
+/* http response result */
+#define HXT_OK                              1
+#define HXT_NO_REGISTER                     0
+#define HXT_AUTH_FAILED                     401
+#define HXT_RES_STATUS_OK                   "S0001"
+#define HXT_RES_AUTH_FAIL                   "S0401"
+#define HXT_RES_NO_REG                      "S0000"
+
+/* hxt websocket result defines */
 #define HXT_CONNECT_OK          0
-#define HXT_DEFAULT_CFG         1
+#define HXT_BASIC_CFG           1
 #define HXT_UPDATE_REMIND       2
 #define HXT_WAKE_CAMERA         3
-#define HXT_VARY_TONE           4
-#define HXT_TONE_TYPE           5
+#define HXT_USER_DATA           4
+#define HXT_ALARM_VARRY         5
 #define HXT_VERIFY_CODE         6
 #define HXT_BIND_CHILD_ID       7
 #define HXT_VARY_CHILD_ID       8
@@ -40,30 +86,20 @@
 #define HXT_STUDY_INFO          12
 #define HXT_STUDY_INFOS         13
 
-#pragma pack(push, 1)
-typedef struct hxt_result
-{
-    char pass_status;
-    char code[5];
-    int status;
-    char desc[32];
-    char msg[512];
-}HxtResult;
+/* file path defines */
+#define UPDATE_BIN_FILE                     ("/userdata/update/HxtDeskService")
+#define HXT_CFG                             ("/userdata/config/hxt_config.json")
+#define HXT_INIT_CFG                        ("/userdata/config/.hxt_init_config.json")
+#define HXT_CHILD_VIDEO_PATH                ("/user/child_%d/video/")
+#define HXT_CHILD_SNAP_PATH                 ("/user/child_%d/snap/")
+#define HXT_CHILD_ALARM_FILE                ("/user/child_%d/alarm/P00%d.mp3")
+#define HXT_CHILD_ALARM_FILE_TMP            ("/user/child_%d/alarm/P00%d.tmp")
+#define WIFI_CONFIG                         ("/userdata/config/wifi.json")
+#define IFLYOS_CAE_CONF_PATH                ("/userdata/config/iflyos/hlw.ini")
+#define IFLYOS_CAE_PARAM_PATH               ("/userdata/config/iflyos/hlw.param")
+#define IFLYOS_CFG                          ("/userdata/config/iflyos/iflyos_config.json") 
 
-typedef struct hxt_children_data
-{
-    int unid;
-    int study_mode;
-    int alarm_type;
-}HxtChildrenData;
-
-typedef struct hxt_wifi_data
-{
-    char wifi_ssid[32];
-    char wifi_pwd[32];
-}HxtWifiData;
-
-
-#pragma pack(pop)
+// #pragma pack(push, 1)
+// #pragma pack(pop)
 
 #endif //__HXT_DEFINES_H__

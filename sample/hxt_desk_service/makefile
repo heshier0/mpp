@@ -10,20 +10,11 @@ SMP_SRCS += $(wildcard $(PWD)/hxt/*.c)
 SMP_SRCS += $(wildcard $(PWD)/iflyos/*.c)
 SMP_SRCS += $(wildcard $(PWD)/board/*.c)
 SMP_SRCS += $(wildcard $(PWD)/utils/*.c)
-SMP_SRCS += $(wildcard $(PWD)/media/*.c)
+SMP_SRCS += $(wildcard $(PWD)/ipc/*.c)
 SMP_SRCS += $(wildcard $(PWD)/posture/*.c)
 
 ROOT_DIR = $(shell pwd)
 SUBDIRS  = $(shell ls -l | grep ^d | awk '{if($$9 != "output") print $$9}')
-
-
-# OPENCV_LIBS := -lopencv_core -lopencv_calib3d -lopencv_dnn -lopencv_features2d \
-#                -lopencv_flann -lopencv_highgui -lopencv_imgcodecs \
-#                -lopencv_imgproc -lopencv_ml -lopencv_objdetect
-       # -L/mnt/g/workspace/plugins/opencv4/lib $(OPENCV_LIBS) 
-
-
-
 
 INCS = -I$(ROOT_DIR)/. \
        $(foreach tmp,$(SUBDIRS),-I$(ROOT_DIR)/$(tmp)/.) \

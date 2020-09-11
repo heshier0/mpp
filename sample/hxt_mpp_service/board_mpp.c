@@ -13,30 +13,32 @@
 #include <acodec.h>
 #include <audio_mp3_adp.h>
 
+#include "command.h"
+#include "board_media.h"
 #include "board_mpp.h"
 
 
-
-WDR_MODE_E      enWDRMode       = WDR_MODE_NONE;
-DYNAMIC_RANGE_E enDynamicRange  = DYNAMIC_RANGE_SDR8;
-PIXEL_FORMAT_E  enPixFormat     = PIXEL_FORMAT_YVU_SEMIPLANAR_420;
-VIDEO_FORMAT_E  enVideoFormat   = VIDEO_FORMAT_LINEAR;
-COMPRESS_MODE_E enCompressMode  = COMPRESS_MODE_NONE;
-VI_VPSS_MODE_E  enMastPipeMode  = VI_OFFLINE_VPSS_OFFLINE;
+/*********************MPP各模块对应关系**********************************
+ VI     VI_PIPE     VI_CHN      VPSS_GRP      VPSS_CHN      VENC_CHN
+----------------------------------------------------------------------
+0       0           0           0               1 (YUV)         0(Video)
+                                                2 (ENC)         2(Snap) 
+1       2           0           1               1               1(Video)
+                                                2               3(Snap)
+*********************************************************************/
 
 
 static SAMPLE_VI_CONFIG_S g_vi_configs;
 
-static BOOL g_voice_status = TRUE;
-static BOOL g_play_status = TRUE;
-static BOOL g_video_status = TRUE;
+static BOOL g_sample_pcm_status = TRUE;  //sample pcm data to fifo
+static BOOL g_play_mp3_status = TRUE;   //get mp3 data from fifo
+static BOOL g_enc_stream_status = TRUE;  //get stream from venc
 
 static BOOL g_start_record = FALSE;
 static BOOL g_recording = FALSE;
 static BOOL g_stop_record = FALSE;
 
 static char s_file_name[255] = {0};
-
 
 /* fifo */
 static BOOL create_fifo(const char* name)
@@ -247,19 +249,19 @@ static BOOL start_vpss(int width, int height)
     SIZE_S stSize;
 
     /*get picture size*/
-    ret_val = SAMPLE_COMM_VI_GetSizeBySensor(g_vi_configs.astViInfo[0].stSnsInfo.enSnsType, &enPicSize);
-    if (HI_SUCCESS != ret_val)
-    {
-        utils_print("get picture size by sensor failed!\n");
-        return FALSE;
-    }
+    // ret_val = SAMPLE_COMM_VI_GetSizeBySensor(g_vi_configs.astViInfo[0].stSnsInfo.enSnsType, &enPicSize);
+    // if (HI_SUCCESS != ret_val)
+    // {
+    //     utils_print("get picture size by sensor failed!\n");
+    //     return FALSE;
+    // }
 
-    ret_val = SAMPLE_COMM_SYS_GetPicSize(enPicSize, &stSize);
-    if (HI_SUCCESS != ret_val)
-    {
-        utils_print("get picture size failed!\n");
-        return FALSE;
-    }
+    // ret_val = SAMPLE_COMM_SYS_GetPicSize(enPicSize, &stSize);
+    // if (HI_SUCCESS != ret_val)
+    // {
+    //     utils_print("get picture size failed!\n");
+    //     return FALSE;
+    // }
 
     /* init vpss groups */
     hi_memset(&vpss_grp_attrs, sizeof(VPSS_GRP_ATTR_S), 0, sizeof(VPSS_GRP_ATTR_S));
@@ -454,7 +456,6 @@ static BOOL bind_vpss_venc()
     return ret;
 }
 
-
 BOOL rotate_picture()
 {
     HI_S32 ret_val = HI_FAILURE;
@@ -613,21 +614,32 @@ void stop_audio_system()
 
 BOOL start_video_system(int width, int height)
 {
+    stop_video_system();
+
     BOOL init_result = FALSE;
 
-    /*config vi*/
-    init_result = start_vi();
-    if(!init_result)
-    {
-        utils_print("start vi failed\n");
-        return FALSE;
-    }
+    // /*config vi*/
+    // init_result = start_vi();
+    // if(!init_result)
+    // {
+    //     utils_print("start vi failed\n");
+    //     return FALSE;
+    // }
 
     init_result = start_vpss(width, height);
     if(!init_result)
     {
         utils_print("start vpss failed\n");
-        stop_vi();
+        // stop_vi();
+        return FALSE;
+    }
+
+    init_result = bind_vi_vpss();
+    if(!init_result)
+    {
+        utils_print("bind vi and vpss failed\n");
+        stop_all_vpss();
+        // stop_vi();
         return FALSE;
     }
 
@@ -635,21 +647,12 @@ BOOL start_video_system(int width, int height)
     if(!init_result)
     {
         utils_print("start venc failed\n");
+        unbind_vi_vpss();
         stop_all_vpss();
-        stop_vi();
+        // stop_vi();
         return FALSE;
     }
     
-    init_result = bind_vi_vpss();
-    if(!init_result)
-    {
-        utils_print("bind vi and vpss failed\n");
-        stop_all_venc();
-        stop_all_vpss();
-        stop_vi();
-        return FALSE;
-    }
-
     init_result = bind_vpss_venc();
     if(!init_result)
     {
@@ -657,7 +660,7 @@ BOOL start_video_system(int width, int height)
         stop_all_venc();
         unbind_vi_vpss();
         stop_all_vpss();
-        stop_vi();
+        // stop_vi();
         return FALSE;
     }
 
@@ -669,7 +672,7 @@ BOOL start_video_system(int width, int height)
         stop_all_venc();
         unbind_vi_vpss();
         stop_all_vpss();
-        stop_vi();
+        // stop_vi();
         return FALSE;
     }
 
@@ -682,9 +685,8 @@ void stop_video_system()
     stop_all_venc();
     unbind_vi_vpss();
     stop_all_vpss();
-    stop_vi();
+    // stop_vi();
 }
-
 
 static void sample_yuv_8bit_dump(VIDEO_FRAME_S* pVBuf, void** pOutBuf)
 {
@@ -872,8 +874,7 @@ static void* sample_pcm_cb(void *data)
 #ifdef DEBUG
     // FILE *pfd = fopen("original.pcm", "wb");
 #endif
-
-    while(g_voice_status)
+    while(g_sample_pcm_status)
     {
         TimeoutVal.tv_sec = 1;
         TimeoutVal.tv_usec = 0;
@@ -958,7 +959,7 @@ static void* play_mp3_cb(void* data)
         utils_print("malloc failed!\n");
         return NULL;
     }
-    while (g_play_status)
+    while (g_play_mp3_status)
     {
         stAudioStream.pStream = pu8AudioStream;
         //读取mp3数据
@@ -995,8 +996,14 @@ static void* play_mp3_cb(void* data)
 
 static void* sample_video_cb(void* data)
 {
-    board_get_stream_from_venc_chn();
-    utils_print("video sample thread exit...\n");
+    video_ratio_t *ptmp = NULL;
+    ptmp = (video_ratio_t*)data;
+    if(ptmp == NULL)
+    {
+        return NULL;
+    }
+
+    board_get_stream_from_venc_chn(ptmp->width, ptmp->height);
     return NULL;
 }
 
@@ -1048,19 +1055,26 @@ BOOL init_mpp()
         return FALSE;
     }
 
+    /*config vi*/
+    init_result = start_vi();
+    if(!init_result)
+    {
+        utils_print("start vi failed\n");
+        return FALSE;
+    }
+
     return TRUE;       
 }
 
 void deinit_mpp()
 {
+    stop_vi();
     stop_audio_system();
     /* exit system */
     SAMPLE_COMM_SYS_Exit();
 }
 
-
-
-
+#if 0
 void board_get_yuv_from_vpss_chn(char** yuv_buf)
 {
     HI_S32 ret_val;
@@ -1088,9 +1102,9 @@ void board_get_yuv_from_vpss_chn(char** yuv_buf)
 
     return;
 }
-
+#endif 
 /* default venc chn 0 */
-void board_get_stream_from_venc_chn()
+void board_get_stream_from_venc_chn(int width, int height)
 {
     VENC_CHN venc_chn = 0;
 
@@ -1104,6 +1118,7 @@ void board_get_stream_from_venc_chn()
     fd_set read_fds;
     struct timeval timout_val; 
 
+    g_enc_stream_status = TRUE;
     ret_val = HI_MPI_VENC_GetChnAttr(venc_chn, &venc_chn_attrs);
     if (ret_val != HI_SUCCESS)
     {
@@ -1125,7 +1140,7 @@ void board_get_stream_from_venc_chn()
         return;
     }
 
-    while (g_video_status)
+    while (g_enc_stream_status)
     {        
         FD_ZERO(&read_fds);
         FD_SET(venc_fd, &read_fds);
@@ -1147,7 +1162,7 @@ void board_get_stream_from_venc_chn()
         {
             if (g_start_record)
             {
-                //board_create_mp4_file(s_file_name);
+                board_create_mp4_file(s_file_name);
                 g_recording = TRUE;
             }
             
@@ -1203,7 +1218,7 @@ void board_get_stream_from_venc_chn()
                 /* to save mp4 */
                 if(g_recording)
                 {   
-                    // board_write_mp4(&venc_stream);  
+                    board_write_mp4(&venc_stream, width, height);  
                     g_start_record = FALSE;
                 }
 
@@ -1228,21 +1243,22 @@ void board_get_stream_from_venc_chn()
 
             if (g_stop_record)
             {
-                //board_close_mp4_file();
+                board_close_mp4_file();
                 g_recording = FALSE;
                 g_stop_record = FALSE;
 
             }
         }
     }
-
+    g_enc_stream_status = FALSE;
+    utils_print("get venc chn stream exit...\n");
     return;
 }
 
 /* default venc chn 2 */
 void board_get_snap_from_venc_chn(const char* jpg_file)
 {
-    VENC_CHN venc_chn = 3;
+    VENC_CHN venc_chn = 2;
 
     struct timeval timeout;
     fd_set read_fds;
@@ -1328,10 +1344,11 @@ void board_get_snap_from_venc_chn(const char* jpg_file)
                 FILE* pFile = fopen(jpg_file, "wb");
                 if (pFile == NULL)
                 {
-                    utils_print("open file err\n");
+                    utils_print("open file %s err\n", jpg_file);
+                    ret = HI_MPI_VENC_ReleaseStream(venc_chn, &stream);
                     free(stream.pstPack);
                     stream.pstPack = NULL;
-                    return;
+                    break;
                 }
                 for (int i = 0; i < stream.u32PackCount; i++)
                 {
@@ -1370,15 +1387,19 @@ void board_get_snap_from_venc_chn(const char* jpg_file)
     return;
 }
 
-
-
-pthread_t start_sample_video()
+void start_sample_video_thread(void* data)
 {
     pthread_t video_tid;
-    pthread_create(&video_tid, NULL, sample_video_cb, NULL);
+
+    pthread_create(&video_tid, NULL, sample_video_cb, data);
     pthread_detach(video_tid);
 
-    return video_tid;
+    return;
+}
+
+void stop_sample_video_thread()
+{
+    g_enc_stream_status = FALSE;
 }
 
 void start_play_mp3_thread()
@@ -1390,15 +1411,24 @@ void start_play_mp3_thread()
     return;
 }
 
-pthread_t start_sample_voice()
+void stop_play_mp3_thread()
+{
+    g_play_mp3_status = FALSE;
+}
+
+void start_sample_voice_thread()
 {
     pthread_t voice_tid;
     pthread_create(&voice_tid, NULL, sample_pcm_cb, NULL);
     pthread_detach(voice_tid);
 
-    return voice_tid;
+    return;
 }
 
+void stop_sample_void_thread()
+{
+    g_sample_pcm_status = FALSE;
+}
 
 void start_video_recording(const char* filename)
 {
@@ -1411,12 +1441,12 @@ void stop_video_recording()
     g_stop_record = TRUE;
 }
 
-void delete_posture_video()
+void delete_video()
 {
     g_start_record = FALSE;
     g_recording = FALSE;
     g_stop_record = FALSE;
-    // board_delete_current_mp4_file();
+    board_delete_current_mp4_file();
 }
 
 
