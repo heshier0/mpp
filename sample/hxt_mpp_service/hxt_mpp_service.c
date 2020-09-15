@@ -19,6 +19,7 @@
 int g_last_sock = -1;
 DATABUFFER g_client_data;
 
+
 static int create_local_tcp_server()
 {
     int reuse = 1;
@@ -99,6 +100,8 @@ static void* process_desk_business_thread(void *args)
     int len = sizeof(cmd_header_t);
     video_ratio_t video_ratio;
     study_video_t study_video;
+
+    int count = 0;
     while(1)
     {
         bzero(&header, len);
@@ -155,7 +158,6 @@ static void* process_desk_business_thread(void *args)
             if(!sampling)
             {
                 sampling = TRUE;
-
                 start_sample_voice_thread();
                 utils_print("start voice sample\n");
             }
@@ -249,6 +251,7 @@ int main(int argc, char **argv)
             close(g_last_sock);
         }
         g_last_sock = client_fd;
+
         start_receive_client_data(client_fd);
         start_process_desk_business();
     }

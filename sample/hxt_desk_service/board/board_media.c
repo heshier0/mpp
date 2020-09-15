@@ -334,11 +334,10 @@ BOOL board_write_mp4(VENC_STREAM_S *venc_stream)
 							(enum AVRounding)(AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX));
 #else
 		#ifdef USING_SEQ
-			pkt.pts = av_rescale_q_rnd(venc_stream->u32Seq - g_media_ctx.video_pts, 
+			pkt.dts = pkt.pts = av_rescale_q_rnd(venc_stream->u32Seq - g_media_ctx.video_pts, 
 										(AVRational){1, STREAM_FRAME_RATE},
 										video_stream->time_base, 
 										(enum AVRounding)(AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX));
-			pkt.dts = pkt.pts;
 		#else
 			pkt.pts = pkt.dts = (long long int)((venc_stream->pstPack[i].u64PTS - g_media_ctx.video_pts) * 0.09 + 0.5);
 		#endif	

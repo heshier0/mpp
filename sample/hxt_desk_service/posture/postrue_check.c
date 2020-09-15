@@ -398,7 +398,6 @@ static void* thread_proc_yuv_data_cb(void *param)
             utils_print("no vpss data...\n");
             continue;
         }
-        
         /* recog posture */
         /* 0 : Normal */
         /* 1 : bad posture */
@@ -456,13 +455,6 @@ void start_posture_recognize()
     }
     g_keep_processing = TRUE;
 
-    /* get posture pattern file */
-    char *model_path1 = hxt_get_posture_detect_model_path();
-    char *model_path2 = hxt_get_posture_class_model_path();
-    if(NULL == model_path1 || NULL == model_path2)
-    {
-        return;
-    }
 
     PostureParams params;
     memset(&params, 0, sizeof(PostureParams));
@@ -471,7 +463,16 @@ void start_posture_recognize()
     params.width = hxt_get_video_height_cfg();
     params.height = hxt_get_video_width_cfg();
     params.snap_freq = hxt_get_attach_ratio_cfg();
-
+    params.study_mode = hxt_get_study_mode_cfg();
+    
+    /* get posture pattern file */
+    char *model_path1 = hxt_get_posture_detect_model_path_cfg();
+    char *model_path2 = hxt_get_posture_class_model_path_cfg();
+    if(NULL == model_path1 || NULL == model_path2)
+    {
+        return;
+    }
+    
     send_posture_start_cmd(params.height, params.width);
     utils_send_local_voice(VOICE_NORMAL_STATUS);
 

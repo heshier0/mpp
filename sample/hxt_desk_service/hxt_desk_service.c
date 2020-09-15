@@ -13,12 +13,9 @@
 #include "common.h"
 #include "server_comm.h"
 
-static pthread_t play_tid, voice_tid, video_tid;
+// static pthread_t play_tid, voice_tid, video_tid;
 static pid_t iflyos_pid = -1, hxt_pid = -1;
 static BOOL g_processing = TRUE;
-
-static int g_client_fd = -1;
-
 
 
 static void start_hxt_process()
@@ -71,18 +68,13 @@ static void handle_signal(int signo)
     if (SIGINT == signo || SIGTERM == signo)
     {
         g_processing = FALSE;
-
-        // g_play_status = 0;
-        // g_voice_status = 0;
-        // g_video_status = 0;
-   }
+    }
 }
 
 static void  deploy_network()
 {
     BOOL first_notice = TRUE;
 
-    // utils_disconnect_wifi();
     /* check if wifi info in cfg */
     while (1)
     {
@@ -184,18 +176,19 @@ int main(int argc, char **argv)
 
     // deploy_network();
 
-
     connect_to_mpp_service();
-#if 1
+
+#if 0
     /* connect to hxt server */
-    int connect_count = 1;
-    while(1)
+    int connect_count = 0;
+    while(connect_count < 6)
     {
         server_started = hxt_refresh_token_request();
         if (server_started)
         {
             break;
         }
+        connect_count++;
         sleep(10*connect_count);
     }
     if(server_started)
@@ -205,15 +198,16 @@ int main(int argc, char **argv)
         {
             start_hxt_process();
         }
+        
         start_iflyos_process();
 
         main_process_cycle();
     }  
 #endif
-    // while(g_processing)
-    // {
-    //     sleep(5);
-    // }
+    while(g_processing)
+    {
+        sleep(5);
+    }
 
     
     // g_play_status = FALSE;

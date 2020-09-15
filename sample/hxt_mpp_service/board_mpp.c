@@ -190,6 +190,7 @@ static BOOL start_vi()
     g_vi_configs.astViInfo[0].stChnInfo.enDynamicRange  = DYNAMIC_RANGE_SDR8;
     g_vi_configs.astViInfo[0].stChnInfo.enVideoFormat   = VIDEO_FORMAT_LINEAR;
     g_vi_configs.astViInfo[0].stChnInfo.enCompressMode  = COMPRESS_MODE_NONE;
+    
 
     g_vi_configs.astViInfo[1].stSnsInfo.MipiDev         = vi_dev[1];
     g_vi_configs.astViInfo[1].stSnsInfo.s32BusId        = 1;
@@ -248,21 +249,6 @@ static BOOL start_vpss(int width, int height)
     PIC_SIZE_E enPicSize;
     SIZE_S stSize;
 
-    /*get picture size*/
-    // ret_val = SAMPLE_COMM_VI_GetSizeBySensor(g_vi_configs.astViInfo[0].stSnsInfo.enSnsType, &enPicSize);
-    // if (HI_SUCCESS != ret_val)
-    // {
-    //     utils_print("get picture size by sensor failed!\n");
-    //     return FALSE;
-    // }
-
-    // ret_val = SAMPLE_COMM_SYS_GetPicSize(enPicSize, &stSize);
-    // if (HI_SUCCESS != ret_val)
-    // {
-    //     utils_print("get picture size failed!\n");
-    //     return FALSE;
-    // }
-
     /* init vpss groups */
     hi_memset(&vpss_grp_attrs, sizeof(VPSS_GRP_ATTR_S), 0, sizeof(VPSS_GRP_ATTR_S));
     vpss_grp_attrs.u32MaxW                        = 1920;
@@ -282,8 +268,8 @@ static BOOL start_vpss(int width, int height)
     vpss_chn_attrs[vpss_chn0].enDynamicRange              = DYNAMIC_RANGE_SDR8;
     vpss_chn_attrs[vpss_chn0].enVideoFormat               = VIDEO_FORMAT_LINEAR;
     vpss_chn_attrs[vpss_chn0].enPixelFormat               = PIXEL_FORMAT_YVU_SEMIPLANAR_420;
-    vpss_chn_attrs[vpss_chn0].stFrameRate.s32SrcFrameRate = -1;
-    vpss_chn_attrs[vpss_chn0].stFrameRate.s32DstFrameRate = -1;
+    vpss_chn_attrs[vpss_chn0].stFrameRate.s32SrcFrameRate = 30;
+    vpss_chn_attrs[vpss_chn0].stFrameRate.s32DstFrameRate = 25;
     vpss_chn_attrs[vpss_chn0].u32Depth                    = 0;
     vpss_chn_attrs[vpss_chn0].bMirror                     = HI_FALSE;
     vpss_chn_attrs[vpss_chn0].bFlip                       = HI_FALSE;
@@ -297,8 +283,8 @@ static BOOL start_vpss(int width, int height)
     vpss_chn_attrs[vpss_chn1].enDynamicRange              = DYNAMIC_RANGE_SDR8;
     vpss_chn_attrs[vpss_chn1].enVideoFormat               = VIDEO_FORMAT_LINEAR;
     vpss_chn_attrs[vpss_chn1].enPixelFormat               = PIXEL_FORMAT_YVU_SEMIPLANAR_420;
-    vpss_chn_attrs[vpss_chn1].stFrameRate.s32SrcFrameRate = -1;
-    vpss_chn_attrs[vpss_chn1].stFrameRate.s32DstFrameRate = -1;
+    vpss_chn_attrs[vpss_chn1].stFrameRate.s32SrcFrameRate = 30;
+    vpss_chn_attrs[vpss_chn1].stFrameRate.s32DstFrameRate = 25;
     vpss_chn_attrs[vpss_chn1].u32Depth                    = 1;
     vpss_chn_attrs[vpss_chn1].bMirror                     = HI_FALSE;
     vpss_chn_attrs[vpss_chn1].bFlip                       = HI_FALSE;
@@ -327,7 +313,6 @@ static BOOL start_venc(int width, int height)
 {
     BOOL ret = TRUE;
     HI_S32 ret_val = HI_FAILURE;
-    HI_S32 gop_val = 25;
     VENC_GOP_MODE_E gop_mode  = VENC_GOPMODE_NORMALP;
     VENC_GOP_ATTR_S gop_attrs = {0};
     VENC_CHN venc_chn[4] = {0, 1, 2, 3};
@@ -1033,7 +1018,7 @@ BOOL init_mpp()
     /* init vb */
     VB_CONFIG_S vb_conf;
     hi_memset(&vb_conf, sizeof(VB_CONFIG_S), 0, sizeof(VB_CONFIG_S));
-    vb_conf.u32MaxPoolCnt = 2;
+    vb_conf.u32MaxPoolCnt = 4;
 
     blk_size = COMMON_GetPicBufferSize(pic_size.u32Width, pic_size.u32Height, PIXEL_FORMAT_YVU_SEMIPLANAR_420, DATA_BITWIDTH_8, COMPRESS_MODE_SEG, DEFAULT_ALIGN);
     vb_conf.astCommPool[0].u64BlkSize  = blk_size;
@@ -1042,6 +1027,15 @@ BOOL init_mpp()
     blk_size = VI_GetRawBufferSize(pic_size.u32Width, pic_size.u32Height, PIXEL_FORMAT_RGB_BAYER_16BPP, COMPRESS_MODE_NONE, DEFAULT_ALIGN);
     vb_conf.astCommPool[1].u64BlkSize  = blk_size;
     vb_conf.astCommPool[1].u32BlkCnt   = 8;    
+    
+    blk_size = COMMON_GetPicBufferSize(pic_size.u32Width, pic_size.u32Height, PIXEL_FORMAT_YVU_SEMIPLANAR_420, DATA_BITWIDTH_8, COMPRESS_MODE_SEG, DEFAULT_ALIGN);
+    vb_conf.astCommPool[2].u64BlkSize  = blk_size;
+    vb_conf.astCommPool[2].u32BlkCnt   = 8;
+    
+    blk_size = VI_GetRawBufferSize(pic_size.u32Width, pic_size.u32Height, PIXEL_FORMAT_RGB_BAYER_16BPP, COMPRESS_MODE_NONE, DEFAULT_ALIGN);
+    vb_conf.astCommPool[3].u64BlkSize  = blk_size;
+    vb_conf.astCommPool[3].u32BlkCnt   = 8;    
+ 
     /* init system */
     ret_val = SAMPLE_COMM_SYS_Init(&vb_conf);
     if (HI_SUCCESS != ret_val)
@@ -1107,7 +1101,6 @@ void board_get_yuv_from_vpss_chn(char** yuv_buf)
 void board_get_stream_from_venc_chn(int width, int height)
 {
     VENC_CHN venc_chn = 0;
-
     VENC_CHN_ATTR_S venc_chn_attrs;
     VENC_STREAM_BUF_INFO_S steam_buff_infos;
     VENC_CHN_STATUS_S chn_stat;
@@ -1140,6 +1133,11 @@ void board_get_stream_from_venc_chn(int width, int height)
         return;
     }
 
+    // for test
+    time_t start = 0, end = 0;
+    int frame_count = 0;
+    FILE *pFile = NULL;
+    //
     while (g_enc_stream_status)
     {        
         FD_ZERO(&read_fds);
@@ -1160,12 +1158,16 @@ void board_get_stream_from_venc_chn(int width, int height)
         }
         else
         {
-            if (g_start_record)
-            {
+            if (g_start_record && !g_recording)
+            {   
                 board_create_mp4_file(s_file_name);
                 g_recording = TRUE;
+                //for test
+                start = time(NULL);
+                utils_print("create mp4\n");
+                // pFile = fopen("/user/1111.h264", "wb");
             }
-            
+
             if (FD_ISSET(venc_fd, &read_fds))
             {
                 /*******************************************************
@@ -1178,14 +1180,13 @@ void board_get_stream_from_venc_chn(int width, int height)
                     utils_print("HI_MPI_VENC_QueryStatus chn[%d] failed with %#x!\n", venc_chn, ret_val);
                     break;
                 }
-
                 /*******************************************************
                 step 2.2 :suggest to check both u32CurPacks and u32LeftStreamFrames at the same time,for example:
-                    if(0 == stStat.u32CurPacks || 0 == stStat.u32LeftStreamFrames)
-                    {
-                    SAMPLE_PRT("NOTE: Current  frame is NULL!\n");
-                    continue;
-                    }
+                if(0 == stStat.u32CurPacks || 0 == stStat.u32LeftStreamFrames)
+                {
+                SAMPLE_PRT("NOTE: Current  frame is NULL!\n");
+                continue;
+                }
                 *******************************************************/
                 if(0 == chn_stat.u32CurPacks)
                 {
@@ -1218,13 +1219,20 @@ void board_get_stream_from_venc_chn(int width, int height)
                 /* to save mp4 */
                 if(g_recording)
                 {   
+                    frame_count ++;
                     board_write_mp4(&venc_stream, width, height);  
                     g_start_record = FALSE;
-                }
-
+                    // for(int i = 0; i < venc_stream.u32PackCount; i++)
+                    // {
+                    //     fwrite(venc_stream.pstPack[i].pu8Addr + venc_stream.pstPack[i].u32Offset, 
+                    //             1, 
+                    //             venc_stream.pstPack[i].u32Len - venc_stream.pstPack[i].u32Offset, 
+                    //             pFile);
+                    // }
+                }                          
                 /*******************************************************
                  step 2.6 : release stream
-                    *******************************************************/
+                *******************************************************/
                 ret_val = HI_MPI_VENC_ReleaseStream(venc_chn, &venc_stream);
                 if (HI_SUCCESS != ret_val)
                 {
@@ -1233,7 +1241,6 @@ void board_get_stream_from_venc_chn(int width, int height)
                     venc_stream.pstPack = NULL;
                     break;
                 }
-
                 /*******************************************************
                  step 2.7 : free pack nodes
                 *******************************************************/
@@ -1244,13 +1251,23 @@ void board_get_stream_from_venc_chn(int width, int height)
             if (g_stop_record)
             {
                 board_close_mp4_file();
+
+                g_start_record = FALSE;
                 g_recording = FALSE;
                 g_stop_record = FALSE;
-
+                /*test*/
+                end = time(NULL);
+                utils_print("saveTime = %ld, frame count is %d\n", end - start, frame_count);
+                frame_count = 0;
+                // fclose(pFile);
             }
         }
     }
     g_enc_stream_status = FALSE;
+    /*test*/
+    end = time(NULL);
+    utils_print("saveTime = %ld, frame count is %d\n", end - start, frame_count);
+    frame_count = 0;
     utils_print("get venc chn stream exit...\n");
     return;
 }

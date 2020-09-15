@@ -302,6 +302,9 @@ static void parse_server_config_data(void *data)
         item = cJSON_GetObjectItem(root, "data");
         sub_item = cJSON_GetObjectItem(item, "childrenUnid");               //设置/变更上报数据的孩子ID
         hxt_set_child_unid(sub_item->valueint);
+        stop_posture_recognize();
+        sleep(1);
+        start_posture_recognize();
     break;
     case 10:
         item = cJSON_GetObjectItem(root, "data");
@@ -323,6 +326,8 @@ static void parse_server_config_data(void *data)
     case 15:
         /* device deregister */
         utils_system_reset();
+        sleep(3);
+        utils_system_reboot();
     break;
     case 16:
         /* power off */

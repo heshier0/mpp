@@ -19,6 +19,13 @@ typedef enum
     PERSONAL = 3
  };
 
+ typedef enum
+ {
+     NORMAL = 1, 
+     MEDIUM = 2,
+     STRICT = 3
+ };
+
 const int g_video_width[3] = {1280, 960, 640};
 const int g_video_height[3] = {720, 540, 360};
 
@@ -329,16 +336,15 @@ void hxt_init_token(void* data)
     }
 }
 
-char* hxt_get_posture_detect_model_path()
+char* hxt_get_posture_detect_model_path_cfg()
 {
     return utils_get_cfg_str_value(g_cfg_root, "model", "detect_model");
 }
 
-char* hxt_get_posture_class_model_path()
+char* hxt_get_posture_class_model_path_cfg()
 {
     return utils_get_cfg_str_value(g_cfg_root, "model", "class_model");
 }
-
 
 //get
 char* hxt_get_desk_uuid_cfg()
@@ -422,8 +428,8 @@ int hxt_get_video_width_cfg()
         video_width = 1280;
         break;
     case 2:
-        video_width = 960;
-        break;
+        // video_width = 960;
+        // break;
     case 3:
         video_width = 640;
         break;    
@@ -445,8 +451,8 @@ int hxt_get_video_height_cfg()
         video_height = 720;
     break;
     case 2:
-        video_height = 540;
-    break;
+    //     video_height = 540;
+    // break;
     case 3:
         video_height = 360;
     break;

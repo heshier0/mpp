@@ -776,13 +776,14 @@ void utils_link_wifi(const char* ssid, const char* pwd)
     {
         return;
     }
+    utils_disconnect_wifi();
+    sleep(1);
 
     char CMD_SAVE_WIFI_INFO[256] = {0};
     sprintf(CMD_SAVE_WIFI_INFO, "wpa_passphrase %s %s > %s", ssid, pwd, WIFI_CFG);
     system(CMD_SAVE_WIFI_INFO);
 
     char CMD_LINK_WIFI[256] = {0};
-    //sprintf(CMD_LINK_WIFI, "sh /userdata/bin/script/link-wifi.sh");
     sprintf(CMD_LINK_WIFI, "nohup wpa_supplicant -B -c %s -iwlan0 > /dev/null 2>&1 &", WIFI_CFG);
     system(CMD_LINK_WIFI);
 

@@ -600,7 +600,7 @@ HI_S32 SAMPLE_COMM_VENC_Creat(VENC_CHN VencChn, PAYLOAD_TYPE_E enType,  SIZE_S s
     SAMPLE_VI_CONFIG_S     stViConfig;
     HI_U32                 u32FrameRate;
     HI_U32                 u32StatTime;
-    HI_U32                 u32Gop = 30;
+    HI_U32                 u32Gop = 25;
 
     // s32Ret = SAMPLE_COMM_SYS_GetPicSize( enSize, &stPicSize);
     // if (HI_SUCCESS != s32Ret)
@@ -609,18 +609,18 @@ HI_S32 SAMPLE_COMM_VENC_Creat(VENC_CHN VencChn, PAYLOAD_TYPE_E enType,  SIZE_S s
     //     return HI_FAILURE;
     // }
 
-    SAMPLE_COMM_VI_GetSensorInfo(&stViConfig);
-    if(SAMPLE_SNS_TYPE_BUTT == stViConfig.astViInfo[0].stSnsInfo.enSnsType)
-    {
-        SAMPLE_PRT("Not set SENSOR%d_TYPE !\n",0);
-        return HI_FALSE;
-    }
-    s32Ret = SAMPLE_COMM_VI_GetFrameRateBySensor(stViConfig.astViInfo[0].stSnsInfo.enSnsType, &u32FrameRate);
-    if (HI_SUCCESS != s32Ret)
-    {
-        SAMPLE_PRT("SAMPLE_COMM_VI_GetFrameRateBySensor failed!\n");
-        return s32Ret;
-    }
+    // SAMPLE_COMM_VI_GetSensorInfo(&stViConfig);
+    // if(SAMPLE_SNS_TYPE_BUTT == stViConfig.astViInfo[0].stSnsInfo.enSnsType)
+    // {
+    //     SAMPLE_PRT("Not set SENSOR%d_TYPE !\n",0);
+    //     return HI_FALSE;
+    // }
+    // s32Ret = SAMPLE_COMM_VI_GetFrameRateBySensor(stViConfig.astViInfo[0].stSnsInfo.enSnsType, &u32FrameRate);
+    // if (HI_SUCCESS != s32Ret)
+    // {
+    //     SAMPLE_PRT("SAMPLE_COMM_VI_GetFrameRateBySensor failed!\n");
+    //     return s32Ret;
+    // }
 
     /******************************************
      step 1:  Create Venc Channel
@@ -919,10 +919,10 @@ HI_S32 SAMPLE_COMM_VENC_Creat(VENC_CHN VencChn, PAYLOAD_TYPE_E enType,  SIZE_S s
                 VENC_H264_CBR_S    stH264Cbr;
 
                 stVencChnAttr.stRcAttr.enRcMode = VENC_RC_MODE_H264CBR;
-                stH264Cbr.u32Gop                = u32Gop; /*the interval of IFrame*/
-                stH264Cbr.u32StatTime           = u32StatTime; /* stream rate statics time(s) */
-                stH264Cbr.u32SrcFrameRate       = u32FrameRate; /* input (vi) frame rate */ //30
-                stH264Cbr.fr32DstFrameRate      = u32FrameRate; /* target frame rate */
+                stH264Cbr.u32Gop                = u32Gop;       /*the interval of IFrame*/
+                stH264Cbr.u32StatTime           = u32StatTime;  /* stream rate statics time(s) */
+                stH264Cbr.u32SrcFrameRate       = 25;           /* input (vi) frame rate */ //30
+                stH264Cbr.fr32DstFrameRate      = 25;           /* target frame rate */
                 // switch (enSize)
                 // {
                 //     case PIC_CIF:
@@ -953,7 +953,7 @@ HI_S32 SAMPLE_COMM_VENC_Creat(VENC_CHN VencChn, PAYLOAD_TYPE_E enType,  SIZE_S s
                 //         stH264Cbr.u32BitRate         = 1024 * 24  + 5120*u32FrameRate/30;
                 //         break;
                 // }
-                stH264Cbr.u32BitRate         = 1024 * 2 + 1024*u32FrameRate/30;
+                stH264Cbr.u32BitRate         = 1024 * 1;//+ 1024*u32FrameRate/30;
                 memcpy(&stVencChnAttr.stRcAttr.stH264Cbr, &stH264Cbr, sizeof(VENC_H264_CBR_S));
             }
             else if (SAMPLE_RC_FIXQP == enRcMode)
@@ -1366,7 +1366,7 @@ HI_S32 SAMPLE_COMM_VENC_Creat(VENC_CHN VencChn, PAYLOAD_TYPE_E enType,  SIZE_S s
 * funciton : Start venc stream mode
 * note      : rate control parameter need adjust, according your case.
 ******************************************************************************/
-HI_S32 SAMPLE_COMM_VENC_Start(VENC_CHN VencChn, PAYLOAD_TYPE_E enType,   SIZE_S stSize, SAMPLE_RC_E enRcMode, HI_U32  u32Profile, HI_BOOL bRcnRefShareBuf,VENC_GOP_ATTR_S *pstGopAttr)
+HI_S32 SAMPLE_COMM_VENC_Start(VENC_CHN VencChn, PAYLOAD_TYPE_E enType, SIZE_S stSize, SAMPLE_RC_E enRcMode, HI_U32  u32Profile, HI_BOOL bRcnRefShareBuf,VENC_GOP_ATTR_S *pstGopAttr)
 {
     HI_S32 s32Ret;
     VENC_RECV_PIC_PARAM_S  stRecvParam;

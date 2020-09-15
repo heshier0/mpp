@@ -12,6 +12,8 @@
 #define USING_SEQ
 #define STREAM_FRAME_RATE 25
 
+static int g_count = 0;
+
 typedef struct media_context
 {
 	AVFormatContext* format_ctx;			//每个通道的AVFormatContext
@@ -85,9 +87,6 @@ static BOOL add_sps_pps(unsigned char* buf, unsigned int size, int width, int he
 	g_media_ctx.format_ctx->streams[g_media_ctx.video_idx]->codecpar->extradata = (unsigned char*)av_malloc(size + AV_INPUT_BUFFER_PADDING_SIZE);
 	memcpy(g_media_ctx.format_ctx->streams[g_media_ctx.video_idx]->codecpar->extradata, buf, size);
 
-	// AVDictionary *opt = 0;
-	// av_dict_set_int(&opt, "video_track_timescale", STREAM_FRAME_RATE, 0);
-
 	ret = avformat_write_header(g_media_ctx.format_ctx, NULL);
 	if (ret < 0)
 	{
@@ -120,6 +119,7 @@ BOOL board_create_mp4_file(const char* filename)
 	int ret = 0;
 	AVOutputFormat *output_fmt = NULL;
 
+	g_count = 0;
 	memset(&g_media_ctx, 0, sizeof(g_media_ctx));
 
 	if (NULL == filename)
@@ -211,6 +211,8 @@ void board_close_mp4_file()
 	g_media_ctx.vpts_inc = 0;
 	g_media_ctx.first_video = 0;
 	g_media_ctx.first_IDR = 0;
+
+	g_count = 0;
 
 	utils_print("SAVE MP4 Successfully!\n");
 }
@@ -331,17 +333,16 @@ BOOL board_write_mp4(void* input_stream, int width, int height)
 							(enum AVRounding)(AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX));
 #else
 		#ifdef USING_SEQ
-			pkt.pts = av_rescale_q_rnd(venc_stream->u32Seq - g_media_ctx.video_pts, 
+			pkt.dts = pkt.pts = av_rescale_q_rnd(venc_stream->u32Seq - g_media_ctx.video_pts, 
 										(AVRational){1, STREAM_FRAME_RATE},
 										video_stream->time_base, 
 										(enum AVRounding)(AV_ROUND_NEAR_INF | AV_ROUND_PASS_MINMAX));
-			pkt.dts = pkt.pts;
 		#else
 			pkt.pts = pkt.dts = (long long int)((venc_stream->pstPack[i].u64PTS - g_media_ctx.video_pts) * 0.09 + 0.5);
 		#endif	
 #endif		
-		pkt.duration = 40;
-		pkt.duration = av_rescale_q(pkt.duration, (AVRational){1, STREAM_FRAME_RATE}, video_stream->time_base);
+		// pkt.duration = 40;
+		// pkt.duration = av_rescale_q(pkt.duration, (AVRational){1, STREAM_FRAME_RATE}, video_stream->time_base);
 		pkt.pos = -1;
 		pkt.data = pack_virt_addr;
 		pkt.size = pack_len;
