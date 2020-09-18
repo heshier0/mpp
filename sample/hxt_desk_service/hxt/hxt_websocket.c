@@ -18,10 +18,10 @@ typedef enum
     HEARTBEAT
 }REPORT_TYPE;
 
-static BOOL g_recv_running = TRUE;
+extern BOOL g_hxt_wbsc_running;
 
+static BOOL g_recv_running = TRUE;
 pthread_t study_info_tid;
-struct ev_loop *g_hxt_wsc_loop;
 
 static BOOL init_study_info(ReportInfo *report_info, StudyInfo *study_info)
 {
@@ -242,6 +242,7 @@ static void parse_server_config_data(void *data)
     switch(data_type)
     {
      case HXT_BASIC_CFG:
+        utils_print("To process basic config...\n");
         item = cJSON_GetObjectItem(root, "data");
         sub_item = cJSON_GetObjectItem(item, "postureCountDuration");   //不良坐姿时长判定值
         hxt_set_posture_judge_cfg(sub_item->valueint);
@@ -260,6 +261,7 @@ static void parse_server_config_data(void *data)
         hxt_reload_cfg();
     break;
     case HXT_UPDATE_REMIND:
+        utils_print("To process update...\n");
         item = cJSON_GetObjectItem(root, "data");
         sub_item = cJSON_GetObjectItem(item, "newVersionId");           //新版本id，大于0时有效
         hxt_set_version_id_cfg(sub_item->valueint);
@@ -273,40 +275,47 @@ static void parse_server_config_data(void *data)
     break;    
     case HXT_WAKE_CAMERA:
         //to wake camera
+        utils_print("To wake camera...\n");
     break;
     case HXT_USER_DATA:
+        utils_print("To process user data...\n");
         item = cJSON_GetObjectItem(root, "data");
         hxt_parse_user_data((void*)item);
         hxt_reload_cfg();
     break;       
-    case 5:
+    case HXT_ALARM_VARRY:
+        utils_print("To varry alarm file...\n");
         item = cJSON_GetObjectItem(root, "data");
         hxt_update_children_alarm_files((void*)item);
         hxt_reload_cfg();
     break;
-    case 6:
+    case HXT_STUDY_MODE_VARRRY:
         //new studyMode
+        utils_print("To varray study mode...\n");
         item = cJSON_GetObjectItem(root, "data");                           
         sub_item = cJSON_GetObjectItem(item, "studyMode");               
         hxt_set_study_mode_cfg(hxt_get_child_unid(), sub_item->valueint);
         hxt_reload_cfg();
     break;
-    case 7:
+    case HXT_BIND_CHILD_ID:
         // child unid
+        utils_print("To bind child id...\n");
         item = cJSON_GetObjectItem(root, "data");
         hxt_update_children_alarm_files((void*)item);
         hxt_reload_cfg();
     break;
-    case 8:
+    case HXT_VARY_CHILD_ID:
         //
+        utils_print("To varry child id...\n");
         item = cJSON_GetObjectItem(root, "data");
         sub_item = cJSON_GetObjectItem(item, "childrenUnid");               //设置/变更上报数据的孩子ID
-        hxt_set_child_unid(sub_item->valueint);
         stop_posture_recognize();
+        hxt_set_child_unid(sub_item->valueint);
         sleep(1);
         start_posture_recognize();
     break;
-    case 10:
+    case HXT_GET_IFLYOS_TOKEN:
+        utils_print("To update iflyos token or sn...\n");
         item = cJSON_GetObjectItem(root, "data");
         sub_item = cJSON_GetObjectItem(item, "iflyosToken");
         if (sub_item)
@@ -319,21 +328,25 @@ static void parse_server_config_data(void *data)
             hxt_set_iflyos_sn_cfg(sub_item->valuestring);
         }
     break;
-    case 14:
+    case HXT_STOP_STUDY:
         /* stop studying */
+        utils_print("To stop study...\n");
         stop_posture_recognize();
     break;
-    case 15:
+    case HXT_DISCONNECT:
         /* device deregister */
+        utils_print("To disconnect...\n");
         utils_system_reset();
         sleep(3);
         utils_system_reboot();
     break;
-    case 16:
+    case HXT_POWEROFF:
         /* power off */
+        utils_print("To poweroff...\n");
     break;
-    case 17:
+    case HXT_RESTART:
         /* restart */
+        utils_print("To restart...\n");
         utils_system_reboot();
     break;
     case 0:
@@ -348,12 +361,15 @@ static void parse_server_config_data(void *data)
         cJSON_Delete(root);
     }
 
+    utils_print("end\n");
     return;
 }
 
 static void hxt_wsc_onopen(struct uwsc_client *cl)
 {
     utils_print("hxt onopen\n");
+
+    g_hxt_wbsc_running = TRUE;
 
     hxt_send_desk_status(cl, POWER_ON, UWSC_OP_TEXT);
     pthread_create(&study_info_tid, NULL, send_study_info_cb, (void *)cl);
@@ -390,22 +406,11 @@ static void hxt_wsc_ping(struct uwsc_client *cl)
     hxt_send_desk_status(cl, HEARTBEAT, UWSC_OP_PING);
 }
 
-static void signal_cb(struct ev_loop *loop, ev_signal *w, int revents)
-{
-    if (w->signum == SIGINT) 
-    {
-        g_recv_running = FALSE;
-        ev_break(loop, EVBREAK_ALL);
-        utils_print("Normal quit\n");
-    }
-}
-
 int hxt_websocket_start()
 {
-    struct ev_loop *loop = EV_DEFAULT;
-    struct ev_signal signal_watcher;
 	int ping_interval = 120;	        /* second */
     struct uwsc_client *cl;
+    struct ev_loop *loop;
 
     char* hxt_url = hxt_get_websocket_url_cfg();
     char* token = hxt_get_token_cfg();
@@ -415,7 +420,8 @@ int hxt_websocket_start()
     strcat(extra_header, token);
     strcat(extra_header, "\r\n");
 
-    //g_hxt_wsc_loop = EV_DEFAULT;
+    loop = ev_loop_new(EVFLAG_AUTO);
+
     cl = uwsc_new(loop, hxt_url, ping_interval, extra_header);
     if (!cl)
     {
@@ -423,7 +429,7 @@ int hxt_websocket_start()
         return -1;
     }
          
-	utils_print("Hxt websocket start ...\n");
+	utils_print("%s -- Hxt websocket start ...\n", utils_get_current_time());
 
     cl->onopen = hxt_wsc_onopen;
     cl->onmessage = hxt_wsc_onmessage;
@@ -431,12 +437,13 @@ int hxt_websocket_start()
     cl->onclose = hxt_wsc_onclose;
     cl->ping = hxt_wsc_ping;
 
-
     ev_run(loop, 0);
-    //hxt_send_desk_status(cl, POWER_OFF, UWSC_OP_TEXT);
 
+    g_hxt_wbsc_running = FALSE;
     free(cl);
-       
+    
+    utils_print("Hxt websocket exit...\n");   
+
     return 0;  
 }
 

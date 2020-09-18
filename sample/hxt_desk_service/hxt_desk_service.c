@@ -13,53 +13,65 @@
 #include "common.h"
 #include "server_comm.h"
 
+BOOL g_hxt_wbsc_running = TRUE;
+BOOL g_iflyos_wbsc_running = TRUE;
+
 // static pthread_t play_tid, voice_tid, video_tid;
 static pid_t iflyos_pid = -1, hxt_pid = -1;
 static BOOL g_processing = TRUE;
 
 
-static void start_hxt_process()
+static void* hxt_websocket_cb(void* data)
 {
-    hxt_pid = fork();
-    if (hxt_pid == 0)
-    {
-        hxt_websocket_start();
-        return 0;
-    }
+    hxt_websocket_start();
+
+    return NULL;
 }
 
-static void start_iflyos_process()
+static void* iflyos_websocket_cb(void* data)
 {
-    iflyos_pid = fork();
-    if (iflyos_pid == 0)
-    {
-        iflyos_websocket_start();
-        return 0;
-    }
+    iflyos_websocket_start();
+
+    return NULL;
 }
 
-static void main_process_cycle()
+static void start_hxt_websocket_thread()
 {
-    pid_t child;
+    pthread_t hxt_tid;
+    if (hxt_get_desk_cfg_request())
+    {
+        pthread_create(&hxt_tid, NULL, hxt_websocket_cb, NULL);
+    }
+    
+    return;
+}
+
+static void start_iflyos_websocket_thread()
+{
+    pthread_t iflyos_tid;
+    if(hxt_get_iflyos_token_cfg() != NULL || hxt_get_iflyos_cae_sn() != NULL)
+    {
+        pthread_create(&iflyos_tid, NULL, iflyos_websocket_cb, NULL);
+    }
+
+    return;
+}
+
+static void check_websocket_running()
+{
     while(g_processing)
     {
-        child = waitpid(hxt_pid, NULL, WNOHANG);
-        if (child == hxt_pid)
+        if(!g_hxt_wbsc_running)
         {
-            sleep(120);
-            utils_print("hxt child process exit, restart it\n");
-            start_hxt_process();
-        }
-        
-        child = waitpid(iflyos_pid, NULL, WNOHANG);
-        if (child == iflyos_pid)
-        {
-            sleep(120);
-            utils_print("iflyos child process exit, restart it\n");
-            start_iflyos_process();
+            start_hxt_websocket_thread();
         }
 
-        sleep(5);
+        if(!g_iflyos_wbsc_running)
+        {
+            start_iflyos_websocket_thread();
+        }
+        
+        sleep(10);
     }
 }
 
@@ -136,13 +148,11 @@ static void  deploy_network()
 
 int main(int argc, char **argv)
 {
-    int st1, st2, st3;
     BOOL server_started = TRUE;
-    BOOL config_get = FALSE;
-    BOOL wifi_exist = FALSE;
+    
     utils_print("HXT V1.0.0\n");
 
-    // signal(SIGCHLD, child_process_signal_handle);
+    // signal(SIGCHLD, main_process_cycle);
 #ifdef DEBUG
     signal(SIGINT, handle_signal);
     signal(SIGTERM, handle_signal);   
@@ -154,20 +164,6 @@ int main(int argc, char **argv)
     /* init gpio */
     board_gpio_init();
 
-    /* init board media process */
-    // if (!board_mpp_init())
-    // {
-    //     utils_print("board mpp init error...\n");
-    //     goto EXIT;
-    // }
-
-    // g_play_status = TRUE;
-    // play_tid = start_play_mp3();
-    // g_voice_status = TRUE;
-    // voice_tid = start_sample_voice();
-    // g_video_status = TRUE;
-    // video_tid = start_sample_video();
-
     sleep(3);
 
     utils_send_local_voice(VOICE_DEVICE_OPEN);
@@ -178,7 +174,7 @@ int main(int argc, char **argv)
 
     connect_to_mpp_service();
 
-#if 0
+#if 1
     /* connect to hxt server */
     int connect_count = 0;
     while(connect_count < 6)
@@ -191,31 +187,16 @@ int main(int argc, char **argv)
         connect_count++;
         sleep(10*connect_count);
     }
+
     if(server_started)
     {
-        config_get = hxt_get_desk_cfg_request();
-        if (config_get)
-        {
-            start_hxt_process();
-        }
-        
-        start_iflyos_process();
-
-        main_process_cycle();
+        start_iflyos_websocket_thread();
+        start_hxt_websocket_thread();
+       
+        check_websocket_running();
     }  
 #endif
-    while(g_processing)
-    {
-        sleep(5);
-    }
-
-    
-    // g_play_status = FALSE;
-    // g_voice_status = FALSE;
-    // g_video_status = FALSE;
-
-    // board_mpp_deinit();
-EXIT:
+ EXIT:
     utils_print("~~~~EXIT~~~~\n");
     board_gpio_uninit();
     hxt_unload_cfg();

@@ -741,7 +741,7 @@ HI_S32 SAMPLE_COMM_VENC_Creat(VENC_CHN VencChn, PAYLOAD_TYPE_E enType,  SIZE_S s
                 //         stH265Vbr.u32MaxBitRate    = 1024 * 15 + 2048*u32FrameRate/30;
                 //         break;
                 // }
-                stH265Vbr.u32MaxBitRate = 1024 * 2 + 1024*u32FrameRate/30;
+                stH265Vbr.u32MaxBitRate = 1024 + 1024*u32FrameRate/30;
                 memcpy(&stVencChnAttr.stRcAttr.stH265Vbr, &stH265Vbr, sizeof(VENC_H265_VBR_S));
             }
             else if(SAMPLE_RC_AVBR == enRcMode)
@@ -976,7 +976,7 @@ HI_S32 SAMPLE_COMM_VENC_Creat(VENC_CHN VencChn, PAYLOAD_TYPE_E enType,  SIZE_S s
                 stVencChnAttr.stRcAttr.enRcMode = VENC_RC_MODE_H264VBR;
                 stH264Vbr.u32Gop           = u32Gop;
                 stH264Vbr.u32StatTime      = u32StatTime;
-                stH264Vbr.u32SrcFrameRate  = u32FrameRate;
+                stH264Vbr.u32SrcFrameRate  = 25; //u32FrameRate;
                 stH264Vbr.fr32DstFrameRate = 25; //u32FrameRate;
                 // switch (enSize)
                 // {
@@ -1011,7 +1011,7 @@ HI_S32 SAMPLE_COMM_VENC_Creat(VENC_CHN VencChn, PAYLOAD_TYPE_E enType,  SIZE_S s
                 //         stH264Vbr.u32MaxBitRate = 1024 * 15  + 2048*u32FrameRate/30;
                 //         break;
                 // }
-                stH264Vbr.u32MaxBitRate = 1024 * 2   + 1024*u32FrameRate/30;
+                stH264Vbr.u32MaxBitRate = 1024;
                 memcpy(&stVencChnAttr.stRcAttr.stH264Vbr, &stH264Vbr, sizeof(VENC_H264_VBR_S));
             }
             else if (SAMPLE_RC_AVBR == enRcMode)

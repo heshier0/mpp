@@ -5,6 +5,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
 #include <fcntl.h>
 #include <pthread.h>
 #include <errno.h>
@@ -48,9 +50,9 @@ static BOOL create_fifo(const char* name)
     {
         return FALSE;
     }
-    if (access(PCM_FIFO, F_OK) == -1)
+    if (access(fifo_name, F_OK) == -1)
     {
-        int res = mkfifo(fifo_name, 0777);
+        int res = mkfifo(fifo_name, 0666);
         if(res != 0)
         {
             utils_print("could not create fifo %s\n", fifo_name);
@@ -76,11 +78,6 @@ static int open_pcm_fifo()
     return open(PCM_FIFO, O_WRONLY);
 }
 
-static int open_mp3_fifo()
-{
-    return open(MP3_FIFO, O_RDONLY);
-}
-
 BOOL create_pcm_fifo()
 {
     return create_fifo(PCM_FIFO);
@@ -89,6 +86,11 @@ BOOL create_pcm_fifo()
 void delete_pcm_fifo()
 {
     delete_fifo(PCM_FIFO);
+}
+
+static int open_mp3_fifo()
+{
+    return open(MP3_FIFO, O_RDONLY);
 }
 
 BOOL create_mp3_fifo()
@@ -599,23 +601,14 @@ void stop_audio_system()
 
 BOOL start_video_system(int width, int height)
 {
-    stop_video_system();
+    // stop_video_system();
 
     BOOL init_result = FALSE;
-
-    // /*config vi*/
-    // init_result = start_vi();
-    // if(!init_result)
-    // {
-    //     utils_print("start vi failed\n");
-    //     return FALSE;
-    // }
 
     init_result = start_vpss(width, height);
     if(!init_result)
     {
         utils_print("start vpss failed\n");
-        // stop_vi();
         return FALSE;
     }
 
@@ -624,7 +617,6 @@ BOOL start_video_system(int width, int height)
     {
         utils_print("bind vi and vpss failed\n");
         stop_all_vpss();
-        // stop_vi();
         return FALSE;
     }
 
@@ -634,7 +626,6 @@ BOOL start_video_system(int width, int height)
         utils_print("start venc failed\n");
         unbind_vi_vpss();
         stop_all_vpss();
-        // stop_vi();
         return FALSE;
     }
     
@@ -645,7 +636,6 @@ BOOL start_video_system(int width, int height)
         stop_all_venc();
         unbind_vi_vpss();
         stop_all_vpss();
-        // stop_vi();
         return FALSE;
     }
 
@@ -657,7 +647,6 @@ BOOL start_video_system(int width, int height)
         stop_all_venc();
         unbind_vi_vpss();
         stop_all_vpss();
-        // stop_vi();
         return FALSE;
     }
 
@@ -821,6 +810,7 @@ static void* sample_pcm_cb(void *data)
     int fd = open_pcm_fifo();
     if (-1 == fd)
     {
+        utils_print("open pcm fifo error\n");
         return NULL;
     }
 
@@ -841,9 +831,8 @@ static void* sample_pcm_cb(void *data)
     /*end added*/
 
     /* get frame after AEC */
-     fd_set read_fds;
-     FD_ZERO(&read_fds);
-
+    fd_set read_fds;
+    FD_ZERO(&read_fds);
     HI_S32 AiFd;
     AiFd = HI_MPI_AI_GetFd(AiDev, AiChn);
     FD_SET(AiFd, &read_fds);
@@ -851,24 +840,17 @@ static void* sample_pcm_cb(void *data)
     struct timeval TimeoutVal;
     AEC_FRAME_S   stAecFrm;
     AUDIO_FRAME_S stFrame;
-    HI_U32 *pMicFrame = NULL;
-    HI_U32 *pReffFrame = NULL;
-    HI_U32 *pCombineFrame = NULL;
-    int idx = 0;
 
-#ifdef DEBUG
-    // FILE *pfd = fopen("original.pcm", "wb");
-#endif
     while(g_sample_pcm_status)
     {
         TimeoutVal.tv_sec = 1;
         TimeoutVal.tv_usec = 0;
-
         FD_ZERO(&read_fds);
         FD_SET(AiFd, &read_fds);
         s32Ret = select(AiFd + 1, &read_fds, NULL, NULL, &TimeoutVal);
         if(s32Ret < 0)
         {
+            utils_print("aenc stream fd error\n");
             continue;
         }
         else if (s32Ret == 0)
@@ -876,7 +858,8 @@ static void* sample_pcm_cb(void *data)
             utils_print("get aenc stream select time out\n");
             continue;
         }
-
+        char* out_buff = NULL;
+        int size = 0;
         if(FD_ISSET(AiFd, &read_fds))
         {
             /* get frame from ai chn */
@@ -887,8 +870,6 @@ static void* sample_pcm_cb(void *data)
                 utils_print("HI_MPI_AI_GetFrame(%d, %d), failed with %#x!\n",AiDev, AiChn, s32Ret);
                 continue;
             }
-            // utils_print("mic frame length is %d\n", stFrame.u32Len);
-            // utils_print("reff frame %d length is %d\n", stAecFrm.bValid, stAecFrm.stRefFrame.u32Len);
 
             if (stFrame.u32Len != stAecFrm.stRefFrame.u32Len)
             {
@@ -896,12 +877,7 @@ static void* sample_pcm_cb(void *data)
                 continue;
             }
 
-            char* out_buff = NULL;
-            int size = sample_pcm_32bit_dump(&stFrame, &stAecFrm, &out_buff);
-            /* write into fifo */
-            // fwrite(out_buff, 1, size, pfd);
-            // fflush(pfd);
-
+            size = sample_pcm_32bit_dump(&stFrame, &stAecFrm, &out_buff);
             /* finally you must release the stream */
             s32Ret = HI_MPI_AI_ReleaseFrame(AiDev, AiChn, &stFrame, &stAecFrm);
             if (HI_SUCCESS != s32Ret )
@@ -909,18 +885,19 @@ static void* sample_pcm_cb(void *data)
                 utils_print("HI_MPI_AI_ReleaseFrame(%d, %d), failed with %#x!\n", AiDev, AiChn, s32Ret);
                 continue;
             }
-
-            int write_count = write(fd, out_buff, size);
-            free(out_buff);
+            
+            if (out_buff == NULL)
+            {
+                utils_print("get pcm data NULL\n");
+                continue;
+            }  
         }
+        int write_count = write(fd, out_buff, size);
+        free(out_buff);
     }
-#ifdef DEBUG
-    // fclose(pfd);
-#endif // DEBUG 
 
 ERROR_EXIT:    
     close(fd);
-    unlink(PCM_FIFO);//?
    
     utils_print("voice sample thread exit...\n");
     return NULL;
@@ -1133,11 +1110,6 @@ void board_get_stream_from_venc_chn(int width, int height)
         return;
     }
 
-    // for test
-    time_t start = 0, end = 0;
-    int frame_count = 0;
-    FILE *pFile = NULL;
-    //
     while (g_enc_stream_status)
     {        
         FD_ZERO(&read_fds);
@@ -1162,10 +1134,6 @@ void board_get_stream_from_venc_chn(int width, int height)
             {   
                 board_create_mp4_file(s_file_name);
                 g_recording = TRUE;
-                //for test
-                start = time(NULL);
-                utils_print("create mp4\n");
-                // pFile = fopen("/user/1111.h264", "wb");
             }
 
             if (FD_ISSET(venc_fd, &read_fds))
@@ -1219,16 +1187,8 @@ void board_get_stream_from_venc_chn(int width, int height)
                 /* to save mp4 */
                 if(g_recording)
                 {   
-                    frame_count ++;
                     board_write_mp4(&venc_stream, width, height);  
                     g_start_record = FALSE;
-                    // for(int i = 0; i < venc_stream.u32PackCount; i++)
-                    // {
-                    //     fwrite(venc_stream.pstPack[i].pu8Addr + venc_stream.pstPack[i].u32Offset, 
-                    //             1, 
-                    //             venc_stream.pstPack[i].u32Len - venc_stream.pstPack[i].u32Offset, 
-                    //             pFile);
-                    // }
                 }                          
                 /*******************************************************
                  step 2.6 : release stream
@@ -1251,23 +1211,13 @@ void board_get_stream_from_venc_chn(int width, int height)
             if (g_stop_record)
             {
                 board_close_mp4_file();
-
                 g_start_record = FALSE;
                 g_recording = FALSE;
                 g_stop_record = FALSE;
-                /*test*/
-                end = time(NULL);
-                utils_print("saveTime = %ld, frame count is %d\n", end - start, frame_count);
-                frame_count = 0;
-                // fclose(pFile);
-            }
+              }
         }
     }
     g_enc_stream_status = FALSE;
-    /*test*/
-    end = time(NULL);
-    utils_print("saveTime = %ld, frame count is %d\n", end - start, frame_count);
-    frame_count = 0;
     utils_print("get venc chn stream exit...\n");
     return;
 }
@@ -1296,7 +1246,7 @@ void board_get_snap_from_venc_chn(const char* jpg_file)
     if (HI_SUCCESS != ret)
     {
         utils_print("HI_MPI_VENC_StartRecvPic faild with%#x!\n", ret);
-        return HI_FAILURE;
+        return;
     }
 
     venc_fd = HI_MPI_VENC_GetFd(venc_chn);
@@ -1423,7 +1373,7 @@ void start_play_mp3_thread()
 {
     pthread_t play_id;
     pthread_create(&play_id, NULL, play_mp3_cb, NULL);
-    pthread_detach(play_id);
+    // pthread_detach(play_id);
 
     return;
 }
@@ -1433,16 +1383,16 @@ void stop_play_mp3_thread()
     g_play_mp3_status = FALSE;
 }
 
-void start_sample_voice_thread()
+void start_sample_voice_thread(void* data)
 {
     pthread_t voice_tid;
     pthread_create(&voice_tid, NULL, sample_pcm_cb, NULL);
-    pthread_detach(voice_tid);
+    // pthread_detach(voice_tid);
 
     return;
 }
 
-void stop_sample_void_thread()
+void stop_sample_voice_thread()
 {
     g_sample_pcm_status = FALSE;
 }

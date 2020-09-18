@@ -15,12 +15,7 @@
 #define PARAM_PATH  "/userdata/config/iflyos/hlw.param"
 
 extern BOOL g_stop_capture;
-
-CAE_HANDLE cae_handle = NULL;
-FILE *frecord = NULL;
-FILE *frecog = NULL;
-FILE *fivw = NULL;
-FILE *flog = NULL;
+CAE_HANDLE g_cae_handle = NULL;
 
 static BOOL wake_up = FALSE;
 
@@ -29,32 +24,33 @@ static void ivw_fn(short angle, short channel, float power, short CMScore, short
     utils_print("angle=%d, channel=%d, power=%f, CMScore=%d, beam=%d, param1=%s\n",
                     angle, channel, power, CMScore, beam, param1);
 
-    if (flog != NULL)
-    {
-        fprintf(flog, "ivw_fn: angle=%d, channel=%d, power=%f, CMScore=%d, beam=%d, param1=%s\n",
-                    angle, channel, power, CMScore, beam, param1);
-        fflush(flog);
-    }
 	wake_up = TRUE;
 }
 
 static void ivw_audio_fn(const void* audio_data, unsigned int audio_len, int param1, const void* param2, void *userdata)
 {
-    // if (fivw != NULL)
-    // {
-    //     fwrite(audio_data, 1, audio_len, fivw);
-    //     fflush(fivw);
-    // }
-
 	struct uwsc_client *cl = (struct uwsc_client *)userdata;
+	if (NULL == cl)
+	{
+		utils_print("handle error...\n");
+		return;
+	}
+
 	if (wake_up)
 	{
 		char *req = iflyos_create_audio_in_request();
+		if (req == NULL)
+		{
+			utils_print("null error\n");
+			wake_up = FALSE;
+			return;
+		}
 		cl->send(cl, req, strlen(req), UWSC_OP_TEXT);
 		free(req);
 		wake_up = FALSE;
+		utils_print("to send voice...\n");
 	}
-
+	
 	if(!g_stop_capture)
 	{
 		cl->send(cl, audio_data, audio_len, UWSC_OP_BINARY);
@@ -63,19 +59,10 @@ static void ivw_audio_fn(const void* audio_data, unsigned int audio_len, int par
 
 static void recog_audio_fn(const void* audio_data, unsigned int audio_len, int param1, const void *param2, void *userdata)
 {
-    // if (frecog != NULL)
-    // {
-    //     fwrite(audio_data, 1, audio_len, frecog);
-    //     fflush(frecog);
-    // }
 }
 
 int iflyos_init_cae_lib(void* data)
 {
-    const char* ivw_path = "ivw.pcm";
-    const char* recog_path = "recog.pcm";
-    const char* log_path = "log.txt";
-
     int rv, i;
     char buffer[1024] = {0};
     int flag = 1;
@@ -85,7 +72,7 @@ int iflyos_init_cae_lib(void* data)
     CAESetShowLog(flag);
 #endif
 
-    rv = CAENew(&cae_handle, CONF_PATH, ivw_fn, ivw_audio_fn, recog_audio_fn, PARAM_PATH, data);
+    rv = CAENew(&g_cae_handle, CONF_PATH, ivw_fn, ivw_audio_fn, recog_audio_fn, PARAM_PATH, data);
     if (rv != 0)
     {
         return -1;
@@ -97,50 +84,14 @@ int iflyos_init_cae_lib(void* data)
         utils_print("CAE auth error\n");
     }
 
-	frecog = fopen(recog_path, "wb");
-	if (frecog == NULL) 
-    {
-		utils_print("open recog pcm error\n");
-		return -1;
-	}
-
-	fivw = fopen(ivw_path, "wb");
-	if (fivw == NULL) 
-    {
-		utils_print("open ivw pcm error\n");
-		return -1;
-	}
-
-	flog = fopen(log_path, "w");
-	if (flog == NULL) 
-    {
-		utils_print("open ivw log error\n");
-		return -1;
-	}
-
     return 0;
 }
 
 void iflyos_deinit_cae_lib()
 {
-    if (cae_handle != NULL)
+    if (g_cae_handle != NULL)
     {
-        CAEDestroy(cae_handle);
-    }
-
-    if(frecog != NULL)
-    {
-        fclose(frecog);
-    }
-
-    if(fivw != NULL)
-    {
-        fclose(fivw);
-    }
-
-    if(flog != NULL)
-    {
-        fclose(flog);
+        CAEDestroy(g_cae_handle);
     }
 }
 
@@ -152,7 +103,7 @@ int iflyos_write_audio(void* buffer, int buf_length)
 		return -1;
 	}
 
-    rv = CAEAudioWrite(cae_handle, buffer, buf_length);
+    rv = CAEAudioWrite(g_cae_handle, buffer, buf_length);
     if(rv != 0)
     {
         utils_print("cae write error: %d\n", rv);
@@ -162,7 +113,7 @@ int iflyos_write_audio(void* buffer, int buf_length)
     return rv;
 }
 
-#ifndef DEBUG
+#if 0
 #define BUFFER_SIZE (256 * 4)
 
 void test_ivw_fn(short angle, short channel, float power, short CMScore, short beam, char *param1, void *param2, void *userData)

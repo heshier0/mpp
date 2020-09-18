@@ -9,7 +9,7 @@ extern "C" {
 
 #define MP3_FIFO                "/tmp/mp3_fifo"
 #define PCM_FIFO                "/tmp/pcm_fifo"
-
+#define MPP_DATA_PORT           10099
 
 BOOL create_pcm_fifo();
 void delete_pcm_fifo();
@@ -34,7 +34,7 @@ void start_sample_video_thread(void* data);
 void stop_sample_video_thread();
 
 void start_sample_voice_thread();
-void stop_sample_void_thread();
+void stop_sample_voice_thread();
 
 void board_get_snap_from_venc_chn(const char* jpg_file);
 

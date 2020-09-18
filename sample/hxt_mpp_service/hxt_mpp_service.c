@@ -7,6 +7,9 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <pthread.h>
+#include <signal.h>
+#include <sys/file.h>
+#include <fcntl.h>
 
 #include "databuffer.h"
 #include "board_mpp.h"
@@ -101,7 +104,6 @@ static void* process_desk_business_thread(void *args)
     video_ratio_t video_ratio;
     study_video_t study_video;
 
-    int count = 0;
     while(1)
     {
         bzero(&header, len);
@@ -125,6 +127,7 @@ static void* process_desk_business_thread(void *args)
         switch (cmd)
         {
         case CMD_SETUP_VIDEO_RATIO:
+            stop_video_system();
             bzero(&video_ratio, sizeof(video_ratio_t));
             ptr = get_buffer(&g_client_data, sizeof(video_ratio_t));
             memcpy(&video_ratio, ptr, sizeof(video_ratio_t));
@@ -140,7 +143,6 @@ static void* process_desk_business_thread(void *args)
                 ptr = get_buffer(&g_client_data, sizeof(video_ratio_t));
                 memcpy(&video_ratio, ptr, sizeof(video_ratio_t));
                 release_buffer(&g_client_data, sizeof(video_ratio_t));
-                // start_video_system(video_ratio.width, video_ratio.height);  
                 start_sample_video_thread((void*)&video_ratio);
                 utils_print("start posture check\n");
             }
@@ -150,7 +152,6 @@ static void* process_desk_business_thread(void *args)
             {
                 posturing = FALSE;
                 stop_sample_video_thread();
-                // stop_video_system();
                 utils_print("stop posture check\n");
             }
         break;
@@ -166,7 +167,7 @@ static void* process_desk_business_thread(void *args)
             if (sampling)
             {
                 sampling = FALSE;
-                stop_sample_void_thread();
+                stop_sample_voice_thread();
                 utils_print("stop voice sample\n");
             }
         break;      
@@ -208,10 +209,30 @@ static void start_process_desk_business()
     pthread_detach(tid);
 }
 
+static void handle_signal(int signo)
+{
+      utils_print("sigpipe...\n");
+}
+
 int main(int argc, char **argv)
 {
     int client_fd = -1;
     struct sockaddr_in client_addr;
+
+    int lock_fd = open("./single.lock", O_RDWR | O_CREAT, 0666);
+    if(lock_fd < 1)
+    {
+        utils_print("open lock failed\n");
+        return -1;
+    }
+    int lock_err = flock(lock_fd, LOCK_EX | LOCK_NB);
+    if(lock_err == -1)
+    {
+        utils_print("lock failed\n");
+        return -2;
+    }
+
+    signal(SIGPIPE, handle_signal);
 
     socklen_t len = sizeof(len);
     int sock = create_local_tcp_server();
@@ -219,7 +240,7 @@ int main(int argc, char **argv)
     {
         return -1;
     }
-    
+   
     create_buffer(&g_client_data, BUFFER_SIZE);
 
     create_pcm_fifo();
@@ -228,14 +249,18 @@ int main(int argc, char **argv)
     if(!init_mpp())
     {
         utils_print("init mpp subsystem error.\n");
-        delete_pcm_fifo();
-        delete_mp3_fifo();
-        destroy_buffer(&g_client_data);
-        return -1;
+        goto ERR_INIT_MPP;
     }
-    start_video_system(640, 360);
+    if (!start_video_system(960, 540))
+    {
+        utils_print("init video system error.\n");
+        goto ERR_INIT_VIDEO_SYS;
+    }
     /* 系统起来就需要播放mp3 */
     start_play_mp3_thread();
+    // start_sample_voice_thread();
+
+    /* to process hxt_desk_service */
     while(1)
     {
         utils_print("Wait to recv info from other process...\n");
@@ -258,11 +283,15 @@ int main(int argc, char **argv)
 
     /*deinit*/
     stop_play_mp3_thread();
-    destroy_buffer(&g_client_data);
     stop_video_system();
+ERR_INIT_VIDEO_SYS:
     deinit_mpp();
+ERR_INIT_MPP:    
     delete_pcm_fifo();
     delete_mp3_fifo();
+    destroy_buffer(&g_client_data);
+
+    flock(lock_fd, LOCK_UN);
 
     return 0;
 }

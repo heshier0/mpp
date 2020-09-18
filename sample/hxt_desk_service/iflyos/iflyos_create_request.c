@@ -15,14 +15,15 @@ static void iflyos_create_init_header()
 {
     inited_header = (FlyosHeader *)utils_malloc(sizeof(FlyosHeader));
 
-    char* token_type = iflyos_get_token_type();
-    char* token = iflyos_get_token();
-    strcpy(inited_header->authorization, token_type);
-    strcat(inited_header->authorization, " ");
+    // char* token_type = iflyos_get_token_type();
+    char* token = iflyos_get_token();//hxt_get_iflyos_token_cfg(); 
+    strcpy(inited_header->authorization, "Bearer ");
+    // strcat(inited_header->authorization, " ");
     strcat(inited_header->authorization, token);
-
-    char* device_id = iflyos_get_device_id();
+    utils_print("token is %s\n", inited_header->authorization);
+    char* device_id = iflyos_get_device_id(); //hxt_get_desk_uuid_cfg();
     strcpy(inited_header->device_id, device_id);
+    utils_print("device id is %s\n", inited_header->device_id);
 
     char* platform_name = iflyos_get_platform_name();
     strcpy(inited_header->platform_name, platform_name);
@@ -201,20 +202,15 @@ void iflyos_deinit_request()
 char*  iflyos_create_audio_in_request()
 {
     cJSON *root = NULL;
-
     iflyos_init_request();
-
     cJSON* header_node = iflyos_create_header(inited_header);
     cJSON* context_node = iflyos_create_context(inited_context);
-    
-    
     cJSON* request_node = NULL;
 
     root = cJSON_CreateObject();
     cJSON_AddItemToObject(root, "iflyos_header", header_node);
     cJSON_AddItemToObject(root, "iflyos_context", context_node);
     cJSON_AddItemToObject(root, "iflyos_request", request_node = cJSON_CreateObject());
-
     //audio-in request
     cJSON *request_header = NULL;
     cJSON *request_payload = NULL;
@@ -237,12 +233,11 @@ char*  iflyos_create_audio_in_request()
     cJSON_AddStringToObject(payload_wakeup, "prompt", "我在");
 
     char* request = cJSON_Print(root);
-
     //for test
     cJSON_free(header_node);
     cJSON_free(context_node);
     cJSON_free(root);
-
+    
     iflyos_deinit_request();
     //end test
 

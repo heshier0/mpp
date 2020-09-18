@@ -247,11 +247,17 @@ void hxt_init_cfg(void* data)
     utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "server", "uploadHostUrl", item->valuestring);
 
     item = cJSON_GetObjectItem(returnObject, "iflyosToken");
-    utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "server", "iflyosToken", item->valuestring);
-
-    // item = cJSON_GetObjectItem(returnObject, "iflyosSN");
-    // utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "server", "iflyosSN", item->valuestring);
-
+    if(item != NULL)
+    {
+        utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "server", "iflyosToken", item->valuestring);
+    }
+    
+    item = cJSON_GetObjectItem(returnObject, "iflyosSN");
+    if(item != NULL)
+    {
+        utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "server", "iflyosSN", item->valuestring);
+    }
+    
     item = cJSON_GetObjectItem(returnObject, "postureCountDuration");
     utils_set_cfg_number_value(g_cfg_root, HXT_CFG, "device", "judgeTime", item->valueint);
 
@@ -428,8 +434,8 @@ int hxt_get_video_width_cfg()
         video_width = 1280;
         break;
     case 2:
-        // video_width = 960;
-        // break;
+        video_width = 960;
+        break;
     case 3:
         video_width = 640;
         break;    
@@ -451,8 +457,8 @@ int hxt_get_video_height_cfg()
         video_height = 720;
     break;
     case 2:
-    //     video_height = 540;
-    // break;
+        video_height = 540;
+    break;
     case 3:
         video_height = 360;
     break;
@@ -669,7 +675,7 @@ BOOL hxt_set_alarm_file_url_cfg(const  char* value)
 }
 
 BOOL hxt_set_posture_judge_cfg(int value)
-{
+{   
     return utils_set_cfg_number_value(g_cfg_root, HXT_CFG, "device", "judgeTime", value);
 }
 

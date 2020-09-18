@@ -6,6 +6,8 @@
 #define MP3_FIFO                "/tmp/mp3_fifo"
 #define PCM_FIFO                "/tmp/pcm_fifo"
 #define VIDEO_FIFO              "/tmp/video_fifo"
+#define PCM_RECV_PORT           10099
+
 
 //wifi config file
 #define WIFI_CFG                "/userdata/config/wifi.conf"

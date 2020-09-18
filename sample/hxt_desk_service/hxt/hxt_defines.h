@@ -73,7 +73,7 @@ typedef enum
 #define HXT_WAKE_CAMERA         3
 #define HXT_USER_DATA           4
 #define HXT_ALARM_VARRY         5
-#define HXT_VERIFY_CODE         6
+#define HXT_STUDY_MODE_VARRRY   6
 #define HXT_BIND_CHILD_ID       7
 #define HXT_VARY_CHILD_ID       8
 #define HXT_GET_IFLYOS_TOKEN    10
