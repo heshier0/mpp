@@ -13,6 +13,7 @@
 #include "utils.h"
 #include "common.h"
 #include "server_comm.h"
+#include "hxt_defines.h"
 
 #define NORMAL_POSTURE_STATUS         0
 #define BAD_POSTURE_STATUS            1
@@ -65,7 +66,6 @@ static char g_mp4_file[128] = {0};
 static char g_snap_file[128] = {0};
 static int g_msg_qid;
 
-#define SELF_DEF_VOICE ("/user/child_%d/alarm/P00%d.mp3")
 static void play_random_warn_voice()
 {
     char* voice[5] = {VOICE_SITTING_WARM1, VOICE_SITTING_WARM2, VOICE_SITTING_WARM3, VOICE_SITTING_WARM4, VOICE_SITTING_WARM5};  
@@ -86,7 +86,7 @@ static void play_random_warn_voice()
         break;
         case 3:
             bzero(self_def_voice, 128);
-            sprintf(self_def_voice, SELF_DEF_VOICE, chlid_unid, idx);
+            sprintf(self_def_voice, HXT_CHILD_ALARM_FILE, chlid_unid, idx);
             utils_send_local_voice(self_def_voice);
         default:
             utils_send_local_voice(voice[idx]);
@@ -300,11 +300,11 @@ static BOOL check_posture_alarm(struct check_status_t *check_status, int check_r
             check_status->_start_posture = check_result;
             check_status->_start_time = now;
         } 
-        // StudyInfo info;
-        // memset(&info, 0, sizeof(StudyInfo));
-        // info.info_type = BAD_POSTURE;
-        // strcpy(info.file, g_mp4_file);
-        // strcpy(info.snap, g_snap_file);
+        StudyInfo info;
+        memset(&info, 0, sizeof(StudyInfo));
+        info.info_type = BAD_POSTURE;
+        strcpy(info.file, g_mp4_file);
+        strcpy(info.snap, g_snap_file);
         // send_study_report_type(&info);                  
     break;
     case AWAY_STATUS:
@@ -454,7 +454,6 @@ void start_posture_recognize()
         return;
     }
     g_keep_processing = TRUE;
-
 
     PostureParams params;
     memset(&params, 0, sizeof(PostureParams));

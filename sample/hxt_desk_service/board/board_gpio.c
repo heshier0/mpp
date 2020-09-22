@@ -64,6 +64,7 @@ static BOOL system_booting = TRUE;
 static BOOL net_connecting = FALSE;
 static BOOL system_reset = FALSE;
 static BOOL qrcode_scanning = FALSE;
+static BOOL ao_mute = FALSE;
 
 static int gpio_set_value(struct gpiod_line *line, int value)
 {
@@ -126,6 +127,7 @@ static void* check_inc_vol_event(void *param)
 {
     struct gpiod_line_event event;
     time_t start = 0, end = 0;
+    BOOL already_max = FALSE;
     while(1)
      {
         gpiod_line_event_wait(btn_vol_inc, NULL);
@@ -149,20 +151,25 @@ static void* check_inc_vol_event(void *param)
             }
             else
             {
-                // int current_vol = 0;
-                // HI_MPI_AO_GetVolume(ao_dev, &current_vol);
-                // if(current_vol == 5)
-                // {
-                //     /*already max*/
-                // }
-                // else
-                // {
-                //     HI_MPI_AO_SetVolume(ao_dev, current_vol+14);
-                // }
-                int width[3] = {1280, 640, 320};
-                int height[3] = {720, 360, 180};
-                int idx = rand() % 3;
-                send_setup_video_ratio_cmd(width[idx], height[idx]);
+                int current_vol = 0;
+                if(ao_mute)
+                {
+                    HI_MPI_AO_SetMute(ao_dev, HI_FALSE, NULL);
+                    ao_mute = FALSE;
+                }  
+
+                HI_MPI_AO_GetVolume(ao_dev, &current_vol);
+                utils_print("volume now is %d\n", current_vol);
+                if(current_vol == 5 && !already_max)
+                {
+                    /*already max*/
+                    utils_send_local_voice(VOICE_VOLUME_MAX);
+                    already_max = TRUE;
+                }
+                else
+                {
+                    HI_MPI_AO_SetVolume(ao_dev, current_vol+10);
+                }
             }
         }
 
@@ -200,13 +207,15 @@ static void* check_dec_vol_event(void *param)
             {
                 int current_vol = 0;
                 HI_MPI_AO_GetVolume(ao_dev, &current_vol);
-                if(current_vol == -112)
+                utils_print("volume now is %d\n", current_vol);
+                if(current_vol == -85)
                 {
                     HI_MPI_AO_SetMute(ao_dev, HI_TRUE, NULL);
+                    ao_mute = TRUE;
                 }
                 else
                 {
-                    HI_MPI_AO_SetVolume(ao_dev, current_vol-14);
+                    HI_MPI_AO_SetVolume(ao_dev, current_vol-10);
                 }
             }
         }

@@ -75,7 +75,6 @@ static BOOL init_study_info(ReportInfo *report_info, StudyInfo *study_info)
             report_info->snap_url = utils_malloc(256);
         }
         hxt_file_upload_request(study_info->snap, report_info->snap_url);
-
     }
     report_info->camera_status = hxt_get_camera_status();
 
@@ -205,7 +204,6 @@ static void* send_study_info_cb(void *params)
         cJSON_AddNumberToObject(data_item, "cameraStatus", report_info.camera_status);
 
         char* json_data = cJSON_PrintUnformatted(root);
-        // char *json_data = cJSON_Print(root);
         if (NULL == json_data)
         {
             goto CLEAR;
@@ -377,8 +375,6 @@ static void hxt_wsc_onopen(struct uwsc_client *cl)
 
 static void hxt_wsc_onmessage(struct uwsc_client *cl,void *data, size_t len, bool binary)
 {
-    utils_print("hxt recv:\n");
-
     if (binary) {
         //文件
     } 
@@ -439,9 +435,8 @@ int hxt_websocket_start()
 
     ev_run(loop, 0);
 
-    g_hxt_wbsc_running = FALSE;
     free(cl);
-    
+    g_hxt_wbsc_running = FALSE;
     utils_print("Hxt websocket exit...\n");   
 
     return 0;  

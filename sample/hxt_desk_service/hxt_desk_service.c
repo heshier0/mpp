@@ -12,6 +12,7 @@
 #include "utils.h"
 #include "common.h"
 #include "server_comm.h"
+#include "report_info_db.h"
 
 BOOL g_hxt_wbsc_running = TRUE;
 BOOL g_iflyos_wbsc_running = TRUE;
@@ -63,12 +64,14 @@ static void check_websocket_running()
     {
         if(!g_hxt_wbsc_running)
         {
+            sleep(120);
             start_hxt_websocket_thread();
         }
 
         if(!g_iflyos_wbsc_running)
         {
-            start_iflyos_websocket_thread();
+            sleep(120);
+           start_iflyos_websocket_thread();
         }
         
         sleep(10);
@@ -149,7 +152,7 @@ static void  deploy_network()
 int main(int argc, char **argv)
 {
     BOOL server_started = TRUE;
-    
+
     utils_print("HXT V1.0.0\n");
 
     // signal(SIGCHLD, main_process_cycle);
@@ -158,6 +161,8 @@ int main(int argc, char **argv)
     signal(SIGTERM, handle_signal);   
 #endif
 
+
+#if 1
     /* load config */
     hxt_load_cfg();
 
@@ -166,15 +171,21 @@ int main(int argc, char **argv)
 
     sleep(3);
 
+    HI_MPI_AO_SetVolume(0, -35);
+    sleep(1);
     utils_send_local_voice(VOICE_DEVICE_OPEN);
 
     board_stop_boot_led_blinking();
 
-    // deploy_network();
+    deploy_network();
 
+    /* check time by ntp */
+    ntp_sync_time();
+
+    /* to c onnect to mpp service */
     connect_to_mpp_service();
 
-#if 1
+
     /* connect to hxt server */
     int connect_count = 0;
     while(connect_count < 6)
@@ -190,17 +201,17 @@ int main(int argc, char **argv)
 
     if(server_started)
     {
-        start_iflyos_websocket_thread();
         start_hxt_websocket_thread();
-       
+        start_iflyos_websocket_thread();
+
         check_websocket_running();
     }  
-#endif
+
  EXIT:
     utils_print("~~~~EXIT~~~~\n");
     board_gpio_uninit();
     hxt_unload_cfg();
-
+#endif
     
 
     return 0;

@@ -12,6 +12,8 @@ SMP_SRCS += $(wildcard $(PWD)/board/*.c)
 SMP_SRCS += $(wildcard $(PWD)/utils/*.c)
 SMP_SRCS += $(wildcard $(PWD)/ipc/*.c)
 SMP_SRCS += $(wildcard $(PWD)/posture/*.c)
+SMP_SRCS += $(wildcard $(PWD)/ntp/*.c)
+SMP_SRCS += $(wildcard $(PWD)/db/*.c)
 
 ROOT_DIR = $(shell pwd)
 SUBDIRS  = $(shell ls -l | grep ^d | awk '{if($$9 != "output") print $$9}')
@@ -27,7 +29,8 @@ INCS = -I$(ROOT_DIR)/. \
        -I/mnt/g/workspace/plugins/libgpiod/include \
        -I/mnt/g/workspace/plugins/opencv4/include/opencv4 \
        -I/mnt/g/workspace/plugins/libsitposture/include \
-       -I/mnt/g/workspace/plugins/iflyos/include
+       -I/mnt/g/workspace/plugins/iflyos/include \
+       -I/mnt/g/workspace/plugins/sqlite3/include
  
 LIBS = -L/mnt/g/workspace/plugins/libev/lib -lev \
        -L/mnt/g/workspace/plugins/cjson/lib -lcjson \
@@ -42,7 +45,8 @@ LIBS = -L/mnt/g/workspace/plugins/libev/lib -lev \
        -L/mnt/g/workspace/plugins/libgpiod/lib -lgpiod \
        -L/mnt/g/workspace/plugins/libsitposture/lib -lsitposture \
        -L/mnt/g/workspace/plugins/libsitPostrecog/lib -lsitPostrecog \
-       -L/mnt/g/workspace/plugins/iflyos/lib -lhlw
+       -L/mnt/g/workspace/plugins/iflyos/lib -lhlw \
+       -L/mnt/g/workspace/plugins/sqlite3/lib -lsqlite3
 
 LIBS +=  -L$(REL_LIB) -lsecurec -lnnie
 LIBS += -L/mnt/g/workspace/plugins/opencv4/lib -lopencv_core -lopencv_calib3d -lopencv_dnn -lopencv_features2d -lopencv_flann -lopencv_highgui -lopencv_imgcodecs -lopencv_imgproc -lopencv_ml -lopencv_objdetect

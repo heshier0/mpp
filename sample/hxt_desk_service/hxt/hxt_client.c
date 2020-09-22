@@ -46,7 +46,6 @@ static char* hxt_get_api_url(const char* api)
     strcat(request_url, api);
 
     char* ret_value = (char*)utils_calloc(strlen(request_url) + 1);
-    memset(ret_value, 0, strlen(request_url) + 1);
     if(NULL == ret_value)
     {
         return NULL;
@@ -348,11 +347,12 @@ BOOL hxt_get_desk_cfg_request()
     if(!utils_post_json_data(api_url, header, NULL, out, 1024*2))
     {
         utils_print("post data send failed\n");
+        utils_free(out);
         utils_free(header);
         utils_free(api_url);
         return FALSE;
     } 
-    utils_print("response length is [%s]\n", out);
+    utils_print("response is [%s]\n", out);
 
     int status_code = hxt_get_reponse_status_code((void *)out);
     if (status_code == HXT_OK)
@@ -434,7 +434,7 @@ BOOL hxt_file_upload_request(const char* filename, char* server_file_path)
     char* header = NULL;
     char* out = NULL;
 
-    if(NULL == filename || NULL == server_file_path)
+    if(NULL == filename || 0 == strlen(filename) || NULL == server_file_path)
     {
         return FALSE;
     }
@@ -443,7 +443,7 @@ BOOL hxt_file_upload_request(const char* filename, char* server_file_path)
     char url[256] = {0};
     sprintf(url, HXT_UPLOAD_FILE, child_unid);
 
-    utils_print("To upload %s ...\n", filename);
+    utils_print("To upload %s...\n", filename);
     while((!uploaded) && (retry_count < 3))
     {
         upload_url = hxt_get_upload_url(url);
@@ -458,6 +458,7 @@ BOOL hxt_file_upload_request(const char* filename, char* server_file_path)
         if (out != NULL)
         {
             utils_free(out);
+            out = NULL;
         }
         out = (char*)utils_malloc(1024);
         utils_upload_file(upload_url, header, filename, out, 1024);
@@ -487,7 +488,11 @@ BOOL hxt_file_upload_request(const char* filename, char* server_file_path)
         }
     }
 
-    utils_free(out);
+    if (out != NULL)
+    {
+        utils_free(out);
+    }
+    
     utils_free(header);
     utils_free(upload_url);
     

@@ -440,7 +440,7 @@ int hxt_get_video_width_cfg()
         video_width = 640;
         break;    
     default:
-        video_width = 640;
+        video_width = 960;
         break;
     }
 
@@ -463,7 +463,7 @@ int hxt_get_video_height_cfg()
         video_height = 360;
     break;
     default:
-        video_height = 360;
+        video_height = 540;
     break;
     }
 

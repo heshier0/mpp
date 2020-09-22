@@ -567,16 +567,16 @@ BOOL start_audio_system()
     }
 
     //设置音量
-    s32Ret = HI_MPI_AO_SetVolume(AoDev, -30);
-    if (s32Ret != HI_SUCCESS)
-    {
-        utils_print("ret=%d\n",s32Ret);
-        SAMPLE_COMM_AUDIO_AoUnbindAdec(AoDev, AoChn, AdChn);
-        SAMPLE_COMM_AUDIO_StopAdec(AdChn);
-        SAMPLE_COMM_AUDIO_StopAo(AoDev, s32AoChnCnt, HI_FALSE);
-        SAMPLE_COMM_AUDIO_StopAi(AiDev, s32AiChnCnt, HI_FALSE, HI_TRUE);
-        return FALSE;
-    }
+    // s32Ret = HI_MPI_AO_SetVolume(AoDev, -30);
+    // if (s32Ret != HI_SUCCESS)
+    // {
+    //     utils_print("ret=%d\n",s32Ret);
+    //     SAMPLE_COMM_AUDIO_AoUnbindAdec(AoDev, AoChn, AdChn);
+    //     SAMPLE_COMM_AUDIO_StopAdec(AdChn);
+    //     SAMPLE_COMM_AUDIO_StopAo(AoDev, s32AoChnCnt, HI_FALSE);
+    //     SAMPLE_COMM_AUDIO_StopAi(AiDev, s32AiChnCnt, HI_FALSE, HI_TRUE);
+    //     return FALSE;
+    // }
     
     return TRUE;
 }
@@ -1372,6 +1372,8 @@ void stop_sample_video_thread()
 void start_play_mp3_thread()
 {
     pthread_t play_id;
+
+    g_play_mp3_status =  TRUE;
     pthread_create(&play_id, NULL, play_mp3_cb, NULL);
     // pthread_detach(play_id);
 
@@ -1386,6 +1388,8 @@ void stop_play_mp3_thread()
 void start_sample_voice_thread(void* data)
 {
     pthread_t voice_tid;
+
+    g_sample_pcm_status = TRUE;
     pthread_create(&voice_tid, NULL, sample_pcm_cb, NULL);
     // pthread_detach(voice_tid);
 

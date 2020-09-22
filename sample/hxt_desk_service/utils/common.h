@@ -73,17 +73,10 @@ typedef struct study_info_s
     char snap[128];
 }StudyInfo;
 
-typedef struct study_info_msg_s
-{
-    long msg_type;
-    StudyInfo* info;
-}StudyInfoMsg;
-
-
 typedef struct report_info_s
 {
-    int child_unid; 
     int parent_unid;
+    int child_unid; 
     int report_type;
     char *study_date;
     char *report_time;
@@ -94,8 +87,8 @@ typedef struct report_info_s
     int camera_status;
 }ReportInfo;
 
-
 #pragma pack(pop)
+
 
 int g_play_status;
 int g_voice_status;

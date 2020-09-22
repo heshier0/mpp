@@ -211,7 +211,7 @@ static void start_process_desk_business()
 
 static void handle_signal(int signo)
 {
-      utils_print("sigpipe...\n");
+    //   system("/userdata/bin/HxtDeskService");
 }
 
 int main(int argc, char **argv)
@@ -219,7 +219,7 @@ int main(int argc, char **argv)
     int client_fd = -1;
     struct sockaddr_in client_addr;
 
-    int lock_fd = open("./single.lock", O_RDWR | O_CREAT, 0666);
+    int lock_fd = open("/tmp/.single.lock", O_RDWR | O_CREAT, 0666);
     if(lock_fd < 1)
     {
         utils_print("open lock failed\n");

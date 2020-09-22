@@ -549,7 +549,6 @@ BOOL utils_post_json_data(const char *url, const char* header_content, const cha
             pclose(fp);
             return FALSE;
         }
-        // out[out_length-1] = '\0';
     }
     pclose(fp);
 
@@ -636,6 +635,14 @@ char* utils_time_to_string()
     ltime = localtime(&t);
     strftime(str_time, 20, "%Y-%m-%d %H:%M:%S", ltime);
     return str_time;
+}
+
+int utils_string_to_time(const char* str_time) 
+{
+    if (NULL == str_time)
+    {
+        return 0;
+    }
 }
 
 char* utils_get_file_md5sum(const char* file_name)

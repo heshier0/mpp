@@ -18,7 +18,7 @@
 
 #include "iflyos_defines.h"
 
-#define BUFFER_SIZE     (8*1024*1024)
+#define BUFFER_SIZE     (4*1024*1024)
 #define PCM_LENGTH      640
 
 extern BOOL g_iflyos_wbsc_running;
@@ -120,7 +120,6 @@ static void iflyos_uwsc_onopen(struct uwsc_client *cl)
 static void iflyos_uwsc_onmessage(struct uwsc_client *cl,
 	void *data, size_t len, bool binary)
 {
-    utils_print("iflyos recv:\n");
     utils_print("%s: [%.*s]\n", utils_get_current_time(), (int)len, (char *)data);
     
     if (binary) {
