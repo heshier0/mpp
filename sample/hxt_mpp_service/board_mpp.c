@@ -155,7 +155,7 @@ static void unbind_vpss_venc()
 
 /* two vi */
 /* sensor0: sony imx307, use library with imx327*/
-/* sensor1: jx f23*/
+/* sensor0: sony imx307, use library with imx327*/
 static BOOL start_vi()
 {
     BOOL ret = TRUE;

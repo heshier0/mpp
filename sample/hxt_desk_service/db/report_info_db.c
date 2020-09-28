@@ -1,42 +1,7 @@
 #include "report_info_db.h"
 #include "common.h"
+#include "utils.h"
 
-#define DB_PATH     ("/userdata/data/desk.db")
-
-static sqlite3 *report_info_db;
-
-
-BOOL open_report_info_db()
-{
-    int result = sqlite3_open(DB_PATH, &report_info_db);
-    if (result != 0)
-    {
-        utils_print("open database %s failed, errcode=%d\n", DB_PATH, result);
-        return FALSE;
-    }
-
-    utils_print("open database %s OK\n", DB_PATH);
-
-    return TRUE;
-}
-
-BOOL close_report_info_db()
-{
-    if (NULL == report_info_db)
-    {
-        utils_print("database is NULL\n");
-        return TRUE;
-    }
-
-    int result = sqlite3_close(report_info_db);
-    if (result != 0)
-    {
-        utils_print("close database failed, errcode=%d\n", result);
-        return FALSE;
-    }
-
-    return TRUE;
-}
 
 BOOL create_report_info_table()
 {
@@ -53,7 +18,7 @@ BOOL create_report_info_table()
                                                     duration INTEGER,\
                                                     videoUrl TEXT, \
                                                     snapVrl TEXT)";
-    result = sqlite3_exec(report_info_db, sql, NULL, NULL, &err_msg);
+    result = sqlite3_exec(g_hxt_service_db, sql, NULL, NULL, &err_msg);
     if (result != SQLITE_OK)
     {
         utils_print("create table failed:%s\n", err_msg);
@@ -75,18 +40,153 @@ BOOL add_report_info(void* data)
     {
         return FALSE;
     }
+    ReportInfo *info = (ReportInfo *)data;
 
-    ReportInfo* info = (ReportInfo *)data;
-    
     /* change date from string to int */
-    int report_time = 0;
-
-    const char* insert_sql = "INSERT INTO report_table VALUES(%d, %d, %d, %d, %d, %d, %d, \"%s\", \"%s\")";
-    sprintf(sql, insert_sql, info->parent_unid, info->child_unid, info->report_type, report_time, 
+    const char* insert_sql = "INSERT INTO report_table VALUES(NULL, %d, %d, %d, \"%s\", %d, %d, %d, \"%s\", \"%s\")";
+    sprintf(sql, insert_sql, info->parent_unid, info->child_unid, info->report_type, info->report_time, 
                                 info->study_mode, info->camera_status, info->duration, info->video_url, info->snap_url);
-    // result = sqlite3_prepare_v2(report_info_db, sql, strlen(sql), &stmt, NULL);
+    utils_print("sql:[%s]\n", sql);
+    result = sqlite3_exec(g_hxt_service_db, sql, NULL, NULL, &err_msg);
+    if (result != SQLITE_OK)
+    {
+        utils_print("insert data failed:%s\n", err_msg);
+        sqlite3_free(err_msg);
 
+        return FALSE;
+    }
+         
+    return TRUE;
+}
 
-    return  0;
+BOOL del_report_info(int id)
+{
+    char *err_msg;
+    char sql[1024] = {0};
+    int result;
+
+    if (id < 0)
+    {
+        return FALSE;
+    }
+    const char *del_sql = "DELETE FROM report_table WHERE id=%d"; 
+    sprintf(sql, del_sql, id);
+    utils_print("sql:[%s]\n", sql);
+    result = sqlite3_exec(g_hxt_service_db, sql, NULL, NULL, &err_msg);
+    if (result != SQLITE_OK)
+    {
+        utils_print("delete data failed:%s\n", err_msg);
+        sqlite3_free(err_msg);
+
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+BOOL del_report_info_expired()
+{
+    char *err_msg;
+    int result;
+
+    const char *del_sql = "DELETE FROM report_table WHERE DATE('NOW','-7 DAY') >= DATE(reportTime)"; 
+    utils_print("sql:[%s]\n", del_sql);
+    result = sqlite3_exec(g_hxt_service_db, del_sql, NULL, NULL, &err_msg);
+    if (result != SQLITE_OK)
+    {
+        utils_print("delete data failed:%s\n", err_msg);
+        sqlite3_free(err_msg);
+
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+int get_report_info_count()
+{
+    char *err_msg;
+    int result;
+    char **db_result;
+    int row_count, col_count;
+
+    const char *select_sql = "SELECT * from report_table";
+    utils_print("sql:[%s]\n", select_sql);
+    result = sqlite3_get_table(g_hxt_service_db, select_sql, &db_result, &row_count, &col_count, &err_msg);
+    if (result != SQLITE_OK)
+    {
+        utils_print("select data failed:%s\n", err_msg);
+        sqlite3_free(err_msg);
+        sqlite3_free_table(db_result);
+        return -1;        
+    }
+    sqlite3_free_table(db_result);
+
+    return row_count;
+}
+
+int get_amount_records_of_day()
+{
+    char *err_msg;
+    int result;
+    char **db_result;
+    int row_count, col_count;
+
+    const char* query_sql = "SELECT COUNT(*) FROM report_table WHERE reportTime>=datetime('now', 'start of day', '+0 day') and \
+                             reportTime<datetime('now', 'start of day', '+1 day')";
+
+    result = sqlite3_get_table(g_hxt_service_db, query_sql, &db_result, &row_count, &col_count, &err_msg);
+    if (result != SQLITE_OK)
+    {
+        utils_print("select data failed:%s\n", err_msg);
+        sqlite3_free(err_msg);
+        sqlite3_free_table(db_result);
+        return -1;        
+    }
+    sqlite3_free_table(db_result);                         
+   
+   return row_count; 
+}
+
+BOOL update_mp4_url(int id, const char *url)
+{
+    char *err_msg;
+    int result;
+    char sql[1024] = {0};
+
+    const char *update_sql = "UPDATE report_table SET videoUrl= %s WHERE ID=%d";
+    sprintf(sql, update_sql, id, url);
+    utils_print("sql:[%s]\n", sql);
+    result = sqlite3_exec(g_hxt_service_db, sql, NULL, NULL, &err_msg);
+    if (result != SQLITE_OK)
+    {
+        utils_print("delete data failed:%s\n", err_msg);
+        sqlite3_free(err_msg);
+
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+BOOL update_snap_url(int id, const char *url)
+{
+        char *err_msg;
+    int result;
+    char sql[1024] = {0};
+
+    const char *update_sql = "UPDATE report_table SET snapUrl= %s WHERE ID=%d";
+    sprintf(sql, update_sql, id, url);
+    utils_print("sql:[%s]\n", sql);
+    result = sqlite3_exec(g_hxt_service_db, sql, NULL, NULL, &err_msg);
+    if (result != SQLITE_OK)
+    {
+        utils_print("delete data failed:%s\n", err_msg);
+        sqlite3_free(err_msg);
+
+        return FALSE;
+    }
+
+    return TRUE;
 }
 

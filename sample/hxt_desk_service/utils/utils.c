@@ -637,12 +637,19 @@ char* utils_time_to_string()
     return str_time;
 }
 
-int utils_string_to_time(const char* str_time) 
+int utils_change_time_format(const char* str_time) 
 {
     if (NULL == str_time)
     {
         return 0;
     }
+    struct tm t;
+    char buf[255] = {0};
+    memset(&t, 0, sizeof(struct tm));
+    strptime(str_time, "%Y-%m-%d %H:%M:%S", &t);
+    time_t tt = mktime(&t);
+
+    return (int)tt;
 }
 
 char* utils_get_file_md5sum(const char* file_name)

@@ -797,60 +797,6 @@ EXIT:
     return reported;
 }
 
-BOOL hxt_check_wifi_data_request()
-{
-    BOOL reported = FALSE;
-    char* api_url = hxt_get_api_url(HXT_CHECK_WIFI_DATA);
-    if(NULL == api_url)
-    {
-        goto CLEANUP5;
-    }
-
-    //post json data to server
-    cJSON *root = cJSON_CreateObject();    
-    if (NULL == root)
-    {
-        goto CLEANUP4;
-    }
-    cJSON_AddNumberToObject(root, "ssid", hxt_get_wifi_ssid_cfg());
-    cJSON_AddNumberToObject(root, "bssid", hxt_get_wifi_bssid_cfg());
-    cJSON_AddNumberToObject(root, "pwd", hxt_get_wifi_pwd_cfg());
-    cJSON_AddNumberToObject(root, "checkCode", hxt_get_wifi_check_code_cfg());
-    
-    char* json_data = cJSON_PrintUnformatted(root);
-    if (NULL == json_data)
-    {
-        goto CLEANUP3;
-    }
-    utils_print("%s\n", json_data);
-    //save response data
-    char* out = (char*)utils_malloc(1024);
-    if(!utils_post_json_data(api_url, "", json_data, out, 1024))
-    {
-        utils_print("post data send failed\n");
-        goto CLEANUP1;
-    } 
-    utils_print("response length is [%s]\n", out);
-    int status_code = hxt_get_reponse_status_code(out);
-    if (status_code == HXT_OK)
-    {
-        reported = TRUE;
-        
-        // char* desc = hxt_get_response_description(out);
-        // hxt_set_desk_sn_code(desc);
-    } 
-
-CLEANUP1:  
-    utils_free(out);
-    // utils_free(json_data);
-CLEANUP3:   
-    cJSON_Delete(root);
-CLEANUP4:
-    utils_free(api_url);
-CLEANUP5:
-    return reported;
-}
-
 BOOL hxt_confirm_desk_bind_request()
 {
     BOOL reported = FALSE;
@@ -868,7 +814,7 @@ BOOL hxt_confirm_desk_bind_request()
     }
     cJSON_AddStringToObject(root, "deskCode", hxt_get_desk_uuid_cfg());
     cJSON_AddStringToObject(root, "snCode", board_get_sn());
-    
+    cJSON_AddStringToObject(root, "checkCode", hxt_get_wifi_check_code_cfg());
     char* json_data = cJSON_PrintUnformatted(root);
     if (NULL == json_data)
     {
@@ -918,7 +864,7 @@ BOOL hxt_bind_desk_with_wifi_request()
     cJSON_AddStringToObject(root, "checkCode", hxt_get_wifi_check_code_cfg());
     cJSON_AddStringToObject(root, "snCode", board_get_sn());
     char* desk_uunid_tmp = hxt_get_init_desk_uuid();
-    if(desk_uunid_tmp != NULL)
+    if(desk_uunid_tmp != NULL && strlen(desk_uunid_tmp) != 0)
     {
         cJSON_AddStringToObject(root, "deskCode", desk_uunid_tmp);
         uuid_exist = TRUE;
@@ -950,7 +896,9 @@ BOOL hxt_bind_desk_with_wifi_request()
         if (!uuid_exist)
         {
             char *uuid = hxt_get_response_description(out);
+            utils_print("desk uuid is %s\n", uuid);
             hxt_set_desk_uuid_cfg(uuid);
+            hxt_reload_cfg();
             /* write into init config,and never erase it*/
             hxt_store_desk_uuid(uuid);
             free(uuid);

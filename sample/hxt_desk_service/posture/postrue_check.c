@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <pthread.h>
 #include <fcntl.h>
 #include <sys/time.h>
@@ -14,17 +15,18 @@
 #include "common.h"
 #include "server_comm.h"
 #include "hxt_defines.h"
+#include "report_info_db.h"
 
 #define NORMAL_POSTURE_STATUS         0
 #define BAD_POSTURE_STATUS            1
 #define AWAY_STATUS                   2
 
-#define FIRST_DEPART_ALARM_TIMEVAL       (3*60)
-#define LAST_DEPART_ALARM_TIMEVAL         (5*60)         
-#define ALARM_TIMEVAL              (3*60)          
-#define BAD_ALARM_TIMEVAL           (10)
-#define CORRECT_JUDGE_TIMEVAL       (5)             
-#define MIN_DURATION_TIME           (3)
+#define FIRST_DEPART_ALARM_TIMEVAL          (3*60)
+#define LAST_DEPART_ALARM_TIMEVAL           (5*60)         
+#define ALARM_TIMEVAL                       (3*60)          
+#define BAD_ALARM_TIMEVAL                   (10)
+#define CORRECT_JUDGE_TIMEVAL               (5)             
+#define MIN_DURATION_TIME                   (3)
 
 /*
 * width: 识别图像宽度
@@ -53,15 +55,15 @@ typedef struct check_status_t
     int _last_posture;
 };
 
+extern BOOL g_hxt_wbsc_running;
+
 static void* g_recog_handle = NULL;
 static pthread_t g_proc_yuv_tid = NULL;
 static BOOL g_keep_processing = FALSE;
-
 static BOOL g_is_recording = FALSE;
 static BOOL g_is_inited = FALSE;
 static BOOL g_first_alarm = TRUE;
 static BOOL g_first_away = TRUE;
-
 static char g_mp4_file[128] = {0};
 static char g_snap_file[128] = {0};
 static int g_msg_qid;
@@ -71,7 +73,7 @@ static void play_random_warn_voice()
     char* voice[5] = {VOICE_SITTING_WARM1, VOICE_SITTING_WARM2, VOICE_SITTING_WARM3, VOICE_SITTING_WARM4, VOICE_SITTING_WARM5};  
     char self_def_voice[128] = {0};  
     int chlid_unid = hxt_get_child_unid();
-    int alarm_type = hxt_get_alarm_type_cfg();
+    int alarm_type = hxt_get_alarm_type_cfg(chlid_unid);
     int idx = rand() % 5;
     switch(alarm_type)
     {
@@ -111,11 +113,41 @@ static void take_rest(int time_ms)
     select(0, NULL, NULL, NULL, &timeout);
 }
 
+/* cmd with mpp service, to control record or snap */
 static BOOL begin_recording()
 {
+    /* if no child bind, no need record */
+    int child_unid = hxt_get_child_unid();
+    if (child_unid == -1)
+    {
+        return FALSE;
+    }
+
     if(!g_is_recording)
     {
-        send_recording_mp4_cmd();
+        time_t now = time(0);
+        struct tm *_tm = localtime(&now);
+        
+        bzero(g_mp4_file, 128);
+        bzero(g_snap_file, 128);
+        snprintf(g_mp4_file, 128, "/user/child_%d/video/%04d%02d%02d-%02d%02d%02d.mp4",
+                            child_unid,
+                            _tm->tm_year + 1900,
+                            _tm->tm_mon + 1, 
+                            _tm->tm_mday,
+                            _tm->tm_hour,
+                            _tm->tm_min,
+                            _tm->tm_sec);
+
+        snprintf(g_snap_file, 128, "/user/child_%d/snap/%04d%02d%02d-%02d%02d%02d.jpg",
+                                child_unid,
+                                _tm->tm_year + 1900,
+                                _tm->tm_mon + 1, 
+                                _tm->tm_mday,
+                                _tm->tm_hour,
+                                _tm->tm_min,
+                                _tm->tm_sec);
+        send_recording_mp4_cmd(g_mp4_file, g_snap_file);
         g_is_recording = TRUE;
         utils_print("%s -----> Begin record\n", utils_get_current_time());
     }
@@ -143,6 +175,50 @@ static void stop_record()
     }
 }
 
+static BOOL send_study_report_type(StudyInfo *info)
+{
+    /* if no child bind, no need to send message */
+    int child_unid = hxt_get_child_unid();
+    if (child_unid == -1)
+    {
+        utils_print("no child binded\n");
+        return FALSE;
+    }
+
+    if (g_hxt_wbsc_running)
+    {
+        /* online mode */
+        info->msg_type = 1;
+        if (msgsnd(g_msg_qid, (void*)info, sizeof(StudyInfo) - sizeof(long), 0) < 0)
+        {
+            utils_print("send study info msg failed, %s\n", strerror(errno));
+            return FALSE;
+        }
+    }
+    else
+    {
+        /* offline mode */
+        ReportInfo report_info;
+        bzero(&report_info, sizeof(ReportInfo));
+        report_info.camera_status = hxt_get_camera_status();
+        report_info.parent_unid = hxt_get_parent_unid_cfg();
+        report_info.child_unid = hxt_get_child_unid();
+        report_info.report_type = info->info_type;
+        strcpy(report_info.study_date, utils_date_to_string());
+        strcpy(report_info.report_time, utils_time_to_string());
+        report_info.study_mode = hxt_get_study_mode_cfg(report_info.child_unid);
+        if (report_info.report_type == BAD_POSTURE)
+        {
+            report_info.duration = 10;
+            strcpy(report_info.video_url, info->file);
+            strcpy(report_info.snap_url, info->snap);
+        }
+        add_report_info((void *)&report_info);
+    }
+    
+    return TRUE;
+}
+
 static BOOL init_check_status(struct check_status_t *check_status, int check_result)
 {
     if(!g_is_inited)
@@ -158,18 +234,6 @@ static BOOL init_check_status(struct check_status_t *check_status, int check_res
     }
 
     return FALSE;
-}
-
-static BOOL send_study_report_type(StudyInfo *info)
-{
-    info->msg_type = 1;
-    if (msgsnd(g_msg_qid, (void*)info, sizeof(StudyInfo) - sizeof(long), 0) < 0)
-    {
-        utils_print("send study info msg failed, %s\n", strerror(errno));
-        return FALSE;
-    }
-    // utils_print("msg send over, study info type is %d\n", info->info_type);
-    return TRUE;
 }
 
 /* confirm if change to normal posture */
@@ -243,7 +307,7 @@ static BOOL check_posture_changed(struct check_status_t *check_status, int check
                 StudyInfo info;
                 memset(&info, 0, sizeof(StudyInfo));
                 info.info_type = CHILD_BACK;
-                // send_study_report_type(&info);
+                send_study_report_type(&info);
             }
 
             check_status->_start_posture = check_result;
@@ -305,7 +369,7 @@ static BOOL check_posture_alarm(struct check_status_t *check_status, int check_r
         info.info_type = BAD_POSTURE;
         strcpy(info.file, g_mp4_file);
         strcpy(info.snap, g_snap_file);
-        // send_study_report_type(&info);                  
+        send_study_report_type(&info);                  
     break;
     case AWAY_STATUS:
         if(interval >= FIRST_DEPART_ALARM_TIMEVAL)
@@ -333,7 +397,7 @@ static BOOL check_posture_alarm(struct check_status_t *check_status, int check_r
             StudyInfo info;
             memset(&info, 0, sizeof(StudyInfo));
             info.info_type = CHILD_AWAY;
-            // send_study_report_type(&info);
+            send_study_report_type(&info);
         }
     break;    
     default:
@@ -385,7 +449,7 @@ static void* thread_proc_yuv_data_cb(void *param)
     StudyInfo info;
     memset(&info, 0, sizeof(StudyInfo));
     info.info_type = STUDY_BEGIN;
-    // send_study_report_type(&info);
+    send_study_report_type(&info);
 
     unsigned char *yuv_buf = NULL;
     utils_print("To process yuv data from vpss ....\n");
@@ -422,7 +486,7 @@ static void* thread_proc_yuv_data_cb(void *param)
             yuv_buf = NULL;
         }
 
-        take_rest(100); 
+        // take_rest(100); 
     }
     /* prevent some fragmentary video*/
     delete_recorded();
@@ -437,8 +501,7 @@ static void* thread_proc_yuv_data_cb(void *param)
     /* send msg to notify ending */
     memset(&info, 0, sizeof(StudyInfo));
     info.info_type = STUDY_END;
-    // send_study_report_type(&info);
-
+    send_study_report_type(&info);
     utils_send_local_voice(VOICE_CAMERA_SLEEP);
 
     utils_print("rocognize thread exit...\n");
@@ -448,6 +511,20 @@ static void* thread_proc_yuv_data_cb(void *param)
 
 void start_posture_recognize()
 {
+    int bind_status = hxt_get_desk_bind_status_cfg();
+    if (bind_status != 1)
+    {
+        utils_print("Desk not binded\n");
+        return;
+    }
+
+    /* get config */
+    if (!hxt_get_desk_cfg_request())
+    {
+        utils_print("Get config from server failed\n");
+        return;
+    }
+
 
     if (g_keep_processing)
     {
@@ -465,14 +542,17 @@ void start_posture_recognize()
     params.study_mode = hxt_get_study_mode_cfg();
     
     /* get posture pattern file */
-    char *model_path1 = hxt_get_posture_detect_model_path_cfg();
-    char *model_path2 = hxt_get_posture_class_model_path_cfg();
+    int study_mode = hxt_get_study_mode_cfg();
+
+    char *model_path1 = hxt_get_posture_detect_model_path_cfg(study_mode);
+    char *model_path2 = hxt_get_posture_class_model_path_cfg(study_mode);
     if(NULL == model_path1 || NULL == model_path2)
     {
         return;
     }
     
     send_posture_start_cmd(params.height, params.width);
+
     utils_send_local_voice(VOICE_NORMAL_STATUS);
 
     // init 

@@ -7,8 +7,10 @@
 
 #include "server_comm.h"
 
+
 #define FLASH_TIMES         3
 #define LED_SLEEP_TIME      (200*1000)
+
 /*
 ** LED状态 **
 -----           ---------           ---------          ------ 
@@ -65,6 +67,11 @@ static BOOL net_connecting = FALSE;
 static BOOL system_reset = FALSE;
 static BOOL qrcode_scanning = FALSE;
 static BOOL ao_mute = FALSE;
+static LED_STATUS led_status = BOOTING;
+
+
+extern BOOL g_hxt_wbsc_running;
+extern BOOL g_device_sleeping;
 
 static int gpio_set_value(struct gpiod_line *line, int value)
 {
@@ -77,6 +84,32 @@ static int gpio_set_value(struct gpiod_line *line, int value)
 static int gpio_get_value(struct gpiod_line *line)
 {
     return gpiod_line_get_value(line);
+}
+
+/* led status func */
+static void set_camera_led_off()
+{
+    gpio_set_value(led_camera_green, 1);
+    gpio_set_value(led_camera_blue, 1);
+    gpio_set_value(led_camera_red, 1);
+}
+
+static void set_wifi_led_off()
+{
+    gpio_set_value(led_wifi_blue, 1);
+    gpio_set_value(led_wifi_red, 1);
+    gpio_set_value(led_wifi_green, 1);
+}
+
+static void board_led_all_off()
+{
+    set_camera_led_off();
+
+    set_wifi_led_off();
+
+    gpio_set_value(led_mute_green, 1);
+    gpio_set_value(led_mute_blue, 1);
+    gpio_set_value(led_mute_red, 1);
 }
 
 static void* check_reset_event(void *param)
@@ -104,7 +137,7 @@ static void* check_reset_event(void *param)
             printf("inteval is %ld\n", end - start);
             if (end - start > 5)
             {
-                board_start_reset_led_blinking();
+                board_set_led_status(RESETING);
                 /* reset */
                 utils_system_reset();
                 utils_system_reboot();
@@ -253,7 +286,7 @@ static void* check_posture_event(void *param)
             if (end - start > 3)
             {
                 /* standby */
-                board_led_all_off();
+               board_set_led_status(SLEEPING);
                 
             }
             else
@@ -261,10 +294,12 @@ static void* check_posture_event(void *param)
                 if (!posture_running)
                 {
                     posture_running = TRUE;
+                    board_set_led_status(CHECKING);
                     start_posture_recognize();   
                 }
                 else
                 {
+                    board_set_led_status(NORMAL);
                     stop_posture_recognize();   
                     posture_running = FALSE;  
                 }
@@ -283,20 +318,21 @@ static void* check_scan_qrcode_event(void *param)
         {
             qrcode_scanning = TRUE;
 
+            board_set_led_status(BINDING);
+
             if(first_notice)
             {
-                utils_send_local_voice(VOICE_SCAN_QRCODE);
+                utils_send_local_voice(VOICE_DEPLOYING_NET);
+                sleep(10);
                 first_notice = FALSE;
             }
 
-            board_start_connect_led_blinking();
-            
             printf("To scan qrcode....\n");
             inc_vol_pressed = dec_vol_pressed = FALSE;
             while (!get_qrcode_yuv_buffer())
             {
-                utils_send_local_voice(VOICE_WIFI_BIND_ERROR);
-                sleep(3);
+                utils_send_local_voice(VOICE_QUERY_WIFI_ERROR);
+                sleep(12);
                 continue;
             }
             break;
@@ -311,32 +347,44 @@ static void* check_scan_qrcode_event(void *param)
 
 static void* led_blinking_thread(void* param)
 {
+    BOOL changed_to_normal = FALSE;
     while(1)
     {
-        if(system_booting)
+        time_t t = time(0);
+        switch(led_status)
         {
+        case BOOTING:
             gpio_set_value(led_camera_blue, 0);
             gpio_set_value(led_wifi_blue, 0);
             usleep(200 * 1000);
             gpio_set_value(led_camera_blue, 1);
             gpio_set_value(led_wifi_blue, 1);
             usleep(200 * 1000);
-        }
-
-        if(net_connecting)
-        {
-            gpio_set_value(led_wifi_blue, 1);
-            gpio_set_value(led_wifi_red, 1);
-            gpio_set_value(led_wifi_green, 0);
-            usleep(200 * 1000);
+        break;
+        case NO_BIND:
+            set_camera_led_off();
+            gpio_set_value(led_wifi_blue, 0);
+        break;
+        case BINDING:
             gpio_set_value(led_wifi_green, 1);
             usleep(200 * 1000);
-        }
-
-        if(system_reset)
-        {
-            time_t t = time(0);
-            while( (t - time(0)) <= 2)
+            gpio_set_value(led_wifi_green, 0);
+            usleep(200 * 1000);
+            gpio_set_value(led_camera_green, 0);
+        break;
+        case CHECKING:
+            gpio_set_value(led_camera_green, 0);
+            gpio_set_value(led_wifi_green, 0);
+        break;
+        case WIFI_ERR:
+            gpio_set_value(led_wifi_red, 0);
+        break;
+        case CAMERA_ERR:
+            set_camera_led_off();
+            gpio_set_value(led_camera_red, 0);
+        break;
+        case RESETING:
+            while( (time(0) - t) <= 2)
             {
                 gpio_set_value(led_wifi_green, 0);
                 gpio_set_value(led_camera_green, 0);
@@ -346,10 +394,98 @@ static void* led_blinking_thread(void* param)
                 usleep(200 * 1000);
             }
             board_led_all_off();
+        break;
+        case SLEEPING:
+            board_led_all_off();
+        break;
+        case NORMAL:
+        default:    
+            set_camera_led_off();
+            if (!changed_to_normal)
+            {
+                set_wifi_led_off();
+                changed_to_normal = TRUE;
+            }
+            gpio_set_value(led_wifi_green, 0);
+        break;
         }
     }
 
     return NULL;
+}
+
+static void board_listen_button_event()
+{
+    pthread_t t1, t2, t3, t4, t5;
+    pthread_create(&t1, NULL, check_inc_vol_event, NULL);
+    pthread_create(&t2, NULL, check_dec_vol_event, NULL);
+    pthread_create(&t3, NULL, check_scan_qrcode_event, NULL);
+    pthread_create(&t4, NULL, check_posture_event, NULL);
+    pthread_create(&t5, NULL, check_reset_event, NULL);
+}
+
+static void init_wifi_led()
+{
+    led_wifi_red = gpiod_chip_get_line(gpio0, 1);
+    gpiod_line_request_output(led_wifi_red, "HxtDeskService", GPIOD_LINE_ACTIVE_STATE_HIGH);
+    led_wifi_blue = gpiod_chip_get_line(gpio2, 4);
+    gpiod_line_request_output(led_wifi_blue, "HxtDeskService", GPIOD_LINE_ACTIVE_STATE_HIGH);
+    led_wifi_green = gpiod_chip_get_line(gpio9, 2);
+    gpiod_line_request_output(led_wifi_green, "HxtDeskService", GPIOD_LINE_ACTIVE_STATE_HIGH);
+
+    return;
+}
+
+static void init_camera_led()
+{
+    led_camera_blue = gpiod_chip_get_line(gpio2, 5);
+    gpiod_line_request_output(led_camera_blue, "HxtDeskService", GPIOD_LINE_ACTIVE_STATE_HIGH);
+    led_camera_red = gpiod_chip_get_line(gpio2, 6);
+    gpiod_line_request_output(led_camera_red, "HxtDeskService", GPIOD_LINE_ACTIVE_STATE_HIGH);
+    led_camera_green = gpiod_chip_get_line(gpio2, 7);
+    gpiod_line_request_output(led_camera_green, "HxtDeskService", GPIOD_LINE_ACTIVE_STATE_HIGH);
+
+    return;
+}
+
+static void init_mute_led()
+{
+    led_mute_red = gpiod_chip_get_line(gpio9, 4);
+    gpiod_line_request_output(led_mute_red, "HxtDeskService", GPIOD_LINE_ACTIVE_STATE_HIGH);
+    led_mute_blue = gpiod_chip_get_line(gpio0, 5);
+    gpiod_line_request_output(led_mute_blue, "HxtDeskService", GPIOD_LINE_ACTIVE_STATE_HIGH);
+    led_mute_green = gpiod_chip_get_line(gpio10, 1);
+    gpiod_line_request_output(led_mute_green, "HxtDeskService", GPIOD_LINE_ACTIVE_STATE_HIGH);
+
+    return;
+}
+
+static void init_btn_events()
+{
+    btn_mute = gpiod_chip_get_line(gpio10, 6);
+    gpiod_line_request_both_edges_events(btn_mute, "HxtDeskService");
+    btn_reset = gpiod_chip_get_line(gpio5, 7);
+    gpiod_line_request_both_edges_events(btn_reset, "HxtDeskService");
+    btn_vol_dec = gpiod_chip_get_line(gpio8, 2);
+    gpiod_line_request_both_edges_events(btn_vol_dec, "HxtDeskService");
+    btn_vol_inc = gpiod_chip_get_line(gpio8, 4);
+    gpiod_line_request_both_edges_events(btn_vol_inc, "HxtDeskService");
+}
+
+static void board_led_blinking()
+{
+    pthread_t tid; 
+    pthread_create(&tid, NULL, led_blinking_thread, NULL);
+}
+
+void board_set_led_status(status)
+{
+    led_status = status;
+}
+
+BOOL board_get_qrcode_scan_status()
+{
+    return qrcode_scanning;
 }
 
 int board_gpio_init()
@@ -361,48 +497,18 @@ int board_gpio_init()
     gpio9 = gpiod_chip_open_by_name("gpiochip9");
     gpio10 = gpiod_chip_open_by_name("gpiochip10");
 
-    /* button */
-    btn_mute = gpiod_chip_get_line(gpio10, 6);
-    gpiod_line_request_both_edges_events(btn_mute, "HxtDeskService");
-    btn_reset = gpiod_chip_get_line(gpio5, 7);
-    gpiod_line_request_both_edges_events(btn_reset, "HxtDeskService");
-    btn_vol_inc = gpiod_chip_get_line(gpio8, 2);
-    gpiod_line_request_both_edges_events(btn_vol_inc, "HxtDeskService");
-    btn_vol_dec = gpiod_chip_get_line(gpio8, 4);
-    gpiod_line_request_both_edges_events(btn_vol_dec, "HxtDeskService");
-
     /* led */
-    led_wifi_red = gpiod_chip_get_line(gpio0, 1);
-    gpiod_line_request_output(led_wifi_red, "HxtDeskService", GPIOD_LINE_ACTIVE_STATE_HIGH);
-    led_wifi_blue = gpiod_chip_get_line(gpio2, 4);
-    gpiod_line_request_output(led_wifi_blue, "HxtDeskService", GPIOD_LINE_ACTIVE_STATE_HIGH);
-    led_wifi_green = gpiod_chip_get_line(gpio9, 2);
-    gpiod_line_request_output(led_wifi_green, "HxtDeskService", GPIOD_LINE_ACTIVE_STATE_HIGH);
-
-    led_camera_blue = gpiod_chip_get_line(gpio2, 5);
-    gpiod_line_request_output(led_camera_blue, "HxtDeskService", GPIOD_LINE_ACTIVE_STATE_HIGH);
-    led_camera_red = gpiod_chip_get_line(gpio2, 6);
-    gpiod_line_request_output(led_camera_red, "HxtDeskService", GPIOD_LINE_ACTIVE_STATE_HIGH);
-    led_camera_green = gpiod_chip_get_line(gpio2, 7);
-    gpiod_line_request_output(led_camera_green, "HxtDeskService", GPIOD_LINE_ACTIVE_STATE_HIGH);
-
-    led_mute_red = gpiod_chip_get_line(gpio9, 4);
-    gpiod_line_request_output(led_mute_red, "HxtDeskService", GPIOD_LINE_ACTIVE_STATE_HIGH);
-    led_mute_blue = gpiod_chip_get_line(gpio0, 5);
-    gpiod_line_request_output(led_mute_blue, "HxtDeskService", GPIOD_LINE_ACTIVE_STATE_HIGH);
-    led_mute_green = gpiod_chip_get_line(gpio10, 1);
-    gpiod_line_request_output(led_mute_green, "HxtDeskService", GPIOD_LINE_ACTIVE_STATE_HIGH);
-
-
-    /* button event */
-    pthread_t t1, t2, t3, t4, t5;
-    pthread_create(&t1, NULL, check_inc_vol_event, NULL);
-    pthread_create(&t2, NULL, check_dec_vol_event, NULL);
-    pthread_create(&t3, NULL, check_scan_qrcode_event, NULL);
-    pthread_create(&t4, NULL, check_posture_event, NULL);
-    pthread_create(&t5, NULL, check_reset_event, NULL);
-    board_listen_posture_event();
+    init_wifi_led();
+    init_camera_led();
+    init_mute_led();
+    /*led blinking*/
     board_led_blinking();
+
+    /* button */
+    init_btn_events();
+    /* button event */
+    board_listen_button_event();
+
 
     return 0;
 }
@@ -433,76 +539,3 @@ void board_gpio_uninit()
     return;
 }
 
-void board_led_blinking()
-{
-    pthread_t tid; 
-    pthread_create(&tid, NULL, led_blinking_thread, NULL);
-}
-
-void board_stop_boot_led_blinking()
-{
-    system_booting = FALSE;
-
-    gpio_set_value(led_camera_blue, 1);
-    gpio_set_value(led_camera_green, 0);
-    gpio_set_value(led_wifi_blue, 0);
-}
-
-void board_start_connect_led_blinking()
-{
-    net_connecting = TRUE;
-}
-
-void board_stop_connect_led_blinking()
-{
-    net_connecting = FALSE;
-
-    gpio_set_value(led_wifi_blue, 1);
-    gpio_set_value(led_wifi_red, 1);
-    gpio_set_value(led_wifi_green, 0);
-}
-
-void board_start_reset_led_blinking()
-{
-    system_reset = TRUE;
-}
-
-void board_listen_posture_event()
-{
-    pthread_t tid;
-    pthread_create(&tid, NULL, check_posture_event, NULL);
-}
-
-void board_led_camera_error()
-{
-    gpio_set_value(led_camera_green, 1);
-    gpio_set_value(led_camera_blue, 1);
-    gpio_set_value(led_camera_red, 0);
-}
-
-void board_led_wifi_error()
-{
-    gpio_set_value(led_wifi_green, 1);
-    gpio_set_value(led_wifi_blue, 1);
-    gpio_set_value(led_wifi_red, 0);
-}
-
-void board_led_all_off()
-{
-    gpio_set_value(led_wifi_green, 1);
-    gpio_set_value(led_wifi_blue, 1);
-    gpio_set_value(led_wifi_red, 1);
-
-    gpio_set_value(led_camera_green, 1);
-    gpio_set_value(led_camera_blue, 1);
-    gpio_set_value(led_camera_red, 1);
-
-    gpio_set_value(led_mute_green, 1);
-    gpio_set_value(led_mute_blue, 1);
-    gpio_set_value(led_mute_red, 1);
-}
-
-BOOL board_get_qrcode_scan_status()
-{
-    return qrcode_scanning;
-}

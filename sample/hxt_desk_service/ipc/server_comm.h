@@ -11,7 +11,7 @@ int send_posture_start_cmd(int width, int height);
 int send_posture_stop_cmd();
 int send_voice_sample_start_cmd();
 int send_voice_sample_stop_cmd();
-int send_recording_mp4_cmd();
+int send_recording_mp4_cmd(const char* video_file, const char* snap_file);
 int send_delete_mp4_cmd();
 int send_stop_record_mp4_cmd();
 

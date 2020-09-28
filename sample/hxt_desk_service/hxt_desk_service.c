@@ -14,25 +14,25 @@
 #include "server_comm.h"
 #include "report_info_db.h"
 
-BOOL g_hxt_wbsc_running = TRUE;
-BOOL g_iflyos_wbsc_running = TRUE;
+volatile BOOL g_hxt_wbsc_running = FALSE;
+volatile BOOL g_iflyos_wbsc_running = FALSE;
+volatile BOOL g_device_sleeping = FALSE;
+volatile BOOL g_iflyos_first_login = TRUE;
+volatile BOOL g_hxt_first_login = TRUE;
 
-// static pthread_t play_tid, voice_tid, video_tid;
+
 static pid_t iflyos_pid = -1, hxt_pid = -1;
 static BOOL g_processing = TRUE;
-
 
 static void* hxt_websocket_cb(void* data)
 {
     hxt_websocket_start();
-
     return NULL;
 }
 
 static void* iflyos_websocket_cb(void* data)
 {
     iflyos_websocket_start();
-
     return NULL;
 }
 
@@ -49,8 +49,13 @@ static void start_hxt_websocket_thread()
 
 static void start_iflyos_websocket_thread()
 {
+    if (!g_hxt_wbsc_running)
+    {
+        return;
+    }
+
     pthread_t iflyos_tid;
-    if(hxt_get_iflyos_token_cfg() != NULL || hxt_get_iflyos_cae_sn() != NULL)
+    if(hxt_get_iflyos_token_cfg() != NULL && hxt_get_iflyos_cae_sn() != NULL)
     {
         pthread_create(&iflyos_tid, NULL, iflyos_websocket_cb, NULL);
     }
@@ -60,21 +65,24 @@ static void start_iflyos_websocket_thread()
 
 static void check_websocket_running()
 {
+    time_t begin, end;
+    begin = time(NULL);
     while(g_processing)
     {
-        if(!g_hxt_wbsc_running)
+        end = time(NULL);
+        if (end - begin >= 10)
         {
-            sleep(120);
-            start_hxt_websocket_thread();
-        }
+            if(!g_hxt_wbsc_running)
+            {
+                start_hxt_websocket_thread();
+            }
 
-        if(!g_iflyos_wbsc_running)
-        {
-            sleep(120);
-           start_iflyos_websocket_thread();
+            if(!g_iflyos_wbsc_running)
+            {
+                start_iflyos_websocket_thread();
+            }
         }
-        
-        sleep(10);
+        sleep(20);
     }
 }
 
@@ -86,7 +94,7 @@ static void handle_signal(int signo)
     }
 }
 
-static void  deploy_network()
+static void  hxt_bind_user()
 {
     BOOL first_notice = TRUE;
 
@@ -97,17 +105,15 @@ static void  deploy_network()
         {
             /* step into qrcode scan */
             sleep(3);
-            // utils_send_local_voice(VOICE_SCAN_QRCODE);
             continue;
         }
-
+        utils_send_local_voice(VOICE_QUERY_WIFI_INFO);
         /* to connect wifi */
         if (!utils_check_wifi_state())
         {
             utils_link_wifi(hxt_get_wifi_ssid_cfg(), hxt_get_wifi_pwd_cfg());
+            sleep(10);
         }
-        
-        sleep(5);
         
         /*link ok, play voice*/
         if (utils_check_wifi_state())
@@ -119,24 +125,18 @@ static void  deploy_network()
             }
             else
             {
+                utils_send_local_voice(VOICE_SERVER_CONNECT_OK);
                 if(!board_get_qrcode_scan_status())
                 {
                     if (hxt_bind_desk_with_wifi_request())
                     {
-                        board_stop_connect_led_blinking();
-
-                        hxt_confirm_desk_bind_request();
-
-                        utils_send_local_voice(VOICE_WIFI_BIND_OK);
-                        hxt_set_desk_bind_status_cfg(1);
-
-                        break;
+                        if (hxt_confirm_desk_bind_request())
+                        {
+                            hxt_set_desk_bind_status_cfg(1);
+                            break;
+                        }
                     }
-                    else
-                    {
-                        utils_send_local_voice(VOICE_WIFI_BIND_ERROR);
-                        sleep(5);
-                    }
+                    sleep(5);
                 }
             }
         }
@@ -145,23 +145,23 @@ static void  deploy_network()
             utils_disconnect_wifi();
         }
     }
-    
+    board_set_led_status(NORMAL);
     return;
 }
 
 int main(int argc, char **argv)
 {
+    utils_print("%s\n", HXT_DESK_SERVICE_VERSION);
+    
     BOOL server_started = TRUE;
 
-    utils_print("HXT V1.0.0\n");
-
-    // signal(SIGCHLD, main_process_cycle);
 #ifdef DEBUG
     signal(SIGINT, handle_signal);
     signal(SIGTERM, handle_signal);   
 #endif
-
-
+    
+    open_hxt_service_db();
+    
 #if 1
     /* load config */
     hxt_load_cfg();
@@ -169,22 +169,19 @@ int main(int argc, char **argv)
     /* init gpio */
     board_gpio_init();
 
-    sleep(3);
-
     HI_MPI_AO_SetVolume(0, -35);
     sleep(1);
     utils_send_local_voice(VOICE_DEVICE_OPEN);
+    board_set_led_status(NO_BIND);
+    sleep(5);
+    /* bind user */
+    hxt_bind_user();
 
-    board_stop_boot_led_blinking();
-
-    deploy_network();
-
-    /* check time by ntp */
+    /* sync time to ntp.ntsc.ac.cn */
     ntp_sync_time();
 
     /* to c onnect to mpp service */
     connect_to_mpp_service();
-
 
     /* connect to hxt server */
     int connect_count = 0;
@@ -208,11 +205,12 @@ int main(int argc, char **argv)
     }  
 
  EXIT:
-    utils_print("~~~~EXIT~~~~\n");
     board_gpio_uninit();
     hxt_unload_cfg();
-#endif
     
+#endif
+    close_hxt_service_db();
+    utils_print("~~~~EXIT~~~~\n");
 
     return 0;
 }

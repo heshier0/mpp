@@ -30,6 +30,9 @@ int utils_open_fifo(const char* name, int mode);
 char* utils_date_to_string();
 //display format "yyyy-mm-dd HH:MM:SS" 
 char* utils_time_to_string();
+//change "yyyy-mm-dd HH:MM:SS" to integer
+int utils_change_time_format(const char* str_time);
+
 char* utils_get_file_md5sum(const char* file_name);
 int utils_split_file_to_chunk(const char* path);
 unsigned long utils_get_file_size(const char* path);

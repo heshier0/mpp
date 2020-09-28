@@ -21,7 +21,9 @@
 #define BUFFER_SIZE     (4*1024*1024)
 #define PCM_LENGTH      640
 
+extern BOOL g_hxt_wbsc_running;
 extern BOOL g_iflyos_wbsc_running;
+extern BOOL g_iflyos_first_login;
 
 DATABUFFER g_voice_buffer;
 static BOOL g_sampling = FALSE;
@@ -115,6 +117,14 @@ static void iflyos_uwsc_onopen(struct uwsc_client *cl)
 
     /* send cmd to tell service */
     send_voice_sample_start_cmd();
+
+    /* */
+    if (g_iflyos_first_login)
+    {
+        utils_send_local_voice(VOICE_IFLYOS_READY);
+        g_iflyos_first_login = FALSE;
+    }
+    
 }
 
 static void iflyos_uwsc_onmessage(struct uwsc_client *cl,

@@ -19,6 +19,7 @@ typedef enum
 }REPORT_TYPE;
 
 extern BOOL g_hxt_wbsc_running;
+extern BOOL g_hxt_first_login;
 
 static BOOL g_recv_running = TRUE;
 pthread_t study_info_tid;
@@ -35,80 +36,21 @@ static BOOL init_study_info(ReportInfo *report_info, StudyInfo *study_info)
         utils_print("Study info type ERROR\n");
         return FALSE;
     }
-    memset(report_info, 0, sizeof(report_info));
-
+    report_info->camera_status = hxt_get_camera_status();
     report_info->parent_unid = hxt_get_parent_unid_cfg();
-
     report_info->child_unid = hxt_get_child_unid();
-
     report_info->report_type = study_info->info_type;
-
-    char* study_date = utils_date_to_string();
-    if(report_info->study_date == NULL)
-    {
-        report_info->study_date = utils_malloc(strlen(study_date) + 1);
-    }
-    strcpy(report_info->study_date, study_date);
-
-    char* report_time = utils_time_to_string();
-    if (report_info->report_time == NULL)
-    {
-        report_info->report_time = utils_malloc(strlen(report_time) + 1);
-    }
-    strcpy(report_info->report_time, report_time);
-
+    strcpy(report_info->study_date, utils_date_to_string());
+    strcpy(report_info->report_time, utils_time_to_string());
     report_info->study_mode = hxt_get_study_mode_cfg(report_info->child_unid);
-
     if (report_info->report_type == BAD_POSTURE)
     {
         report_info->duration = 10;
-        
-        /* send video */        
-        if (report_info->video_url == NULL)
-        {
-            report_info->video_url = utils_malloc(256);
-        }
         hxt_file_upload_request(study_info->file, report_info->video_url);
-
-        if (report_info->snap_url == NULL)
-        {
-            report_info->snap_url = utils_malloc(256);
-        }
         hxt_file_upload_request(study_info->snap, report_info->snap_url);
     }
-    report_info->camera_status = hxt_get_camera_status();
-
+    
     return TRUE;
-}
-
-static void deinit_study_nifo(ReportInfo *report_info)
-{
-    if (NULL == report_info)
-    {
-        return;
-    }
-    if(report_info->video_url != NULL)
-    {
-        utils_free(report_info->video_url);
-        report_info->video_url = NULL;
-    }
-    if(report_info->snap_url != NULL)
-    {
-        utils_free(report_info->snap_url);
-        report_info->snap_url = NULL;
-    }
-    if(report_info->study_date != NULL)
-    {
-        utils_free(report_info->study_date);
-        report_info->study_date = NULL;
-    }
-    if(report_info->report_time != NULL)
-    {
-        utils_free(report_info->report_time);
-        report_info->report_time = NULL;
-    }
-
-    return;
 }
 
 static void hxt_send_desk_status(struct uwsc_client *cl, REPORT_TYPE type, int info_type)
@@ -163,11 +105,12 @@ static void* send_study_info_cb(void *params)
     if (msqid < 0)
     {
         utils_print("get message queue id error\n");
-        return -1;
+        return NULL;
     }
 
     while (g_recv_running)
     {
+        bzero(&info, sizeof(info));
         utils_print("To wait study report .....\n");
         if (-1 == msgrcv(msqid, &info, sizeof(StudyInfo) - sizeof(long), 1, 0))
         {
@@ -175,7 +118,7 @@ static void* send_study_info_cb(void *params)
             continue;
         }
         utils_print("study report type is %d\n", info.info_type);
-        memset(&report_info, 0, sizeof(report_info));
+        bzero(&report_info, sizeof(report_info));
         init_study_info(&report_info, &info);
         //post json data to server
         cJSON *root = cJSON_CreateObject();    
@@ -215,10 +158,10 @@ CLEAR:
         {
             cJSON_Delete(root);
         }
-
-        deinit_study_nifo(&report_info);
     }
     msgctl(msqid, IPC_RMID, 0);
+
+    return NULL;
 }
 
 static void parse_server_config_data(void *data)
@@ -318,13 +261,16 @@ static void parse_server_config_data(void *data)
         sub_item = cJSON_GetObjectItem(item, "iflyosToken");
         if (sub_item)
         {
+            utils_print("to update iflyos token");
             hxt_set_iflyos_token_cfg(sub_item->valuestring);
         }
-        sub_item = cJSON_GetObjectItem(item, "iflosID");
+        sub_item = cJSON_GetObjectItem(item, "iflyosID");
         if (sub_item)
         {
+            utils_print("to update iflyos id");
             hxt_set_iflyos_sn_cfg(sub_item->valuestring);
         }
+        hxt_reload_cfg();
     break;
     case HXT_STOP_STUDY:
         /* stop studying */
@@ -371,6 +317,13 @@ static void hxt_wsc_onopen(struct uwsc_client *cl)
 
     hxt_send_desk_status(cl, POWER_ON, UWSC_OP_TEXT);
     pthread_create(&study_info_tid, NULL, send_study_info_cb, (void *)cl);
+
+
+    // if (g_hxt_first_login)
+    // {
+        
+    //     g_hxt_first_login = FALSE;
+    // }
 }
 
 static void hxt_wsc_onmessage(struct uwsc_client *cl,void *data, size_t len, bool binary)
@@ -388,12 +341,14 @@ static void hxt_wsc_onmessage(struct uwsc_client *cl,void *data, size_t len, boo
 static void hxt_wsc_onerror(struct uwsc_client *cl, int err, const char *msg)
 {
     utils_print("hxt onerror:%d: %s\n", err, msg);
+    g_recv_running = FALSE;
     ev_break(cl->loop, EVBREAK_ALL);
 }
 
 static void hxt_wsc_onclose(struct uwsc_client *cl, int code, const char *reason)
 {
     utils_print("hxt onclose:%d: %s\n", code, reason);
+    g_recv_running = FALSE;
     ev_break(cl->loop, EVBREAK_ALL);
 }
 
@@ -436,6 +391,7 @@ int hxt_websocket_start()
     ev_run(loop, 0);
 
     free(cl);
+    
     g_hxt_wbsc_running = FALSE;
     utils_print("Hxt websocket exit...\n");   
 

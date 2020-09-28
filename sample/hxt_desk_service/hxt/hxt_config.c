@@ -21,7 +21,7 @@ typedef enum
 
  typedef enum
  {
-     NORMAL = 1, 
+     LOW = 1, 
      MEDIUM = 2,
      STRICT = 3
  };
@@ -31,7 +31,7 @@ const int g_video_height[3] = {720, 540, 360};
 
 static cJSON* g_cfg_root  = NULL;     //指向配置文件的Object
 pthread_mutex_t g_hxt_cfg_lock =  PTHREAD_MUTEX_INITIALIZER;
-static int g_children_unid = 1;
+static int g_children_unid = -1;
 static int g_camera_status = 1;
 
 static void hxt_mk_private_doc(int child_unid)
@@ -87,7 +87,7 @@ char* hxt_get_init_desk_uuid()
     {
         return NULL;
     }
-    char* tmp = utils_get_cfg_str_value(root, "desk", "deskCode");
+    char* tmp = utils_get_cfg_str_value(root, "desk", "uuid");
     if (tmp == NULL)
     {
         return NULL;
@@ -201,16 +201,25 @@ BOOL hxt_parse_user_data(void* data)
     
     item = cJSON_GetObjectItem(returnObject, "childrenData");
     int item_count = cJSON_GetArraySize(item);
-    for(int i = 0; i < item_count; i ++)
+    utils_print("child data count is %d\n", item_count);
+    /* if children data is empty,remove it from config*/
+    if (item_count == 0)
     {
-        cJSON *node = cJSON_GetArrayItem(item, i);
-        if (!node)
-        {
-            continue;
-        }
-        hxt_update_children_alarm_files((void*)node);
+        
     }
-  
+    else
+    {
+        for(int i = 0; i < item_count; i ++)
+        {
+            cJSON *node = cJSON_GetArrayItem(item, i);
+            if (!node)
+            {
+                continue;
+            }
+            hxt_update_children_alarm_files((void*)node);
+        }
+    }
+    
     return result;
 }
 
@@ -239,7 +248,7 @@ void hxt_init_cfg(void* data)
     }
 
     pthread_mutex_lock(&g_hxt_cfg_lock);
- 
+
     cJSON* item = cJSON_GetObjectItem(returnObject, "websocketUrl");
     utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "server", "websocketUrl", item->valuestring);
 
@@ -252,10 +261,10 @@ void hxt_init_cfg(void* data)
         utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "server", "iflyosToken", item->valuestring);
     }
     
-    item = cJSON_GetObjectItem(returnObject, "iflyosSN");
+    item = cJSON_GetObjectItem(returnObject, "iflyosID");
     if(item != NULL)
     {
-        utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "server", "iflyosSN", item->valuestring);
+        utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "server", "iflyosID", item->valuestring);
     }
     
     item = cJSON_GetObjectItem(returnObject, "postureCountDuration");
@@ -342,17 +351,27 @@ void hxt_init_token(void* data)
     }
 }
 
-char* hxt_get_posture_detect_model_path_cfg()
+char* hxt_get_posture_detect_model_path_cfg(int study_mode)
 {
     return utils_get_cfg_str_value(g_cfg_root, "model", "detect_model");
 }
 
-char* hxt_get_posture_class_model_path_cfg()
+char* hxt_get_posture_class_model_path_cfg(int study_mode)
 {
     return utils_get_cfg_str_value(g_cfg_root, "model", "class_model");
 }
 
 //get
+int hxt_get_camera_status()
+{
+    return g_camera_status;
+}
+
+int hxt_get_desk_bind_status_cfg()
+{
+    return utils_get_cfg_number_value(g_cfg_root, "desk", "bind");
+}
+
 char* hxt_get_desk_uuid_cfg()
 {
     return utils_get_cfg_str_value(g_cfg_root, "desk", "uuid");
@@ -375,7 +394,7 @@ char* hxt_get_iflyos_token_cfg()
 
 char* hxt_get_iflyos_cae_sn()
 {
-    return utils_get_cfg_str_value(g_cfg_root, "server", "iflyosSN");
+    return utils_get_cfg_str_value(g_cfg_root, "server", "iflyosID");
 }
 
 char* hxt_get_token_cfg()
@@ -502,6 +521,11 @@ int hxt_get_parent_unid_cfg()
 
 int hxt_get_study_mode_cfg(const int unid)
 {
+    if (unid == -1)
+    {
+        return 3; //最严
+    }
+
     char child_index[64] = {0};
     sprintf(child_index, "child_%d", unid);
 
@@ -510,6 +534,11 @@ int hxt_get_study_mode_cfg(const int unid)
 
 int hxt_get_alarm_type_cfg(const int unid)
 {
+    if (unid == -1)
+    {
+        return 2;
+    }
+    
     char child_index[64] = {0};
     sprintf(child_index, "child_%d", unid);
 
@@ -609,7 +638,7 @@ BOOL hxt_set_iflyos_sn_cfg(const char* value)
     {
         return FALSE;
     }
-    return utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "server", "ilfyosSN", value);
+    return utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "server", "iflyosID", value);
 }
 
 BOOL hxt_set_token_cfg(const char* value)
@@ -784,16 +813,6 @@ BOOL hxt_set_camera_status(int status)
     return TRUE;
 }
 
-int hxt_get_camera_status()
-{
-    return g_camera_status;
-}
-
-int hxt_get_desk_bind_status_cfg()
-{
-    return utils_get_cfg_number_value(g_cfg_root, "desk", "bind");
-}
-
 BOOL hxt_set_desk_bind_status_cfg(int status)
 {
     int ret_val = utils_set_cfg_number_value(g_cfg_root, HXT_CFG, "desk", "bind", status);
@@ -820,6 +839,8 @@ BOOL hxt_set_attach_ratio_cfg(const char* value)
     return utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "device", "attachRatio", value);
 }
 
+
+//???
 int hxt_get_selfdef_voice_count()
 {
     int file_count = 0;

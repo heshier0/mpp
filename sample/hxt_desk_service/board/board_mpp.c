@@ -980,7 +980,7 @@ BOOL board_mpp_init()
     {
         utils_print("start video system error!\n");
         SAMPLE_COMM_SYS_Exit();
-        board_led_camera_error();
+        board_set_led_status(CAMERA_ERR);
         return FALSE;
     }
 
