@@ -67,7 +67,6 @@ static char* hxt_get_upload_url(const char* api)
     {
         return NULL;
     }
-    utils_print("upload host %s\n", upload_host);
 
     char* ver = hxt_get_api_version_cfg();
     if(NULL == ver)
@@ -80,7 +79,6 @@ static char* hxt_get_upload_url(const char* api)
     strcat(request_url, "/api/");
     strcat(request_url, ver);
     strcat(request_url, api);
-    utils_print("%s\n", request_url);
 
     char* ret_value = (char*)utils_calloc(strlen(request_url) + 1);
     if(NULL == ret_value)
@@ -326,49 +324,6 @@ CLEANUP4:
     return reported;
 }
 
-BOOL hxt_get_desk_cfg_request()
-{
-    BOOL reported = FALSE;
-    char* api_url = hxt_get_api_url(HXT_GET_DESK_CONFIG);
-    if(NULL == api_url)
-    {
-        return FALSE;
-    }
-
-    char* header = hxt_get_header_with_token();
-    if(NULL == header)
-    {
-        utils_free(api_url);
-        return FALSE;
-    }
-
-    //save response data
-    char *out = (char*)utils_malloc(1024*2);
-    if(!utils_post_json_data(api_url, header, NULL, out, 1024*2))
-    {
-        utils_print("post data send failed\n");
-        utils_free(out);
-        utils_free(header);
-        utils_free(api_url);
-        return FALSE;
-    } 
-    utils_print("response is [%s]\n", out);
-
-    int status_code = hxt_get_reponse_status_code((void *)out);
-    if (status_code == HXT_OK)
-    {
-        /* init hxt config */
-        hxt_init_cfg((void*)out);
-        reported = TRUE;
-    }
-
-    utils_free(out);
-    utils_free(header);
-    utils_free(api_url);
-    
-    return reported;
-}
-
 BOOL hxt_report_info_request(int reportType, int cameraStatus)
 {
     BOOL reported = FALSE;
@@ -426,7 +381,7 @@ CLEANUP5:
     return reported;
 }
 
-BOOL hxt_file_upload_request(const char* filename, char* server_file_path)
+BOOL hxt_file_upload_request(const char* filename, const char* study_date, char* server_file_path)
 {
     BOOL uploaded = FALSE;
     int retry_count = 0;
@@ -434,16 +389,18 @@ BOOL hxt_file_upload_request(const char* filename, char* server_file_path)
     char* header = NULL;
     char* out = NULL;
 
-    if(NULL == filename || 0 == strlen(filename) || NULL == server_file_path)
+    if(NULL == filename || 0 == strlen(filename) || NULL == server_file_path || NULL == study_date)
     {
         return FALSE;
     }
     
+    /* create json data*/
     int child_unid = hxt_get_child_unid();
-    char url[256] = {0};
-    sprintf(url, HXT_UPLOAD_FILE, child_unid);
 
-    utils_print("To upload %s...\n", filename);
+    char url[256] = {0};
+    sprintf(url, HXT_UPLOAD_FILE, child_unid, study_date);
+    // utils_print("url is %s\n",url);
+    
     while((!uploaded) && (retry_count < 3))
     {
         upload_url = hxt_get_upload_url(url);
@@ -451,9 +408,8 @@ BOOL hxt_file_upload_request(const char* filename, char* server_file_path)
         {
             return FALSE;
         }
-
+        // utils_print("upload url is %s\n", upload_url);
         header = hxt_get_header_with_token();
-        utils_print("[%s]\n", header);
 
         if (out != NULL)
         {
@@ -462,7 +418,7 @@ BOOL hxt_file_upload_request(const char* filename, char* server_file_path)
         }
         out = (char*)utils_malloc(1024);
         utils_upload_file(upload_url, header, filename, out, 1024);
-        utils_print("[%s]\n", out);
+        // utils_print("[%s]\n", out);
         if (strlen(out) == 0)
         {
             retry_count ++;
@@ -499,7 +455,7 @@ BOOL hxt_file_upload_request(const char* filename, char* server_file_path)
     return uploaded;
 }
 
-BOOL hxt_sample_snap_upload_request(const char* filename, char* server_file_path)
+BOOL hxt_sample_snap_upload_request(const char* filename, const char* study_date, char* server_file_path)
 {
     BOOL uploaded = FALSE;
     int retry_count = 0;
@@ -507,14 +463,15 @@ BOOL hxt_sample_snap_upload_request(const char* filename, char* server_file_path
     char* header = NULL;
     char* out = NULL;
 
-    if(NULL == filename || NULL == server_file_path)
+    if(NULL == filename || NULL == server_file_path || NULL == study_date)
     {
         return FALSE;
     }
     
+    /* create json data*/
     int child_unid = hxt_get_child_unid();
     char url[256] = {0};
-    sprintf(url, HXT_UPLOAD_SAMPLE_SNAP, child_unid);
+    sprintf(url, HXT_UPLOAD_SAMPLE_SNAP, child_unid, study_date);
 
     utils_print("To upload %s ...\n", filename);
     while((!uploaded) && (retry_count < 3))
@@ -906,6 +863,11 @@ BOOL hxt_bind_desk_with_wifi_request()
         
         reported = TRUE;
     } 
+    else if (status_code == HXT_BIND_FAILED)
+    {
+        utils_print("device is already binded\n");
+        reported = FALSE;
+    }
 
 CLEANUP1:  
     utils_free(out);
@@ -936,15 +898,71 @@ BOOL hxt_refresh_token_request()
     return token_required;
 }
 
-BOOL hxt_get_new_version_request(int new_ver_id, const char* new_ver_no, const char* update_url)
+BOOL hxt_get_new_version_request(const char* update_url)
 {
-    if (NULL == update_url || new_ver_id <= 0)
+    if (NULL == update_url)
     {
         return FALSE;
     }
 
     /*download file*/
-    utils_download_file(update_url, UPDATE_BIN_FILE);
+    utils_download_file(update_url, UPDATE_FILES);
 
     return TRUE;
+}
+
+BOOL hxt_get_desk_cfg_request()
+{
+    int retry_count = 0;
+    BOOL reported = FALSE;
+    char* api_url = hxt_get_api_url(HXT_GET_DESK_CONFIG);
+    if(NULL == api_url)
+    {
+        return FALSE;
+    }
+
+    char* header = hxt_get_header_with_token();
+    if(NULL == header)
+    {
+        utils_free(api_url);
+        return FALSE;
+    }
+
+    //save response data
+    char *out = (char*)utils_malloc(1024*2);
+ RETRY_GET:   
+    if(!utils_post_json_data(api_url, header, NULL, out, 1024*2))
+    {
+        utils_print("post data send failed\n");
+        utils_free(out);
+        utils_free(header);
+        utils_free(api_url);
+        return FALSE;
+    } 
+    // utils_print("response is [%s]\n", out);
+
+    int status_code = hxt_get_reponse_status_code((void *)out);
+    if (status_code == HXT_OK)
+    {
+        /* init hxt config */
+        hxt_init_cfg((void*)out);
+        reported = TRUE;
+    }
+    else
+    {
+        hxt_refresh_token_request();
+        if (retry_count < 3)
+        {
+            retry_count ++;
+            bzero((void*)out, 1024*2);
+            goto RETRY_GET;
+        }
+    }
+    
+
+    utils_free(out);
+    utils_free(header);
+    utils_free(api_url);
+    
+    return reported;
 }

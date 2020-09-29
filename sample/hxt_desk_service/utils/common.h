@@ -17,7 +17,7 @@
 #define PCM_FIFO                "/tmp/pcm_fifo"
 #define VIDEO_FIFO              "/tmp/video_fifo"
 #define PCM_RECV_PORT           10099
-#define STUDY_INFO_MQ_KEY       (232323L)
+// #define STUDY_INFO_MQ_KEY       (232323L)
 
 /* db */
 #define DB_PATH     ("/userdata/data/desk.db")

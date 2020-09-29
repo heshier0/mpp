@@ -137,10 +137,14 @@ BOOL hxt_update_children_alarm_files(void* data)
     }
     cJSON *node = (cJSON*)data;
     cJSON *node_item = cJSON_GetObjectItem(node, "childrenUnid");
+
+    hxt_set_child_unid(node_item->valueint);    
+
     /* get child personal config */
     char children_unid[64] = {0};
     sprintf(children_unid, "child_%d", node_item->valueint);
     int child_unid = node_item->valueint;
+
     /* create documents for save mp4 and snap file */
     hxt_mk_private_doc(child_unid);
 
@@ -686,11 +690,6 @@ BOOL hxt_set_upload_host_url_cfg(const char* value)
 
 BOOL hxt_set_upgrade_pack_url_cfg(const char* value)
 {
-    if(NULL == value)
-    {
-        return FALSE;
-    }
-
     return utils_set_cfg_str_value(g_cfg_root, HXT_CFG, "version", "upgradePackUrl", value);
 }
 

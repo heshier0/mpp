@@ -277,12 +277,8 @@ BOOL utils_set_cfg_str_value(cJSON* root, const char* cfg, const char* params_it
             return FALSE;
         }
     }
-    else
-    {
-        return (cJSON_SetValuestring(prop_node, value) == NULL);
-    }
 
-    return TRUE;
+    return (cJSON_SetValuestring(prop_node, value) != NULL);
 }
 
 BOOL utils_set_cfg_number_value(cJSON* root, const char* cfg, const char* params_item, const char* prop_item, const double value)
@@ -450,37 +446,35 @@ BOOL utils_download_file(const char *url, const char* save_file_path)
     // {
     //     return FALSE;
     // }
-
     char CMD_DOWNLOAD_FILE[512] = {0};
 #ifdef DEBUG
     sprintf(CMD_DOWNLOAD_FILE, "curl --insecure -o %s %s", save_file_path, url);
 #else
     sprintf(CMD_DOWNLOAD_FILE, "curl --insecure -s -o %s %s", filename, url);
 #endif    
+    utils_print("%s\n", CMD_DOWNLOAD_FILE);
 
-    // FILE *fp = NULL;
-    // fp = popen(CMD_DOWNLOAD_FILE, "r");
-    // if(NULL != fp)
-    // {
-    //     if(fgets(out_buffer, buffer_length, fp) == NULL)
-    //     {
-    //         pclose(fp);
-    //         return FALSE;
-    //     }
-    //     out_buffer[buffer_length-1] = '\0';
-    // }
-    // pclose(fp);
+    char out_buffer[1024] = {0};
+    int buffer_length = 1024;
 
-    // if(filename != NULL)
-    // {
-    //     utils_free(filename);
-    //     filename = NULL;
-    // }
+    FILE *fp = NULL;
+    fp = popen(CMD_DOWNLOAD_FILE, "r");
+    if(NULL != fp)
+    {
+        if(fgets(out_buffer, buffer_length, fp) == NULL)
+        {
+            pclose(fp);
+            return FALSE;
+        }
+        // out_buffer[buffer_length-1] = '\0';
+    }
+    pclose(fp);
 
     return TRUE;
 }
 
-BOOL utils_upload_file(const char* url, const char* header, const char* local_file_path, char* out_buffer, int buffer_length)
+BOOL utils_upload_file(const char* url, const char* header, const char* local_file_path,
+                        char* out_buffer, int buffer_length)
 {
     if(NULL == url || NULL == local_file_path || NULL == out_buffer)
     {
@@ -489,9 +483,10 @@ BOOL utils_upload_file(const char* url, const char* header, const char* local_fi
 
     char CMD_UPLOAD_FILE[1024] = {0};
 #ifdef DEBUG
-    sprintf(CMD_UPLOAD_FILE, "curl --insecure -H \"%s\" -F \"file=@%s\" %s", header, local_file_path, url);
+    sprintf(CMD_UPLOAD_FILE, "curl --insecure --retry 3 -H \"%s\" -F \"file=@%s\" %s", header, local_file_path, url);
 #else
-    sprintf(CMD_UPLOAD_FILE, "curl --insecure -s -H \"%s\" -F \"file=@%s\" %s", header, local_file_path, url);
+    sprintf(CMD_UPLOAD_FILE, "curl --insecure -s -X POST -H \"%s\" -T %s %s", header, local_file_path, url);
+    //sprintf(CMD_UPLOAD_FILE, "curl --insecure -s -H \"%s\" -F \"file=@%s\" %s", header, local_file_path, url);
 #endif // DEBUG
     utils_print("upload cmd: [%s]\n", CMD_UPLOAD_FILE);
 
@@ -504,10 +499,10 @@ BOOL utils_upload_file(const char* url, const char* header, const char* local_fi
             pclose(fp);
             return FALSE;
         }
-        out_buffer[buffer_length-1] = '\0';
+        // out_buffer[buffer_length-1] = '\0';
+        // utils_print("upload file:%s\n", out_buffer);
     }
     pclose(fp);
-
         
     return TRUE;
 }
@@ -538,7 +533,7 @@ BOOL utils_post_json_data(const char *url, const char* header_content, const cha
     sprintf(CMD_POST_JSON, "curl --insecure -s -X POST -H \"Content-Type:application/json;charset=UTF-8\" -H \"%s\" -d \'%s\' %s", 
                                 header_content, json_data, url);
 #endif // DEBUG
-    utils_print("%s\n", CMD_POST_JSON);
+    // utils_print("%s\n", CMD_POST_JSON);
 
     FILE *fp = NULL;
     fp = popen(CMD_POST_JSON, "r");

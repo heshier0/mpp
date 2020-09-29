@@ -200,8 +200,10 @@ int iflyos_websocket_start()
     iflyos_load_cfg();
 
     char ifly_url[255] = {0};
-    char* device_id = iflyos_get_device_id();//hxt_get_desk_uuid_cfg();
-    char* token = iflyos_get_token();//hxt_get_iflyos_token_cfg();
+    //char* device_id = hxt_get_desk_uuid_cfg(); 
+    char* device_id = iflyos_get_device_id();
+    //char* token = hxt_get_iflyos_token_cfg();
+    char* token = iflyos_get_token();
     utils_print("iflyos device_id is %s and token is %s\n", device_id, token);
     sprintf(ifly_url, "wss://ivs.iflyos.cn/embedded/v1?token=%s&device_id=%s", token, device_id); 
 

@@ -49,10 +49,10 @@ typedef enum
 #define HXT_STATUS_REPORT                   "/Device/DeskStatusReport"
 #define HXT_STUDY_REPORT                    "/User/StudyReport"
 #define HXT_STUDY_REPORT_BATCH              "/User/StudyReportBatch"
-#define HXT_UPLOAD_FILE                     "/Upload/UploadFileCustom?childunid=%d"
-#define HXT_GETMAX_CHUNK                    "/Upload/GetMaxChunk?md5=%s&ext=%s"
-#define HXT_UPLOAD_CHUNK                    "/Upload/Chunkload?md5=%s&chunk=%d&chunks=%d"
-#define HXT_MERGE_FILES                     "/Upload/MergeFiles?md5=%s&ext=%s&fileTotalSize=%lu&typeString=%s"
+#define HXT_UPLOAD_FILE                     "/Upload/UploadFileCustom?childunid=%d\\&studyDate=%s"
+#define HXT_GETMAX_CHUNK                    "/Upload/GetMaxChunk?md5=%s\\&ext=%s"
+#define HXT_UPLOAD_CHUNK                    "/Upload/Chunkload?md5=%s\\&chunk=%d\\&chunks=%d"
+#define HXT_MERGE_FILES                     "/Upload/MergeFiles?md5=%s\\&ext=%s\\&fileTotalSize=%lu\\&typeString=%s"
 #define HXT_CHECK_WIFI_DATA                 "/Device/CheckWifiData"
 #define HXT_BIND_DESK_WIFI                  "/Device/BindDeskByWifi"
 #define HXT_CONFIRM_DESK_BIND               "/Device/BindDeskConfirm"
@@ -61,8 +61,11 @@ typedef enum
 /* http response result */
 #define HXT_OK                              1
 #define HXT_NO_REGISTER                     0
+#define HXT_BIND_FAILED                     21         
 #define HXT_AUTH_FAILED                     401
+
 #define HXT_RES_STATUS_OK                   "S0001"
+#define HXT_RES_BIND_FAIL                   "S0301"
 #define HXT_RES_AUTH_FAIL                   "S0401"
 #define HXT_RES_NO_REG                      "S0000"
 
@@ -87,7 +90,7 @@ typedef enum
 #define HXT_STUDY_INFOS         13
 
 /* file path defines */
-#define UPDATE_BIN_FILE                     ("/userdata/update/HxtDeskService")
+#define UPDATE_FILES                        ("/userdata/update/update.tar.gz")
 #define HXT_CFG                             ("/userdata/config/hxt_config.json")
 #define HXT_INIT_CFG                        ("/userdata/config/.hxt_init_config.json")
 #define HXT_CHILD_VIDEO_PATH                ("/user/child_%d/video/")

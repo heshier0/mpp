@@ -65,7 +65,7 @@ int iflyos_init_cae_lib(void* data)
 {
     int rv, i;
     char buffer[1024] = {0};
-    int flag = 1;
+    int flag = 2;
 
     utils_print("version: %s\n", CAEGetVersion());
 #ifdef DEBUG

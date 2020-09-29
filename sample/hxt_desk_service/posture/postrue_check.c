@@ -16,6 +16,7 @@
 #include "server_comm.h"
 #include "hxt_defines.h"
 #include "report_info_db.h"
+#include "databuffer.h"
 
 #define NORMAL_POSTURE_STATUS         0
 #define BAD_POSTURE_STATUS            1
@@ -55,6 +56,7 @@ typedef struct check_status_t
     int _last_posture;
 };
 
+extern DATABUFFER g_msg_buffer;
 extern BOOL g_hxt_wbsc_running;
 
 static void* g_recog_handle = NULL;
@@ -66,7 +68,7 @@ static BOOL g_first_alarm = TRUE;
 static BOOL g_first_away = TRUE;
 static char g_mp4_file[128] = {0};
 static char g_snap_file[128] = {0};
-static int g_msg_qid;
+// static int g_msg_qid;
 
 static void play_random_warn_voice()
 {
@@ -161,7 +163,7 @@ static void delete_recorded()
     {
         send_delete_mp4_cmd();
         g_is_recording = FALSE;
-        utils_print("%s -----> Delete record\n", utils_get_current_time());
+        utils_print("%s -----> Delete record: %s\n", utils_get_current_time(), g_mp4_file);
     }
 }
 
@@ -188,12 +190,22 @@ static BOOL send_study_report_type(StudyInfo *info)
     if (g_hxt_wbsc_running)
     {
         /* online mode */
-        info->msg_type = 1;
-        if (msgsnd(g_msg_qid, (void*)info, sizeof(StudyInfo) - sizeof(long), 0) < 0)
+        // info->msg_type = 1;
+        // if (msgsnd(g_msg_qid, (void*)info, sizeof(StudyInfo) - sizeof(long), 0) < 0)
+        // {
+        //     utils_print("send study info msg failed, %s\n", strerror(errno));
+        //     return FALSE;
+        // }
+        
+        char *ptr = get_free_buffer(&g_msg_buffer, sizeof(StudyInfo));
+        if (NULL == ptr)
         {
-            utils_print("send study info msg failed, %s\n", strerror(errno));
+            utils_print("Msg buffer is full\n");
             return FALSE;
         }
+        info->msg_type = 1;
+        memcpy(ptr, (void*)info, sizeof(StudyInfo));
+        use_free_buffer(&g_msg_buffer, sizeof(StudyInfo));
     }
     else
     {
@@ -293,6 +305,7 @@ static BOOL check_posture_changed(struct check_status_t *check_status, int check
                 if (check_result == NORMAL_POSTURE_STATUS)
                 {
                      play_random_praise_voice();
+                     g_first_alarm = TRUE;
                 }
             }
 
@@ -342,6 +355,12 @@ static BOOL check_posture_alarm(struct check_status_t *check_status, int check_r
         {
             stop_record();
             check_status->_last_record_time = now;
+            StudyInfo info;
+            memset(&info, 0, sizeof(StudyInfo));
+            info.info_type = BAD_POSTURE;
+            strcpy(info.file, g_mp4_file);
+            strcpy(info.snap, g_snap_file);
+            send_study_report_type(&info);   
         }
         if (interval >= check_interval)
         {
@@ -364,12 +383,7 @@ static BOOL check_posture_alarm(struct check_status_t *check_status, int check_r
             check_status->_start_posture = check_result;
             check_status->_start_time = now;
         } 
-        StudyInfo info;
-        memset(&info, 0, sizeof(StudyInfo));
-        info.info_type = BAD_POSTURE;
-        strcpy(info.file, g_mp4_file);
-        strcpy(info.snap, g_snap_file);
-        send_study_report_type(&info);                  
+               
     break;
     case AWAY_STATUS:
         if(interval >= FIRST_DEPART_ALARM_TIMEVAL)
@@ -380,6 +394,12 @@ static BOOL check_posture_alarm(struct check_status_t *check_status, int check_r
                 utils_print("AWAY ALARM !!!\n");
                 check_status->_start_time = now;
                 g_first_away = FALSE;
+
+                /* send message to hxt server */
+                StudyInfo info;
+                memset(&info, 0, sizeof(StudyInfo));
+                info.info_type = CHILD_AWAY;
+                send_study_report_type(&info);
             }
             else
             {
@@ -389,15 +409,15 @@ static BOOL check_posture_alarm(struct check_status_t *check_status, int check_r
                     utils_print("AWAY ALARM22222 !!!\n");
                     /* exit recog thread */
                     g_keep_processing = FALSE;
+
+                    /* send message to hxt server */
+                    StudyInfo info;
+                    memset(&info, 0, sizeof(StudyInfo));
+                    info.info_type = CHILD_AWAY;
+                    send_study_report_type(&info);
                 }
             }
             delete_recorded(); 
-
-            /* send message to hxt server */
-            StudyInfo info;
-            memset(&info, 0, sizeof(StudyInfo));
-            info.info_type = CHILD_AWAY;
-            send_study_report_type(&info);
         }
     break;    
     default:
@@ -439,12 +459,12 @@ static void* thread_proc_yuv_data_cb(void *param)
     struct check_status_t check_status;
     memset(&check_status, 0, sizeof(struct check_status_t));
 
-    g_msg_qid = msgget(STUDY_INFO_MQ_KEY, 0666 | IPC_CREAT);
-    if(g_msg_qid < 0)
-    {
-        utils_print("create message queue error\n");
-        return -1;
-    }
+    // g_msg_qid = msgget(STUDY_INFO_MQ_KEY, 0666 | IPC_CREAT);
+    // if(g_msg_qid < 0)
+    // {
+    //     utils_print("create message queue error\n");
+    //     return -1;
+    // }
 
     StudyInfo info;
     memset(&info, 0, sizeof(StudyInfo));

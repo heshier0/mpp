@@ -12,6 +12,7 @@
 #include "utils.h"
 #include "common.h"
 #include "server_comm.h"
+#include "databuffer.h"
 #include "report_info_db.h"
 
 volatile BOOL g_hxt_wbsc_running = FALSE;
@@ -21,6 +22,7 @@ volatile BOOL g_iflyos_first_login = TRUE;
 volatile BOOL g_hxt_first_login = TRUE;
 
 
+DATABUFFER g_msg_buffer;
 static pid_t iflyos_pid = -1, hxt_pid = -1;
 static BOOL g_processing = TRUE;
 
@@ -126,6 +128,7 @@ static void  hxt_bind_user()
             else
             {
                 utils_send_local_voice(VOICE_SERVER_CONNECT_OK);
+
                 if(!board_get_qrcode_scan_status())
                 {
                     if (hxt_bind_desk_with_wifi_request())
@@ -160,6 +163,7 @@ int main(int argc, char **argv)
     signal(SIGTERM, handle_signal);   
 #endif
     
+    create_buffer(&g_msg_buffer, 16*1024);
     open_hxt_service_db();
     
 #if 1
@@ -210,6 +214,8 @@ int main(int argc, char **argv)
     
 #endif
     close_hxt_service_db();
+    destroy_buffer(&g_msg_buffer);
+    
     utils_print("~~~~EXIT~~~~\n");
 
     return 0;

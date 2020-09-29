@@ -128,7 +128,6 @@ static void* check_reset_event(void *param)
         {
             printf("reset btn pressed down\n");
             end = time(0);
-
         }
         if(event.event_type == GPIOD_LINE_EVENT_FALLING_EDGE)
         {
@@ -273,24 +272,23 @@ static void* check_posture_event(void *param)
         if (event.event_type == GPIOD_LINE_EVENT_FALLING_EDGE)
         {
             start = time(NULL);
-            usleep(50*1000);
-            printf("camera btn pressed down\n");
+            utils_print("camera btn pressed down\n");
         }
 
         if(event.event_type == GPIOD_LINE_EVENT_RISING_EDGE)
         {
-            printf("camera btn pressed up\n");
+            utils_print("camera btn pressed up\n");
             end = time(NULL); 
-            printf("inteval: %ld - %ld = %ld\n", end, start, (end-start));
+            utils_print("inteval: %ld - %ld = %ld\n", end, start, (end-start));
 
             if (end - start > 3)
             {
                 /* standby */
                board_set_led_status(SLEEPING);
-                
             }
             else
             {
+                
                 if (!posture_running)
                 {
                     posture_running = TRUE;
@@ -320,20 +318,23 @@ static void* check_scan_qrcode_event(void *param)
 
             board_set_led_status(BINDING);
 
-            if(first_notice)
-            {
-                utils_send_local_voice(VOICE_DEPLOYING_NET);
-                sleep(10);
-                first_notice = FALSE;
-            }
-
             printf("To scan qrcode....\n");
             inc_vol_pressed = dec_vol_pressed = FALSE;
+            int scan_count = 0;
             while (!get_qrcode_yuv_buffer())
             {
-                utils_send_local_voice(VOICE_QUERY_WIFI_ERROR);
-                sleep(12);
-                continue;
+                if (scan_count < 5)
+                {
+                    utils_send_local_voice(VOICE_DEPLOYING_NET);
+                    sleep(10);
+                    continue;
+                }         
+                else
+                {
+                    utils_send_local_voice(VOICE_QUERY_WIFI_ERROR);
+                    sleep(10);
+                    break;
+                }
             }
             break;
         }

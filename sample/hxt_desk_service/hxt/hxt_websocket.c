@@ -10,6 +10,7 @@
 #include "common.h"
 #include "utils.h"
 #include "hxt_defines.h"
+#include "databuffer.h"
 
 typedef enum 
 {
@@ -20,6 +21,7 @@ typedef enum
 
 extern BOOL g_hxt_wbsc_running;
 extern BOOL g_hxt_first_login;
+extern DATABUFFER g_msg_buffer;
 
 static BOOL g_recv_running = TRUE;
 pthread_t study_info_tid;
@@ -46,8 +48,8 @@ static BOOL init_study_info(ReportInfo *report_info, StudyInfo *study_info)
     if (report_info->report_type == BAD_POSTURE)
     {
         report_info->duration = 10;
-        hxt_file_upload_request(study_info->file, report_info->video_url);
-        hxt_file_upload_request(study_info->snap, report_info->snap_url);
+        hxt_file_upload_request(study_info->file, report_info->study_date, report_info->video_url);
+        hxt_file_upload_request(study_info->snap, report_info->study_date, report_info->snap_url);
     }
     
     return TRUE;
@@ -101,25 +103,16 @@ static void* send_study_info_cb(void *params)
     }    
     struct uwsc_client *cl = (struct uwsc_client *)params;
 
-    int msqid = msgget(STUDY_INFO_MQ_KEY, 0666 | IPC_CREAT);
-    if (msqid < 0)
-    {
-        utils_print("get message queue id error\n");
-        return NULL;
-    }
-
     while (g_recv_running)
     {
-        bzero(&info, sizeof(info));
-        utils_print("To wait study report .....\n");
-        if (-1 == msgrcv(msqid, &info, sizeof(StudyInfo) - sizeof(long), 1, 0))
+        char* ptr = get_buffer(&g_msg_buffer, sizeof(StudyInfo));
+        if (NULL == ptr)
         {
             sleep(5);
             continue;
         }
-        utils_print("study report type is %d\n", info.info_type);
         bzero(&report_info, sizeof(report_info));
-        init_study_info(&report_info, &info);
+        init_study_info(&report_info, (StudyInfo*)ptr);
         //post json data to server
         cJSON *root = cJSON_CreateObject();    
         if (NULL == root)
@@ -158,8 +151,9 @@ CLEAR:
         {
             cJSON_Delete(root);
         }
+        release_buffer(&g_msg_buffer, sizeof(StudyInfo));
+        ptr = NULL;
     }
-    msgctl(msqid, IPC_RMID, 0);
 
     return NULL;
 }
@@ -177,6 +171,7 @@ static void parse_server_config_data(void *data)
         return;
     }
     
+    int old_ver = 0;
     cJSON *sub_item = NULL;
     cJSON *item = cJSON_GetObjectItem(root, "dataType");
     int data_type = item->valueint;
@@ -204,15 +199,23 @@ static void parse_server_config_data(void *data)
     case HXT_UPDATE_REMIND:
         utils_print("To process update...\n");
         item = cJSON_GetObjectItem(root, "data");
-        sub_item = cJSON_GetObjectItem(item, "newVersionId");           //新版本id，大于0时有效
-        hxt_set_version_id_cfg(sub_item->valueint);
-        sub_item = cJSON_GetObjectItem(item, "newVersionNo");           //新版本号
-        hxt_set_version_cfg(sub_item->valuestring);
-        sub_item = cJSON_GetObjectItem(item, "upgradepackUrl");         //新版本文件地址
-        hxt_set_upgrade_pack_url_cfg(sub_item->valuestring);
-        hxt_reload_cfg();
-        //to upgrade
-        hxt_get_new_version_request();
+        if (item != NULL)
+        {
+            old_ver = hxt_get_version_id_cfg();
+            sub_item = cJSON_GetObjectItem(item, "newVersionId");           //新版本id，大于0时有效
+            if (old_ver < sub_item->valueint)
+            {
+                hxt_set_version_id_cfg(sub_item->valueint);
+                sub_item = cJSON_GetObjectItem(item, "newVersionNo");           //新版本号
+                hxt_set_version_cfg(sub_item->valuestring);
+                sub_item = cJSON_GetObjectItem(item, "upgradepackUrl");         //新版本文件地址
+                hxt_set_upgrade_pack_url_cfg(sub_item->valuestring);
+                hxt_reload_cfg();
+                //to upgrade
+
+                hxt_get_new_version_request(sub_item->valuestring);
+            }
+        }
     break;    
     case HXT_WAKE_CAMERA:
         //to wake camera
@@ -317,13 +320,6 @@ static void hxt_wsc_onopen(struct uwsc_client *cl)
 
     hxt_send_desk_status(cl, POWER_ON, UWSC_OP_TEXT);
     pthread_create(&study_info_tid, NULL, send_study_info_cb, (void *)cl);
-
-
-    // if (g_hxt_first_login)
-    // {
-        
-    //     g_hxt_first_login = FALSE;
-    // }
 }
 
 static void hxt_wsc_onmessage(struct uwsc_client *cl,void *data, size_t len, bool binary)
