@@ -8,8 +8,6 @@
 
 
 
-BOOL create_report_info_table();
-
 BOOL add_report_info(void* data);
 
 BOOL del_report_info(int id);

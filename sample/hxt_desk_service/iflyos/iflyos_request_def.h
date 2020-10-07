@@ -1,7 +1,51 @@
 #ifndef __IFLYOS_REQUEST_DEF_H__
 #define __IFLYOS_REQUEST_DEF_H__
 
-#include "iflyos_defines.h"
+
+#define PLATFORM_NAME       "Linux"
+#define PLATFORM_VER        "1.0.0"
+
+#define SYSTEM_VER          "1.3"
+
+#define AUDIO_PLAYER_VER        "1.2"
+#define AUDIO_PLAYER_STATE      "IDLE"
+
+#define SPEAKER_VER             "1.0"
+#define SPEAKER_VOL             10
+#define SPEAKER_TYPE            "percent"
+
+/****request define****/
+//recognizer
+#define recog_audion_in          "recognizer.audio_in"
+#define recog_text_in            "recognizer.text_in" 
+//system
+#define sys_state_sync           "system.state_sync"
+#define sys_exception            "system.exception"
+#define sys_sw_update_result     "system.check_software_update_result"
+#define sys_update_sw_state      "system.update_software_state_sync"
+//audio player
+#define aplayer_pl_prog_sync     "audio_player.playback.progress_sync"
+#define aplayer_tts_prog_sync    "audio_player.tts.progress_sync"
+#define aplayer_ring_prog_sync   "audio_player.ring.progress_sync"
+#define aplayer_tts_text_in      "audio_player.tts.text_in"
+//local alarm
+#define alarm_state_sync         "alarm.state_sync"
+//video player
+#define vplayer_prog_sync        "vedio_player.progress_sync"
+//playback controller
+#define pc_ctrl_cmd              "playback_controller.control_command"
+//app action
+#define app_check_result         "app_action.check_result"
+#define app_exec_success         "app_action.execute_succeed"
+#define app_exec_fail            "app_action.execute_failed"
+//template
+#define tmpl_elem_sel            "template.element_selected"
+//launcher
+#define launch_sa_result         "launcher.start_activity_result"
+#define launch_back_result       "launcher.back_result"
+#define launch_sel_result        "launcher.select_result"
+//wakeword
+#define wakeword_result                "wakeword.set_wakeword_result"
 
 #pragma pack(push, 1)
 //recognizer

@@ -3,10 +3,8 @@
 
 #include "utils.h"
 
-#include "common.h"
-
 #include "server_comm.h"
-
+#include "board_func.h"
 
 #define FLASH_TIMES         3
 #define LED_SLEEP_TIME      (200*1000)
@@ -146,6 +144,7 @@ static void* check_reset_event(void *param)
                 board_led_all_off();
                 sleep(2);
                 /* reboot */
+                utils_print("Btn pressed to reboot\n");
                 utils_system_reboot();
             }
             
@@ -171,15 +170,16 @@ static void* check_inc_vol_event(void *param)
         {
             printf("inc vol btn pressed down\n");
             start = time(0);
-        }
+        }    
+
         if(event.event_type == GPIOD_LINE_EVENT_RISING_EDGE)
         {
             printf("inc vol btn pressed up\n");
             end = time(0);
             printf("inteval is %ld\n", end - start);
-            if (end - start > 5)
+            if (end - start >= 5)
             {
-                inc_vol_pressed = 1;
+                inc_vol_pressed = TRUE;
             }
             else
             {
@@ -226,12 +226,13 @@ static void* check_dec_vol_event(void *param)
             start = time(0);
 
         }
+
         if(event.event_type == GPIOD_LINE_EVENT_RISING_EDGE)
         {
             printf("dec vol btn press up\n");
             end = time(0);
             printf("inteval is %ld\n", end - start);
-            if (end - start > 5)
+            if (end - start >= 5)
             {
                 dec_vol_pressed = TRUE;
             }
@@ -291,9 +292,9 @@ static void* check_posture_event(void *param)
                 
                 if (!posture_running)
                 {
-                    posture_running = TRUE;
                     board_set_led_status(CHECKING);
-                    start_posture_recognize();   
+                    start_posture_recognize();
+                    posture_running = TRUE;   
                 }
                 else
                 {
@@ -309,7 +310,6 @@ static void* check_posture_event(void *param)
 
 static void* check_scan_qrcode_event(void *param)
 {
-    BOOL first_notice = TRUE;
     while(1)
     {
         if (inc_vol_pressed && dec_vol_pressed)
@@ -321,7 +321,7 @@ static void* check_scan_qrcode_event(void *param)
             printf("To scan qrcode....\n");
             inc_vol_pressed = dec_vol_pressed = FALSE;
             int scan_count = 0;
-            while (!get_qrcode_yuv_buffer())
+            while (!board_get_qrcode_yuv_buffer())
             {
                 if (scan_count < 5)
                 {
@@ -336,12 +336,11 @@ static void* check_scan_qrcode_event(void *param)
                     break;
                 }
             }
-            break;
+            inc_vol_pressed = dec_vol_pressed = FALSE;
+            qrcode_scanning = FALSE;
         }
-        sleep(1);
+        sleep(3);
     }
-
-    qrcode_scanning = FALSE;
 
     return NULL;
 }
@@ -479,7 +478,7 @@ static void board_led_blinking()
     pthread_create(&tid, NULL, led_blinking_thread, NULL);
 }
 
-void board_set_led_status(status)
+void board_set_led_status(LED_STATUS status)
 {
     led_status = status;
 }

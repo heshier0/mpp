@@ -1,49 +1,14 @@
 #ifndef __HXT_DEFINES_H__
 #define __HXT_DEFINES_H__
 
-#define DEBUG 
+#include "common.h"
 
-#ifdef DEBUG
-    #define utils_print(format, ...) printf("%s>>>%d: " format "\n", __FUNCTION__, __LINE__, ##__VA_ARGS__)
-    #define malloc_print(__ptr__,size) printf("[ALLOC] %32s:%4d | addr= %p, size= %lu, expr= `%s`\n", __FUNCTION__, __LINE__ , __ptr__, size, #size)
-    #define free_print(ptr)	printf("[ FREE] %32s:%4d | addr= %p, expr= `%s`\n", __FUNCTION__, __LINE__, ptr, #ptr)
-#else
-    #define malloc_print(__ptr__,size)
-    #define free_print(ptr)
-    #define utils_print(format, ...)
-#endif 
 
-#define utils_malloc(size) ({ \
-	void *__ptr__ = malloc(size); \
-	memset(__ptr__, 0, size); \
-	__ptr__; \
-	})
 
-#define utils_calloc(size) ({ \
-	void *__ptr__ = calloc(size, 1); \
-	__ptr__; \
-	})
-
-#define utils_free(ptr) ({ \
-	free(ptr); \
-	})
-
-typedef enum
-{
-    TRUE  = 1, 
-    FALSE  = 0
-}BOOL;
-
-typedef enum 
-{
-    OFFLINE = 0,
-    ONLINE = 1
-}WORK_MODE;
-
-#define MAX_UPLOAD_COUNT                    50
-#define MAX_STRORE_TIME                     (7*24*60*60)
 
 /* http request url */
+#define HXT_SERVER_URL                      "https://www.horxeton.com:7002/api/v1"
+
 #define HXT_GET_TOKEN                       "/Authorize/GetDeskToken"
 #define HXT_GET_DESK_CONFIG                 "/Device/GetDeskConfig"
 #define HXT_STATUS_REPORT                   "/Device/DeskStatusReport"

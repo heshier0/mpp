@@ -5,9 +5,47 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <sqlite3.h>
+#define DEBUG 
 
-#include "hxt_defines.h"
+#ifdef DEBUG
+    #define utils_print(format, ...) printf("%s>>>%d: " format "\n", __FUNCTION__, __LINE__, ##__VA_ARGS__)
+    #define malloc_print(__ptr__,size) printf("[ALLOC] %32s:%4d | addr= %p, size= %lu, expr= `%s`\n", __FUNCTION__, __LINE__ , __ptr__, size, #size)
+    #define free_print(ptr)	printf("[ FREE] %32s:%4d | addr= %p, expr= `%s`\n", __FUNCTION__, __LINE__, ptr, #ptr)
+#else
+    #define malloc_print(__ptr__,size)
+    #define free_print(ptr)
+    #define utils_print(format, ...)
+#endif 
+
+#define utils_malloc(size) ({ \
+	void *__ptr__ = malloc(size); \
+	memset(__ptr__,0,size); \
+    malloc_print(__ptr__,size); \
+	__ptr__; \
+	})
+
+#define utils_calloc(size) ({ \
+	void *__ptr__ = calloc(size, 1); \
+    malloc_print(__ptr__,size); \
+	__ptr__; \
+	})
+
+#define utils_free(ptr) ({ \
+    free_print(ptr); \
+	free(ptr); \
+	})
+
+typedef enum
+{
+    TRUE  = 1, 
+    FALSE  = 0
+}BOOL;
+
+typedef enum 
+{
+    OFFLINE = 0,
+    ONLINE = 1
+}WORK_MODE;
 
 #define HXT_DESK_SERVICE_VERSION        "1.0.0"
 #define HXT_DESK_SERVICE_VERSION_NUMBER  100000
@@ -21,10 +59,18 @@
 
 /* db */
 #define DB_PATH     ("/userdata/data/desk.db")
-sqlite3 *g_hxt_service_db;
+#define INIT_SQL    ("/userdata/data/init.sql")
 
 //wifi config file
 #define WIFI_CFG                ("/userdata/config/wifi.conf")
+
+//posture pattern file
+#define LOW_CLASS_DETECT_FILE   ("/userdata/pattern/low_class/detect.wk")
+#define MEDIUM_CLASS_DETECT_FILE   ("/userdata/pattern/medium_class/detect.wk")
+#define HIGH_CLASS_DETECT_FILE   ("/userdata/pattern/high_class/detect.wk")
+#define LOW_CLASS_SAMPLE_FILE   ("/userdata/pattern/low_class/class.wk")
+#define MEDIUM_CLASS_SAMPLE_FILE   ("/userdata/pattern/medium_class/class.wk")
+#define HIGH_CLASS_SAMPLE_FILE   ("/userdata/pattern/high_class/class.wk")
 
 //local voice
 #define VOICE_DEVICE_OPEN                       "/userdata/media/voice/V001.mp3"
@@ -70,12 +116,15 @@ sqlite3 *g_hxt_service_db;
 
 
 /* db table name */
-#define IFLYOS_DEVICE_TABLE                 "iflyos_device_cfg_table"
-#define IFLYOS_PLATFORM_TABLE               "iflyos_platform_cfg_table"
-#define IFLYOS_SYSTEM_TABLE                 "iflyos_system_cfg_table"
-#define IFLYOS_SPEAKER_TABLE                "iflyos_speaker_table"
-#define IFLYOS_AUDIO_PLAYER_TABLE           "iflyos_audio_player_table"
-
+#define IFLYOS_DEVICE_TABLE                 "IflyosParams"
+#define DESK_PARAMS_TABLE                   "DeskParams"
+#define SERVER_PARAMS_TABLE                 "ServerParams"
+#define WIFI_PARAMS_TABLE                   "WifiParams"
+#define CONNECT_PARAMS_TABLE                "ConnectParams"
+#define RUNNING_PARAMS_TABLE                "RunningParams"
+#define UPDATE_PARAMS_TABLE                 "UpdateParams"
+#define USER_PARAMS_TABLE                   "UserParams"
+#define REPORT_INFOS_TABLE                  "ReportInfos"
 
 #pragma pack(push, 1)
 

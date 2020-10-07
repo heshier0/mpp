@@ -16,7 +16,7 @@
 
 #include "common.h"
 #include "utils.h"
-
+#include "db.h"
 
 
 static char* separate_filename(const char *url)
@@ -48,7 +48,7 @@ static char* separate_filename(const char *url)
         filename = (char*)utils_calloc(length+1);
         memcpy(filename, start, (end - start));
     }
-    filename[strlen(filename)] = '\0';
+    //filename[strlen(filename)] = '\0';
 
     return filename;
 }
@@ -85,237 +85,8 @@ char *utils_get_current_time()
     time(&t);
     ltime = localtime(&t);
     strftime(s, 20, "%Y-%m-%d %H:%M:%S", ltime);
-    s[19] = '\0';
 
     return s;
-}
-
-cJSON* utils_load_cfg(const char* cfg)
-{
-    FILE *file = NULL;
-    cJSON *root = NULL;
-    long length = 0;
-    char* content = NULL;
-    size_t read_chars = 0;
-
-    if(NULL==cfg)
-    {
-        return NULL;
-    }
-
-    //以2进制方式打开
-    file = fopen(cfg, "rb");
-    if (NULL == file)
-    {
-        goto CLEANUP;
-    }
-    //获取长度
-    if (fseek(file, 0, SEEK_END) != 0)
-    {
-        goto CLEANUP;
-    }
-    length = ftell(file);
-    if (length < 0)
-    {
-        goto CLEANUP;
-    }
-    if (fseek(file, 0, SEEK_SET) != 0)
-    {
-        goto CLEANUP;
-    }
-    //分配内存
-    //content = (char*)malloc((size_t)length + sizeof(""));
-    content = (char*)utils_malloc(length+1);
-    if (NULL == content)
-    {
-        goto CLEANUP;
-    }
-    //读取文件
-    read_chars = fread(content, sizeof(char), (size_t)length, file);
-    if ((long)read_chars != length)
-    {
-        utils_free(content);
-        content = NULL;
-        goto CLEANUP;
-    }
-    content[read_chars] = '\0';
-    root = cJSON_Parse(content);
-    if(content != NULL)
-    {
-        utils_free(content);
-        content = NULL;
-    }
-
-CLEANUP:
-    if (file != NULL)
-    {
-        fclose(file);
-    }    
-
-    return root;
-}
-
-void utils_unload_cfg(cJSON* root)
-{
-    if (root != NULL)
-    {
-        cJSON_Delete(root);
-    }
-
-    return;
-}
-
-BOOL utils_reload_cfg(const char* cfg, cJSON* root)
-{
-    if (NULL==root || NULL==cfg)
-    {
-        return FALSE;
-    }
-
-    char* content = cJSON_Print(root);
-    if(NULL == content)
-    {
-        return FALSE;
-    }
-
-    FILE *fp = fopen(cfg, "w+");
-    if (NULL == fp )
-    {
-        return FALSE;
-    }
-    
-    fwrite(content, strlen(content), 1, fp);
-    fflush(fp);
-    fclose(fp);
-  
-    utils_free(content);
-    content = NULL;
-
-    return TRUE;
-}
-
-char* utils_get_cfg_str_value(cJSON* root, const char* params_item, const char* prop_item)
-{
-    if (NULL == root || 
-        NULL == params_item || 
-        NULL == prop_item)
-    {
-        return NULL;
-    }
-   
-    cJSON *params_node = cJSON_GetObjectItem(root, params_item);
-    if (!params_node)
-    {
-        return NULL;
-    }
-    cJSON *prop_node = cJSON_GetObjectItem(params_node, prop_item);
-    if (!prop_node)
-    {
-        return NULL;
-    }
-
-    return prop_node->valuestring;
-}
-
-double utils_get_cfg_number_value(cJSON* root, const char* params_item, const char* prop_item)
-{
-    if (NULL == params_item || NULL == prop_item)
-    {
-        return 0;
-    }
-   
-    cJSON *params_node = cJSON_GetObjectItem(root, params_item);
-    if (!params_node)
-    {
-        return 0;
-    }
-    cJSON *prop_node = cJSON_GetObjectItem(params_node, prop_item);
-    if (!prop_node)
-    {
-        return 0;
-    }
-    
-    return prop_node->valuedouble;
-}
-
-BOOL utils_set_cfg_str_value(cJSON* root, const char* cfg, const char* params_item, const char* prop_item, const char* value)
-{
-    if (NULL == cfg || 
-        NULL == root || 
-        NULL == params_item || 
-        NULL == prop_item)
-    {
-        utils_print("params null\n");
-        return FALSE;
-    }
-   
-    cJSON *params_node = cJSON_GetObjectItem(root, params_item);
-    if (!params_node)
-    {
-        int ret = cJSON_AddItemToObject(root, params_item, params_node = cJSON_CreateObject());
-        if (ret == 0)
-        {
-            return FALSE;
-        }
-    }
-
-    cJSON *prop_node = cJSON_GetObjectItem(params_node, prop_item);
-    if(!prop_node)
-    {
-        if(NULL == value)
-        {
-            prop_node = cJSON_AddNullToObject(params_node, prop_item);
-            return TRUE;
-        }
-        else
-        {
-            prop_node = cJSON_AddStringToObject(params_node, prop_item, value);
-        }
-        
-        if(prop_node == NULL)
-        {
-            return FALSE;
-        }
-    }
-
-    return (cJSON_SetValuestring(prop_node, value) != NULL);
-}
-
-BOOL utils_set_cfg_number_value(cJSON* root, const char* cfg, const char* params_item, const char* prop_item, const double value)
-{
-    if (NULL == cfg ||
-        NULL == root ||
-        NULL == params_item || 
-        NULL == prop_item)
-    {
-        return FALSE;
-    }
-   
-    cJSON *params_node = cJSON_GetObjectItem(root, params_item);
-    if (!params_node)
-    {
-        int ret = cJSON_AddItemToObject(root, params_item, params_node = cJSON_CreateObject());
-        if (ret == 0)
-        {
-            return FALSE;
-        }
-    }
-
-    cJSON *prop_node = cJSON_GetObjectItem(params_node, prop_item);
-    if (!prop_node)
-    {
-        prop_node = cJSON_AddNumberToObject(params_node, prop_item, value);
-        if(prop_node == NULL)
-        {
-            return FALSE;
-        }
-    }
-    else
-    {
-        cJSON_SetNumberValue(prop_node, value);
-    }
-
-    return TRUE;
 }
 
 BOOL utils_write_fifo(const int fd, const char* write_buffer, const int write_len, const int timeout_val)
@@ -550,64 +321,6 @@ BOOL utils_post_json_data(const char *url, const char* header_content, const cha
     return TRUE;
 }
 
-char* utils_get_response_value(const char* json_data, const char* root_name, const char* item_name, const char* sub_name, const char* last_node)
-{
-    char* name = NULL;
-    if(NULL == json_data || NULL == root_name || NULL == item_name || NULL == sub_name)
-    {
-        return NULL;
-    }
-
-    cJSON *root = cJSON_Parse(json_data);
-    if(!root)
-    {
-        return NULL;
-    }
-    cJSON *responses = cJSON_GetObjectItem(root, root_name);
-    if (!responses)
-    {
-        goto END;
-    }
-
-    int item_count = cJSON_GetArraySize(responses);
-    for(int i = 0; i < item_count; i++)
-    {
-        cJSON *item = cJSON_GetArrayItem(responses, i);
-        if (!item)
-        {
-            continue;
-        }
-        cJSON *header = cJSON_GetObjectItem(item, item_name);
-        cJSON *value= NULL;
-        if(NULL == last_node)
-        {
-            value = cJSON_GetObjectItem(header, sub_name);
-        }
-        else
-        {
-            cJSON* sub_value = cJSON_GetObjectItem(header, sub_name);
-            value = cJSON_GetObjectItem(sub_value, last_node);
-        }
-        
-        if (value)
-        {
-            int len = strlen(value->valuestring);
-            name = malloc(len + 1);
-            memcpy(name, value->valuestring, len);
-            name[len] = '\0';
-            break;
-        }
-    }
-
-END:
-    if(root)
-    {
-        cJSON_Delete(root);
-    }
-
-    return name;
-}
-
 char* utils_date_to_string()
 {
     static char str_date[16] = {0};
@@ -667,7 +380,7 @@ char* utils_get_file_md5sum(const char* file_name)
             pclose(fp);
             return NULL;
         }
-        line[strlen(line)-1] = '\0';
+        // line[strlen(line)] = '\0';
     }
 
     pclose(fp);
@@ -846,8 +559,8 @@ void utils_system_reset()
     system("rm -rf /user/*");
     /* remove wifi config */
     system("rm /userdata/config/wifi.conf");
-    /* reset cfg */
-    system("cp /userdata/config/.hxt_init_config.json /userdata/config/hxt_config.json");
+    /* deinit database data */
+    deinit_hxt_service_db();
 
     return;
 }

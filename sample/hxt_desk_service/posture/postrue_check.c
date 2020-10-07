@@ -12,11 +12,13 @@
 #include <sitting_posture.h>
 
 #include "utils.h"
-#include "common.h"
 #include "server_comm.h"
-#include "hxt_defines.h"
 #include "report_info_db.h"
 #include "databuffer.h"
+#include "hxt_client.h"
+#include "db.h"
+#include "board_func.h"
+
 
 #define NORMAL_POSTURE_STATUS         0
 #define BAD_POSTURE_STATUS            1
@@ -60,7 +62,6 @@ extern DATABUFFER g_msg_buffer;
 extern BOOL g_hxt_wbsc_running;
 
 static void* g_recog_handle = NULL;
-static pthread_t g_proc_yuv_tid = NULL;
 static BOOL g_keep_processing = FALSE;
 static BOOL g_is_recording = FALSE;
 static BOOL g_is_inited = FALSE;
@@ -74,8 +75,8 @@ static void play_random_warn_voice()
 {
     char* voice[5] = {VOICE_SITTING_WARM1, VOICE_SITTING_WARM2, VOICE_SITTING_WARM3, VOICE_SITTING_WARM4, VOICE_SITTING_WARM5};  
     char self_def_voice[128] = {0};  
-    int chlid_unid = hxt_get_child_unid();
-    int alarm_type = hxt_get_alarm_type_cfg(chlid_unid);
+    int chlid_unid = get_select_child_id(); //hxt_get_child_unid();
+    int alarm_type = get_alarm_type(chlid_unid); //hxt_get_alarm_type_cfg(chlid_unid);
     int idx = rand() % 5;
     switch(alarm_type)
     {
@@ -119,7 +120,7 @@ static void take_rest(int time_ms)
 static BOOL begin_recording()
 {
     /* if no child bind, no need record */
-    int child_unid = hxt_get_child_unid();
+    int child_unid = get_select_child_id();//hxt_get_child_unid();
     if (child_unid == -1)
     {
         return FALSE;
@@ -180,7 +181,7 @@ static void stop_record()
 static BOOL send_study_report_type(StudyInfo *info)
 {
     /* if no child bind, no need to send message */
-    int child_unid = hxt_get_child_unid();
+    int child_unid = get_select_child_id(); //hxt_get_child_unid();
     if (child_unid == -1)
     {
         utils_print("no child binded\n");
@@ -212,13 +213,13 @@ static BOOL send_study_report_type(StudyInfo *info)
         /* offline mode */
         ReportInfo report_info;
         bzero(&report_info, sizeof(ReportInfo));
-        report_info.camera_status = hxt_get_camera_status();
-        report_info.parent_unid = hxt_get_parent_unid_cfg();
-        report_info.child_unid = hxt_get_child_unid();
+        report_info.camera_status = 1;
+        report_info.parent_unid = get_parent_id(); 
+        report_info.child_unid = get_select_child_id();
         report_info.report_type = info->info_type;
         strcpy(report_info.study_date, utils_date_to_string());
         strcpy(report_info.report_time, utils_time_to_string());
-        report_info.study_mode = hxt_get_study_mode_cfg(report_info.child_unid);
+        report_info.study_mode = get_study_mode(report_info.child_unid);
         if (report_info.report_type == BAD_POSTURE)
         {
             report_info.duration = 10;
@@ -364,22 +365,25 @@ static BOOL check_posture_alarm(struct check_status_t *check_status, int check_r
         }
         if (interval >= check_interval)
         {
-            if(g_first_alarm)
-            {
-                play_random_warn_voice();
-                utils_print("BAD POSTURE ALARM !!!\n");
-                check_status->_last_alarm_time = now;
-                g_first_alarm = FALSE;
-            }
-            else
-            {
-                if ((now - check_status->_last_alarm_time) >= ALARM_TIMEVAL)
-                {
-                    play_random_warn_voice();
-                    utils_print("BAD POSTURE ALARM2222 !!!\n");
-                    check_status->_last_alarm_time = now;
-                }
-            }
+            // if(g_first_alarm)
+            // {
+            //     play_random_warn_voice();
+            //     utils_print("BAD POSTURE ALARM !!!\n");
+            //     check_status->_last_alarm_time = now;
+            //     g_first_alarm = FALSE;
+            // }
+            // else
+            // {
+            //     if ((now - check_status->_last_alarm_time) >= ALARM_TIMEVAL)
+            //     {
+            //         play_random_warn_voice();
+            //         utils_print("BAD POSTURE ALARM2222 !!!\n");
+            //         check_status->_last_alarm_time = now;
+            //     }
+            // }
+            play_random_warn_voice();
+            utils_print("BAD POSTURE ALARM !!!\n");
+            check_status->_last_alarm_time = now;
             check_status->_start_posture = check_result;
             check_status->_start_time = now;
         } 
@@ -441,19 +445,25 @@ static void* thread_proc_yuv_data_cb(void *param)
         return NULL;
     }
 
-    PostureParams *params = utils_malloc(sizeof(PostureParams));
-    memcpy(params, param, sizeof(PostureParams));
-    if (params->alarm_interval == 0)
+    int alarm_interval = 0, video_duration = 0, study_mode = 0,width = 0, height = 0;
+    PostureParams *params = (PostureParams *)param;
+    alarm_interval = params->alarm_interval;
+    video_duration = params->video_duration;
+    study_mode = params->study_mode;
+    width = params->width;
+    height = params->height;
+
+    if (alarm_interval == 0)
     {
-        params->alarm_interval = 10;
+        alarm_interval = 10;
     }
-    if(params->video_duration == 0)
+    if(video_duration == 0)
     {
-        params->video_duration = 10;
+        video_duration = 10;
     }
-    if (params->study_mode == 0)
+    if (study_mode == 0)
     {
-        params->study_mode = 3;
+        study_mode = 3;
     }
     
     struct check_status_t check_status;
@@ -486,7 +496,7 @@ static void* thread_proc_yuv_data_cb(void *param)
         /* 0 : Normal */
         /* 1 : bad posture */
         /* 2 : away */
-        one_check_result = run_sit_posture(g_recog_handle, yuv_buf, params->width, params->height, 5);
+        one_check_result = run_sit_posture(g_recog_handle, yuv_buf, width, height, 5);
         utils_print("%s -----> %d\n", utils_get_current_time(), one_check_result);
         if (init_check_status(&check_status, one_check_result))
         {
@@ -498,7 +508,7 @@ static void* thread_proc_yuv_data_cb(void *param)
             utils_print("POSTURE CHANGED\n");
             continue;
         }
-        check_posture_alarm(&check_status, one_check_result, params->video_duration, params->alarm_interval);
+        check_posture_alarm(&check_status, one_check_result, video_duration, alarm_interval);
 
         if (yuv_buf != NULL)
         {
@@ -513,15 +523,15 @@ static void* thread_proc_yuv_data_cb(void *param)
     /**/
     if (g_recog_handle != NULL)
     {
+        utils_print("To release recog mem...\n");
         uninit_sit_posture(&g_recog_handle);
     }
-
-    utils_free(params);
 
     /* send msg to notify ending */
     memset(&info, 0, sizeof(StudyInfo));
     info.info_type = STUDY_END;
     send_study_report_type(&info);
+    
     utils_send_local_voice(VOICE_CAMERA_SLEEP);
 
     utils_print("rocognize thread exit...\n");
@@ -531,12 +541,18 @@ static void* thread_proc_yuv_data_cb(void *param)
 
 void start_posture_recognize()
 {
-    int bind_status = hxt_get_desk_bind_status_cfg();
+    int bind_status = get_desk_bind_status();
     if (bind_status != 1)
     {
         utils_print("Desk not binded\n");
         return;
     }
+
+    if (g_keep_processing)
+    {
+        return;
+    }
+    g_keep_processing = TRUE;
 
     /* get config */
     if (!hxt_get_desk_cfg_request())
@@ -545,45 +561,41 @@ void start_posture_recognize()
         return;
     }
 
-
-    if (g_keep_processing)
-    {
-        return;
-    }
-    g_keep_processing = TRUE;
-
     PostureParams params;
     memset(&params, 0, sizeof(PostureParams));
-    params.video_duration = hxt_get_video_length_cfg();
-    params.alarm_interval = hxt_get_posture_judge_cfg();         
-    params.width = hxt_get_video_height_cfg();
-    params.height = hxt_get_video_width_cfg();
-    params.snap_freq = hxt_get_attach_ratio_cfg();
-    params.study_mode = hxt_get_study_mode_cfg();
+    params.video_duration = get_video_length(); 
+    params.alarm_interval = get_judge_time(); 
+    params.width = hxt_get_video_height();
+    params.height = hxt_get_video_width();
+    params.snap_freq = get_attach_ratio();
+    params.study_mode = get_study_mode(get_select_child_id()); 
+    //for test
+    params.study_mode = 3;
     
-    /* get posture pattern file */
-    int study_mode = hxt_get_study_mode_cfg();
-
-    char *model_path1 = hxt_get_posture_detect_model_path_cfg(study_mode);
-    char *model_path2 = hxt_get_posture_class_model_path_cfg(study_mode);
+    char *model_path1 = hxt_get_posture_detect_model_path(params.study_mode);
+    char *model_path2 = hxt_get_posture_class_model_path(params.study_mode);
     if(NULL == model_path1 || NULL == model_path2)
     {
         return;
     }
-    
-    send_posture_start_cmd(params.height, params.width);
-
-    utils_send_local_voice(VOICE_NORMAL_STATUS);
-
     // init 
     utils_print("To start recognize....\n");
     g_recog_handle = init_sit_posture(model_path1, model_path2);
     if (NULL == g_recog_handle)
     {
         utils_print("posture model init failed\n");
+        g_keep_processing = FALSE;
+        return;
     }
-    pthread_create(&g_proc_yuv_tid, NULL, thread_proc_yuv_data_cb, (void*)&params);
-   
+
+    send_posture_start_cmd(params.height, params.width);
+
+    utils_send_local_voice(VOICE_NORMAL_STATUS);
+
+    pthread_t proc_yuv_tid = NULL;
+    pthread_create(&proc_yuv_tid, NULL, thread_proc_yuv_data_cb, (void*)&params);
+    pthread_detach(proc_yuv_tid);
+
     return;
 }
 

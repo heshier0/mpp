@@ -3,8 +3,10 @@
 #include <stdio.h>
 #include <cJSON.h>
 
+
 #include "utils.h"
-#include "iflyos_defines.h"
+#include "iflyos_func.h"
+
 
 #define IFLYOS_REPONSES             ("iflyos_responses")
 #define IFLYOS_HEADER               ("header")
@@ -16,14 +18,14 @@
 #define IFLYOS_MP3_URL              ("url")
 
 
-void iflyos_free(void* ptr)
+static void iflyos_free(void* ptr)
 {
     if(ptr == NULL)
     {
         return;
     }
     
-    free(ptr);
+    utils_free(ptr);
     ptr = NULL;
 
     return;
@@ -42,6 +44,7 @@ static char* iflyos_get_response_value(const char* json_data, const char* item_n
     {
         return NULL;
     }
+
     cJSON *responses = cJSON_GetObjectItem(root, IFLYOS_REPONSES);
     if (!responses)
     {
@@ -71,9 +74,9 @@ static char* iflyos_get_response_value(const char* json_data, const char* item_n
         if (value)
         {
             int len = strlen(value->valuestring);
-            name = malloc(len + 1);
+            name = utils_malloc(len + 1);
             memcpy(name, value->valuestring, len);
-            name[len] = '\0';
+            // name[len] = '\0';
             break;
         }
     }

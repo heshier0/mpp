@@ -2,7 +2,6 @@
 #define __IFLYOS_COMMON_DEF_H__
 
 #include "utils.h"
-#include "iflyos_defines.h"
 
 /*********************************************
  * {
@@ -15,8 +14,8 @@
 #pragma pack(push, 1)
 typedef struct iflyos_header
 {               
-    char authorization[80];          //must
-    char device_id[20];                 //must
+    char authorization[128];          //must
+    char device_id[32];                 //must
     char device_ip[32];             
     float latitude;
     float longitude;
@@ -47,8 +46,7 @@ typedef struct iflyos_context_recognizer
     char version[6];
 }FlyosContextRecognizer;
 
-//属性保留
-//若需要使用相应功能，则作为结构体成员加入FlyosContext
+
 typedef struct iflyos_context_speaker
 {
     char version[6];    //must
@@ -56,6 +54,8 @@ typedef struct iflyos_context_speaker
     char type[8];
 }FlyosContextSpeaker;
 
+//属性保留
+//若需要使用相应功能，则作为结构体成员加入FlyosContext
 typedef struct iflyos_context_alarm
 {
     char version[6];    //must
@@ -127,10 +127,10 @@ typedef struct iflyos_context_interceptor
 
 typedef struct iflyos_context
 {
-    FlyosContextSystem* system;
-    FLyosContextAudioPlayer* audio_player;
-    FlyosContextRecognizer* recognizer;
-    FlyosContextSpeaker* speaker;
+    FlyosContextSystem system;
+    FLyosContextAudioPlayer audio_player;
+    FlyosContextRecognizer recognizer;
+    FlyosContextSpeaker speaker;
 }FlyosContext;
 
 

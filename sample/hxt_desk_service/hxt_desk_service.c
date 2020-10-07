@@ -13,7 +13,9 @@
 #include "common.h"
 #include "server_comm.h"
 #include "databuffer.h"
-#include "report_info_db.h"
+#include "db.h"
+#include "hxt_client.h"
+#include "board_func.h"
 
 volatile BOOL g_hxt_wbsc_running = FALSE;
 volatile BOOL g_iflyos_wbsc_running = FALSE;
@@ -57,9 +59,15 @@ static void start_iflyos_websocket_thread()
     }
 
     pthread_t iflyos_tid;
-    if(hxt_get_iflyos_token_cfg() != NULL && hxt_get_iflyos_cae_sn() != NULL)
+    // if(hxt_get_iflyos_token_cfg() != NULL && hxt_get_iflyos_cae_sn() != NULL)
+    char *token = get_iflyos_token();
+    char *sn = get_iflyos_sn();
+    if (token != NULL && sn != NULL)
     {
         pthread_create(&iflyos_tid, NULL, iflyos_websocket_cb, NULL);
+
+        utils_free(token);
+        utils_free(sn);
     }
 
     return;
@@ -103,9 +111,13 @@ static void  hxt_bind_user()
     /* check if wifi info in cfg */
     while (1)
     {
-        while (hxt_get_wifi_ssid_cfg() == NULL || strlen(hxt_get_wifi_ssid_cfg()) == 0)
+        char* ssid = get_wifi_ssid();
+        char* pwd = get_wifi_pwd();
+
+        if(ssid == NULL || pwd == NULL)
         {
             /* step into qrcode scan */
+            utils_print("To wait scan wifi info....\n");
             sleep(3);
             continue;
         }
@@ -113,15 +125,18 @@ static void  hxt_bind_user()
         /* to connect wifi */
         if (!utils_check_wifi_state())
         {
-            utils_link_wifi(hxt_get_wifi_ssid_cfg(), hxt_get_wifi_pwd_cfg());
+            // utils_link_wifi(hxt_get_wifi_ssid_cfg(), hxt_get_wifi_pwd_cfg());
+            utils_link_wifi(ssid, pwd);
             sleep(10);
         }
-        
+        utils_free(ssid);
+        utils_free(pwd);
+
         /*link ok, play voice*/
         if (utils_check_wifi_state())
         {
             //check desk bind status 
-            if(hxt_get_desk_bind_status_cfg() == 1)
+            if (get_desk_bind_status() == 1)
             {
                 break;
             }
@@ -135,7 +150,7 @@ static void  hxt_bind_user()
                     {
                         if (hxt_confirm_desk_bind_request())
                         {
-                            hxt_set_desk_bind_status_cfg(1);
+                            set_desk_bind_status(1);
                             break;
                         }
                     }
@@ -162,14 +177,9 @@ int main(int argc, char **argv)
     signal(SIGINT, handle_signal);
     signal(SIGTERM, handle_signal);   
 #endif
-    
-    create_buffer(&g_msg_buffer, 16*1024);
     open_hxt_service_db();
-    
 #if 1
-    /* load config */
-    hxt_load_cfg();
-
+    create_buffer(&g_msg_buffer, 16*1024);
     /* init gpio */
     board_gpio_init();
 
@@ -210,12 +220,10 @@ int main(int argc, char **argv)
 
  EXIT:
     board_gpio_uninit();
-    hxt_unload_cfg();
-    
+    destroy_buffer(&g_msg_buffer);
 #endif
     close_hxt_service_db();
-    destroy_buffer(&g_msg_buffer);
-    
+
     utils_print("~~~~EXIT~~~~\n");
 
     return 0;

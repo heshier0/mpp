@@ -15,9 +15,11 @@
 #include <acodec.h>
 #include <audio_mp3_adp.h>
 
+#include "defines.h"
 #include "command.h"
 #include "board_media.h"
 #include "board_mpp.h"
+
 
 
 /*********************MPP各模块对应关系**********************************
@@ -771,7 +773,7 @@ static int sample_pcm_32bit_dump(const AUDIO_FRAME_S *audio_frame, const AEC_FRA
     tmp_short_reff_ptr = (short*)user_addr[1];
 
 
-    *pOutbuf = malloc(reff_buf_len*2 + mic_buf_len*2);
+    *pOutbuf = utils_malloc(reff_buf_len*2 + mic_buf_len*2);
     memset(*pOutbuf, 0, (reff_buf_len*2 + mic_buf_len*2));
 
     int tmp_val = 0;
@@ -815,19 +817,19 @@ static void* sample_pcm_cb(void *data)
     }
 
     /* 2020-08-29 added */
-    s32Ret = HI_MPI_AI_GetChnParam(AiDev, AiChn, &stAiChnPara);
-    if (HI_SUCCESS != s32Ret)
-    {
-        utils_print("%s: Get ai chn param failed\n");
-        goto ERROR_EXIT;
-    }
-    stAiChnPara.u32UsrFrmDepth = 30;
-    s32Ret = HI_MPI_AI_SetChnParam(AiDev, AiChn, &stAiChnPara);
-    if (HI_SUCCESS != s32Ret)
-    {
-        utils_print("%s: set ai chn param failed\n");
-        goto ERROR_EXIT;
-    }
+    // s32Ret = HI_MPI_AI_GetChnParam(AiDev, AiChn, &stAiChnPara);
+    // if (HI_SUCCESS != s32Ret)
+    // {
+    //     utils_print("%s: Get ai chn param failed\n");
+    //     goto ERROR_EXIT;
+    // }
+    // stAiChnPara.u32UsrFrmDepth = 30;
+    // s32Ret = HI_MPI_AI_SetChnParam(AiDev, AiChn, &stAiChnPara);
+    // if (HI_SUCCESS != s32Ret)
+    // {
+    //     utils_print("%s: set ai chn param failed\n");
+    //     goto ERROR_EXIT;
+    // }
     /*end added*/
 
     /* get frame after AEC */
@@ -874,6 +876,7 @@ static void* sample_pcm_cb(void *data)
             if (stFrame.u32Len != stAecFrm.stRefFrame.u32Len)
             {
                 utils_print("mic frame and reff frame not equal\n");
+                HI_MPI_AI_ReleaseFrame(AiDev, AiChn, &stFrame, &stAecFrm);
                 continue;
             }
 
@@ -893,7 +896,7 @@ static void* sample_pcm_cb(void *data)
             }  
         }
         int write_count = write(fd, out_buff, size);
-        free(out_buff);
+        utils_free(out_buff);
     }
 
 ERROR_EXIT:    
@@ -915,7 +918,7 @@ static void* play_mp3_cb(void* data)
     HI_S32 s32AdecChn = 0;
     HI_U8* pu8AudioStream = NULL;
 
-    pu8AudioStream = (HI_U8*)malloc(sizeof(HI_U8) * MAX_AUDIO_STREAM_LEN);
+    pu8AudioStream = (HI_U8*)utils_malloc(sizeof(HI_U8) * MAX_AUDIO_STREAM_LEN);
     if (NULL == pu8AudioStream)
     {
         utils_print("malloc failed!\n");
@@ -947,7 +950,7 @@ static void* play_mp3_cb(void* data)
         }    
     }
 
-    free(pu8AudioStream);
+    utils_free(pu8AudioStream);
     pu8AudioStream = NULL;
     close(fd);
 
@@ -1164,7 +1167,7 @@ void board_get_stream_from_venc_chn(int width, int height)
                 /*******************************************************
                  step 2.3 : malloc corresponding number of pack nodes.
                 *******************************************************/
-                venc_stream.pstPack = (VENC_PACK_S*)malloc(sizeof(VENC_PACK_S) * chn_stat.u32CurPacks);
+                venc_stream.pstPack = (VENC_PACK_S*)utils_malloc(sizeof(VENC_PACK_S) * chn_stat.u32CurPacks);
                 if (NULL == venc_stream.pstPack)
                 {
                     utils_print("malloc stream pack failed!\n");
@@ -1178,7 +1181,7 @@ void board_get_stream_from_venc_chn(int width, int height)
                 ret_val = HI_MPI_VENC_GetStream(venc_chn, &venc_stream, HI_TRUE);
                 if (HI_SUCCESS != ret_val)
                 {
-                    free(venc_stream.pstPack);
+                    utils_free(venc_stream.pstPack);
                     venc_stream.pstPack = NULL;
                     utils_print("HI_MPI_VENC_GetStream failed with %#x!\n", ret_val);
                     break;
@@ -1197,14 +1200,14 @@ void board_get_stream_from_venc_chn(int width, int height)
                 if (HI_SUCCESS != ret_val)
                 {
                     utils_print("HI_MPI_VENC_ReleaseStream failed!\n");
-                    free(venc_stream.pstPack);
+                    utils_free(venc_stream.pstPack);
                     venc_stream.pstPack = NULL;
                     break;
                 }
                 /*******************************************************
                  step 2.7 : free pack nodes
                 *******************************************************/
-                free(venc_stream.pstPack);
+                utils_free(venc_stream.pstPack);
                 venc_stream.pstPack = NULL;
             }    
 
@@ -1291,7 +1294,7 @@ void board_get_snap_from_venc_chn(const char* jpg_file)
                     utils_print("NOTE: Current  frame is NULL!\n");
                     return;
                 }
-                stream.pstPack = (VENC_PACK_S*)malloc(sizeof(VENC_PACK_S) * venc_chn_stat.u32CurPacks);
+                stream.pstPack = (VENC_PACK_S*)utils_malloc(sizeof(VENC_PACK_S) * venc_chn_stat.u32CurPacks);
                 if (NULL == stream.pstPack)
                 {
                     utils_print("malloc memory failed!\n");
@@ -1303,7 +1306,7 @@ void board_get_snap_from_venc_chn(const char* jpg_file)
                 {
                     utils_print("HI_MPI_VENC_GetStream failed with %#x!\n", ret);
 
-                    free(stream.pstPack);
+                    utils_free(stream.pstPack);
                     stream.pstPack = NULL;
                     return;
                 }
@@ -1313,7 +1316,7 @@ void board_get_snap_from_venc_chn(const char* jpg_file)
                 {
                     utils_print("open file %s err\n", jpg_file);
                     ret = HI_MPI_VENC_ReleaseStream(venc_chn, &stream);
-                    free(stream.pstPack);
+                    utils_free(stream.pstPack);
                     stream.pstPack = NULL;
                     break;
                 }
@@ -1331,12 +1334,12 @@ void board_get_snap_from_venc_chn(const char* jpg_file)
                 {
                     utils_print("HI_MPI_VENC_ReleaseStream failed with %#x!\n", ret);
 
-                    free(stream.pstPack);
+                    utils_free(stream.pstPack);
                     stream.pstPack = NULL;
                     return;
                 }
 
-                free(stream.pstPack);
+                utils_free(stream.pstPack);
                 stream.pstPack = NULL;
             }
             break;
@@ -1375,7 +1378,7 @@ void start_play_mp3_thread()
 
     g_play_mp3_status =  TRUE;
     pthread_create(&play_id, NULL, play_mp3_cb, NULL);
-    // pthread_detach(play_id);
+    pthread_detach(play_id);
 
     return;
 }
@@ -1391,7 +1394,7 @@ void start_sample_voice_thread(void* data)
 
     g_sample_pcm_status = TRUE;
     pthread_create(&voice_tid, NULL, sample_pcm_cb, NULL);
-    // pthread_detach(voice_tid);
+    pthread_detach(voice_tid);
 
     return;
 }

@@ -15,8 +15,9 @@
 #include "common.h"
 #include "utils.h"
 #include "databuffer.h"
-
-#include "iflyos_defines.h"
+#include "db.h"
+#include "server_comm.h"
+#include "iflyos_func.h"
 
 #define BUFFER_SIZE     (4*1024*1024)
 #define PCM_LENGTH      640
@@ -108,12 +109,13 @@ static void iflyos_uwsc_onopen(struct uwsc_client *cl)
 
     g_iflyos_wbsc_running = TRUE;
 
-    // int sock_fd = create_udp_server();
     /* sample voice to iflyos */
     g_sampling = TRUE;
 
     pthread_create(&read_pcm_tid, NULL, thread_read_pcm_cb, NULL);
+    pthread_detach(read_pcm_tid);
     pthread_create(&send_pcm_tid, NULL, thread_send_pcm_cb, (void*)cl);
+    pthread_detach(send_pcm_tid);
 
     /* send cmd to tell service */
     send_voice_sample_start_cmd();
@@ -130,8 +132,6 @@ static void iflyos_uwsc_onopen(struct uwsc_client *cl)
 static void iflyos_uwsc_onmessage(struct uwsc_client *cl,
 	void *data, size_t len, bool binary)
 {
-    utils_print("%s: [%.*s]\n", utils_get_current_time(), (int)len, (char *)data);
-    
     if (binary) {
         //文件
     } 
@@ -145,19 +145,23 @@ static void iflyos_uwsc_onmessage(struct uwsc_client *cl,
         
         if(strcmp(name, aplayer_audio_out) == 0)
         {
+            utils_print("To play audio....\n");
             iflyos_play_response_audio(data);
         }
         else if (strcmp(name, recog_stop_capture) == 0)
         {
+            utils_print("Stop capture ....\n");
             g_stop_capture = TRUE;
         }
         else
         {
-            /**/
+        utils_print("other response\n");
         }
         
-        free(name);
+        utils_free(name);
     }
+
+    utils_print("%s: [%.*s]\n", utils_get_current_time(), (int)len, (char *)data);
 }
 
 static void iflyos_uwsc_onerror(struct uwsc_client *cl, int err, const char *msg)
@@ -168,8 +172,8 @@ static void iflyos_uwsc_onerror(struct uwsc_client *cl, int err, const char *msg
         g_sampling = FALSE;
         send_voice_sample_stop_cmd();
 
-        pthread_join(read_pcm_tid, NULL);
-        pthread_join(send_pcm_tid, NULL);
+        // pthread_join(read_pcm_tid, NULL);
+        // pthread_join(send_pcm_tid, NULL);
     }
 
     ev_break(cl->loop, EVBREAK_ALL);
@@ -183,8 +187,8 @@ static void iflyos_uwsc_onclose(struct uwsc_client *cl, int code, const char *re
         g_sampling = FALSE;
         send_voice_sample_stop_cmd();
 
-        pthread_join(read_pcm_tid, NULL);
-        pthread_join(send_pcm_tid, NULL);
+        // pthread_join(read_pcm_tid, NULL);
+        // pthread_join(send_pcm_tid, NULL);
     }
 
     ev_break(cl->loop, EVBREAK_ALL);
@@ -197,21 +201,21 @@ int iflyos_websocket_start()
     struct ev_loop *loop;
 
     create_buffer(&g_voice_buffer, BUFFER_SIZE);
-    iflyos_load_cfg();
 
     char ifly_url[255] = {0};
-    //char* device_id = hxt_get_desk_uuid_cfg(); 
-    char* device_id = iflyos_get_device_id();
-    //char* token = hxt_get_iflyos_token_cfg();
-    char* token = iflyos_get_token();
+    char* device_id = "HXT20200607P";//get_device_id();
+    char* token = "V1ZKr70AkzsLyqib92_Myb-DPPn8KvMfbAQcGDaNnCrDxGSwXqC7pFfkOpSVKFMx"; //get_iflyos_token();
     utils_print("iflyos device_id is %s and token is %s\n", device_id, token);
     sprintf(ifly_url, "wss://ivs.iflyos.cn/embedded/v1?token=%s&device_id=%s", token, device_id); 
+    // utils_free(token);
+    // utils_free(device_id);
 
     loop = ev_loop_new(EVFLAG_AUTO);
     cl = uwsc_new(loop, ifly_url, ping_interval, NULL);
     if (!cl)
     {
         utils_print("iflyos websocket client init failed...\n");
+        destroy_buffer(&g_voice_buffer);
         return -1;
     }
     
@@ -230,12 +234,8 @@ int iflyos_websocket_start()
     g_iflyos_wbsc_running = FALSE;
     iflyos_deinit_cae_lib();
     free(cl);
-    iflyos_unload_cfg();
     destroy_buffer(&g_voice_buffer);
     
-    
-   
-
     return 0;
 }
 

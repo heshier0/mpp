@@ -5,151 +5,47 @@
 #include <fcntl.h>
 
 #include <cJSON.h>
+#include "db.h"
+#include "iflyos_func.h"
 
-#include "iflyos_common_def.h"
-
-static FlyosHeader* inited_header;
-static FlyosContext* inited_context;
-
-static void iflyos_create_init_header()
+static cJSON* iflyos_create_header()
 {
-    inited_header = (FlyosHeader *)utils_malloc(sizeof(FlyosHeader));
-
-    // char* token_type = iflyos_get_token_type();
-    char* token = iflyos_get_token();//hxt_get_iflyos_token_cfg(); 
-    strcpy(inited_header->authorization, "Bearer ");
-    // strcat(inited_header->authorization, " ");
-    strcat(inited_header->authorization, token);
-    utils_print("token is %s\n", inited_header->authorization);
-    char* device_id = iflyos_get_device_id(); //hxt_get_desk_uuid_cfg();
-    strcpy(inited_header->device_id, device_id);
-    utils_print("device id is %s\n", inited_header->device_id);
-
-    char* platform_name = iflyos_get_platform_name();
-    strcpy(inited_header->platform_name, platform_name);
-
-    char* platform_version = iflyos_get_platform_version();
-    strcpy(inited_header->platform_version, platform_version);
-}
-
-static void iflyos_create_init_context()
-{
-    inited_context = (FlyosContext *)utils_malloc(sizeof(FlyosContext));
-
-    FlyosContextSystem context_system;
-    memset(&context_system, 0, sizeof(FlyosContextSystem));
-    char* sys_version = iflyos_get_system_version();
-    strcpy(context_system.version, sys_version);
-
-    FLyosContextAudioPlayer audio_player;
-    memset(&audio_player, 0, sizeof(FLyosContextAudioPlayer));
-    char* audio_version = iflyos_get_audio_version();
-    char* audio_state = iflyos_get_audio_state();
-    strcpy(audio_player.version, audio_version);
-    strcpy(audio_player.state, audio_state);
-
-    FlyosContextSpeaker speaker;
-    memset(&speaker, 0, sizeof(FlyosContextSpeaker));
-    char* speaker_version = iflyos_get_speaker_version();
-    char* speaker_type = iflyos_get_speaker_type();
-    int speaker_vol = iflyos_get_speaker_volume();
-    strcpy(speaker.version, speaker_version);
-    strcpy(speaker.type, speaker_type);
-    speaker.volume = speaker_vol;
-
-    inited_context->system = (FlyosContextSystem *)utils_malloc(sizeof(FlyosContextSystem));
-    memcpy(inited_context->system, &context_system, sizeof(FlyosContextSystem));
-    
-    inited_context->audio_player = (FLyosContextAudioPlayer *)utils_malloc(sizeof(FLyosContextAudioPlayer));
-    memcpy(inited_context->audio_player, &audio_player, sizeof(FLyosContextAudioPlayer));
-
-    inited_context->speaker = (FlyosContextSpeaker *)utils_malloc(sizeof(FlyosContextSpeaker));
-    memcpy(inited_context->speaker, &speaker, sizeof(FlyosContextSpeaker));
-
-    return;
-}
-
-static void iflyos_destroy_header(FlyosHeader* header)
-{
-    if (NULL == header)
-    {
-        return;
-    }
-    utils_free(header);
-    header = NULL;
-
-    return;
-}
-
-static void iflyos_destroy_context(FlyosContext* context)
-{
-    if(NULL == context)
-    {
-        return;
-    }
-   
-    if(context->system != NULL)
-    {
-        utils_free(context->system);
-        context->system = NULL;
-    }
-    
-    if(context->audio_player != NULL)
-    {
-        utils_free(context->audio_player);
-        context->audio_player = NULL;
-    }
-
-    if(context->speaker != NULL)
-    {
-        utils_free(context->speaker);
-        context->speaker = NULL;
-    }
-
-    utils_free(context);
-    context = NULL;
-
-    return;
-}
-
-static cJSON* iflyos_create_header(FlyosHeader* header)
-{
-    if (NULL == header)
-    {
-        return NULL;
-    }
 
     cJSON *root = NULL;
     cJSON *device = NULL;
     cJSON *location = NULL;
     cJSON *platform = NULL;
 
-    root = cJSON_CreateObject();
+    /* auth */
+    char auth[128] = {0};
+    char* token = "V1ZKr70AkzsLyqib92_Myb-DPPn8KvMfbAQcGDaNnCrDxGSwXqC7pFfkOpSVKFMx";//get_iflyos_token(); 
+    strcpy(auth, "Bearer ");
+    strcat(auth, token);
+    utils_print("token is %s\n", auth);
+    /* device id */
+    char* device_id = "HXT20200607P"; //get_device_id();
+    utils_print("device id is %s\n", device_id);
 
-    cJSON_AddItemToObject(root, "authorization", cJSON_CreateString(header->authorization));
+    root = cJSON_CreateObject();
+    cJSON_AddItemToObject(root, "authorization", cJSON_CreateString(auth));
     cJSON_AddItemToObject(root, "device", device = cJSON_CreateObject());
 
-    cJSON_AddStringToObject(device, "device_id", header->device_id);
-    cJSON_AddStringToObject(device, "ip", header->device_ip);
+    cJSON_AddStringToObject(device, "device_id", device_id);
+    cJSON_AddStringToObject(device, "ip", "");
     cJSON_AddItemToObject(device, "location", location = cJSON_CreateObject());
     cJSON_AddItemToObject(device, "platform", platform = cJSON_CreateObject());
 
-    cJSON_AddNumberToObject(location, "latitude", header->latitude);
-    cJSON_AddNumberToObject(location, "longtitude", header->longitude);
+    cJSON_AddNumberToObject(location, "latitude", 0);
+    cJSON_AddNumberToObject(location, "longtitude", 0);
     
-    cJSON_AddStringToObject(platform, "name", header->platform_name);
-    cJSON_AddStringToObject(platform, "version", header->platform_version);
+    cJSON_AddStringToObject(platform, "name", PLATFORM_NAME);
+    cJSON_AddStringToObject(platform, "version", PLATFORM_VER);
 
     return root;
 }
 
-static cJSON* iflyos_create_context(FlyosContext* context)
+static cJSON* iflyos_create_context()
 {
-    if (NULL == context)
-    {
-        return;
-    }
-
     cJSON* root = NULL;
     cJSON* system = NULL;
     cJSON* audio_player = NULL;
@@ -164,47 +60,35 @@ static cJSON* iflyos_create_context(FlyosContext* context)
     cJSON_AddItemToObject(root, "speaker", speaker = cJSON_CreateObject());
     // cJSON_AddItemToObject(root, "wakeword", wakeword = cJSON_CreateObject());
 
-    cJSON_AddStringToObject(system, "version", context->system->version);
-    cJSON_AddBoolToObject(system, "software_updater", context->system->software_updater);
-    cJSON_AddBoolToObject(system, "power_controller", context->system->power_controller);
-    cJSON_AddBoolToObject(system, "device_modes", context->system->device_modes);
-    cJSON_AddBoolToObject(system, "factory_reset", context->system->factory_reset);
-    cJSON_AddBoolToObject(system, "reboot", context->system->reboot);
+    cJSON_AddStringToObject(system, "version", SYSTEM_VER);
+    cJSON_AddBoolToObject(system, "software_updater", cJSON_False);
+    cJSON_AddBoolToObject(system, "power_controller", cJSON_False);
+    cJSON_AddBoolToObject(system, "device_modes", cJSON_False);
+    cJSON_AddBoolToObject(system, "factory_reset", cJSON_False);
+    cJSON_AddBoolToObject(system, "reboot", cJSON_False);
 
-    cJSON_AddStringToObject(audio_player, "version", context->audio_player->version);
+    cJSON_AddStringToObject(audio_player, "version", AUDIO_PLAYER_VER);
     cJSON_AddItemToObject(audio_player, "playback", playback = cJSON_CreateObject());
-    cJSON_AddStringToObject(playback, "state", context->audio_player->state);
-    cJSON_AddStringToObject(playback, "resource_id", context->audio_player->resource_id);
-    cJSON_AddNumberToObject(playback, "offset", context->audio_player->offset);
+    cJSON_AddStringToObject(playback, "state", AUDIO_PLAYER_STATE);
+    cJSON_AddStringToObject(playback, "resource_id", "");
+    cJSON_AddNumberToObject(playback, "offset", 0);
 
-    cJSON_AddStringToObject(speaker, "version", context->speaker->version);
-    cJSON_AddNumberToObject(speaker, "volume", context->speaker->volume);
-    cJSON_AddStringToObject(speaker, "type", context->speaker->type);
-
-    //wakeup word
-    // cJSON_AddStringToObject(wakeword, "version", "1.1");
+    cJSON_AddStringToObject(speaker, "version", SPEAKER_VER);
+    cJSON_AddNumberToObject(speaker, "volume", SPEAKER_VOL);
+    cJSON_AddStringToObject(speaker, "type", SPEAKER_TYPE);
 
     return root;
-}
-
-static void iflyos_init_request()
-{
-    iflyos_create_init_header();
-    iflyos_create_init_context();
-}
-
-void iflyos_deinit_request()
-{
-    iflyos_destroy_header(inited_header);
-    iflyos_destroy_context(inited_context);
 }
 
 char*  iflyos_create_audio_in_request()
 {
     cJSON *root = NULL;
-    iflyos_init_request();
-    cJSON* header_node = iflyos_create_header(inited_header);
-    cJSON* context_node = iflyos_create_context(inited_context);
+
+    // iflyos_create_init_header();
+    // iflyos_create_init_context();
+
+    cJSON* header_node = iflyos_create_header();
+    cJSON* context_node = iflyos_create_context();
     cJSON* request_node = NULL;
 
     root = cJSON_CreateObject();
@@ -233,14 +117,11 @@ char*  iflyos_create_audio_in_request()
     cJSON_AddStringToObject(payload_wakeup, "prompt", "我在");
 
     char* request = cJSON_Print(root);
-    //for test
-    cJSON_free(header_node);
-    cJSON_free(context_node);
+
+    // cJSON_free(header_node);
+    // cJSON_free(context_node);
     cJSON_free(root);
     
-    iflyos_deinit_request();
-    //end test
-
     return request;
 }
 
@@ -252,11 +133,9 @@ char* iflyos_create_txt_in_request(const char* txt_buffer)
     }
 
     cJSON *root = NULL;
-
-    iflyos_init_request();
-
-    cJSON* header_node = iflyos_create_header(inited_header);
-    cJSON* context_node = iflyos_create_context(inited_context);
+    // iflyos_init_request();
+    cJSON* header_node = iflyos_create_header();
+    cJSON* context_node = iflyos_create_context();
     cJSON* request_node = NULL;
 
     root = cJSON_CreateObject();
@@ -279,12 +158,10 @@ char* iflyos_create_txt_in_request(const char* txt_buffer)
     char* request = cJSON_Print(root);
 
     //for test
-    cJSON_free(header_node);
-    cJSON_free(context_node);
+    // cJSON_free(header_node);
+    // cJSON_free(context_node);
     cJSON_free(root);
     //end test
-
-    iflyos_deinit_request();
 
     return request;
 }
@@ -293,10 +170,10 @@ char* iflyos_create_set_wakeword_request()
 {
     cJSON *root = NULL;
 
-    iflyos_init_request();
+    // iflyos_init_request();
 
-    cJSON* header_node = iflyos_create_header(inited_header);
-    cJSON* context_node = iflyos_create_context(inited_context);
+    cJSON* header_node = iflyos_create_header();
+    cJSON* context_node = iflyos_create_context();
     
     
     cJSON* request_node = NULL;
@@ -316,18 +193,14 @@ char* iflyos_create_set_wakeword_request()
     cJSON_AddStringToObject(request_header, "name", wakeword_result);
     cJSON_AddStringToObject(request_header, "request_id", "");
 
-    // cJSON_AddStringToObject(request_payload, "result", "SUCCEED");
-    // cJSON_AddStringToObject(request_payload, "wakeword", "蓝小飞");
-    // cJSON_AddStringToObject(request_payload, "error_type", "DOWNLOAD_ERROR");
     
     char* request = cJSON_Print(root);
 
     //for test
-    cJSON_free(header_node);
-    cJSON_free(context_node);
+    // cJSON_free(header_node);
+    // cJSON_free(context_node);
     cJSON_free(root);
 
-    iflyos_deinit_request();
     //end test
 
     return request;

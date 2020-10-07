@@ -138,20 +138,23 @@ static void* process_desk_business_thread(void *args)
         case CMD_START_POSTURE:
             if(!posturing)
             {
-                posturing = TRUE;
                 bzero(&video_ratio, sizeof(video_ratio_t));
                 ptr = get_buffer(&g_client_data, sizeof(video_ratio_t));
-                memcpy(&video_ratio, ptr, sizeof(video_ratio_t));
-                release_buffer(&g_client_data, sizeof(video_ratio_t));
-                start_sample_video_thread((void*)&video_ratio);
-                utils_print("start posture check\n");
+                if (ptr != NULL)
+                {
+                    memcpy(&video_ratio, ptr, sizeof(video_ratio_t));
+                    release_buffer(&g_client_data, sizeof(video_ratio_t));
+                    start_sample_video_thread((void*)&video_ratio);
+                    utils_print("start posture check\n");
+                }
+                posturing = TRUE;
             }
         break;      
         case CMD_STOP_POSTURE:
             if (posturing)
             {
-                posturing = FALSE;
                 stop_sample_video_thread();
+                posturing = FALSE;
                 utils_print("stop posture check\n");
             }
         break;

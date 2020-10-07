@@ -7,6 +7,7 @@
 #include <sys/stat.h>
 #include <sys/mman.h>
 
+#include "board_func.h"
 
 #define DIE_ID0 0x12020400
 #define DIE_ID1 0x12020404
@@ -87,7 +88,7 @@ static void* mem_map(unsigned long phy_addr, unsigned long size)
     }
 
     /* add this mmap to MMAP Node */
-    pNew = (TMMAP_Node_t *)malloc(sizeof(TMMAP_Node_t));
+    pNew = (TMMAP_Node_t *)utils_malloc(sizeof(TMMAP_Node_t));
     if (NULL == pNew)
     {
         printf("mem_map():malloc new node failed! \n");
@@ -133,8 +134,9 @@ static int mem_unmap(void* addr_mapped)
 
     do
     {
-        if( ((unsigned long)addr_mapped >= pTmp->Start_V) && 
-            ((unsigned long)addr_mapped <= (pTmp->Start_V + pTmp->length)) )
+       // if( ((unsigned long)addr_mapped >= pTmp->Start_V) && 
+        //     ((unsigned long)addr_mapped <= (pTmp->Start_V + pTmp->length)) )
+        if (pTmp != NULL)
         {
             pTmp->refcount --;
             if (0 == pTmp->refcount)
@@ -156,7 +158,7 @@ static int mem_unmap(void* addr_mapped)
                     printf("mem_unmap(): munmap failed\n");
                 }
 
-                free(pTmp);
+                utils_free(pTmp);
             }
             return 0;
         }

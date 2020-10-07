@@ -7,10 +7,11 @@
 
 #include <uwsc/uwsc.h>
 
-#include "common.h"
 #include "utils.h"
 #include "hxt_defines.h"
 #include "databuffer.h"
+#include "db.h"
+#include "hxt_client.h"
 
 typedef enum 
 {
@@ -38,19 +39,26 @@ static BOOL init_study_info(ReportInfo *report_info, StudyInfo *study_info)
         utils_print("Study info type ERROR\n");
         return FALSE;
     }
-    report_info->camera_status = hxt_get_camera_status();
-    report_info->parent_unid = hxt_get_parent_unid_cfg();
-    report_info->child_unid = hxt_get_child_unid();
+    report_info->camera_status = 1;//hxt_get_camera_status();
+    report_info->parent_unid = get_parent_id(); //hxt_get_parent_unid_cfg();
+    report_info->child_unid = get_select_child_id(); //hxt_get_child_unid();
     report_info->report_type = study_info->info_type;
     strcpy(report_info->study_date, utils_date_to_string());
     strcpy(report_info->report_time, utils_time_to_string());
-    report_info->study_mode = hxt_get_study_mode_cfg(report_info->child_unid);
+    report_info->study_mode = get_study_mode(report_info->child_unid);//hxt_get_study_mode_cfg(report_info->child_unid);
     if (report_info->report_type == BAD_POSTURE)
     {
         report_info->duration = 10;
-        hxt_file_upload_request(study_info->file, report_info->study_date, report_info->video_url);
-        hxt_file_upload_request(study_info->snap, report_info->study_date, report_info->snap_url);
+        if(hxt_file_upload_request(study_info->file, report_info->study_date, report_info->video_url))
+        {
+            remove(study_info->file);
+        }
+        if (hxt_file_upload_request(study_info->snap, report_info->study_date, report_info->snap_url))
+        {
+            remove(study_info->snap);
+        }
     }
+
     
     return TRUE;
 }
@@ -66,7 +74,7 @@ static void hxt_send_desk_status(struct uwsc_client *cl, REPORT_TYPE type, int i
     cJSON *root = cJSON_CreateObject();    
     if (NULL == root)
     {
-        return;
+        goto END;
     }
 
     cJSON *data_item = NULL;
@@ -75,21 +83,19 @@ static void hxt_send_desk_status(struct uwsc_client *cl, REPORT_TYPE type, int i
     cJSON_AddNumberToObject(root, "dataType", HXT_DESK_STATUS);
     cJSON_AddItemToObject(root, "data", data_item = cJSON_CreateObject());
     cJSON_AddNumberToObject(data_item, "reportType", type);
-    cJSON_AddNumberToObject(data_item, "cameraStatus", hxt_get_camera_status());
+    cJSON_AddNumberToObject(data_item, "cameraStatus", 1);
     
     char* json_data = cJSON_PrintUnformatted(root);
     if (NULL == json_data)
     {
-        return;
+        goto END;
     }
     utils_print("HXT_DESK_STATUS: %s\n", json_data);
     cl->send(cl, json_data, strlen(json_data), info_type);
 
-    if(root != NULL)
-    {
-        cJSON_Delete(root);
-    }
-
+    utils_free(json_data);
+END:
+    cJSON_Delete(root);
     return;
 }
 
@@ -146,11 +152,10 @@ static void* send_study_info_cb(void *params)
         }
         utils_print("STUDY-INFO: %s\n", json_data);
         cl->send(cl, json_data, strlen(json_data), UWSC_OP_TEXT);
+
+        utils_free(json_data);
 CLEAR:
-        if(root != NULL)
-        {
-            cJSON_Delete(root);
-        }
+        cJSON_Delete(root);
         release_buffer(&g_msg_buffer, sizeof(StudyInfo));
         ptr = NULL;
     }
@@ -172,48 +177,63 @@ static void parse_server_config_data(void *data)
     }
     
     int old_ver = 0;
-    cJSON *sub_item = NULL;
+    cJSON *sub_item = NULL,  *sub_item1 = NULL, *sub_item2=NULL;
     cJSON *item = cJSON_GetObjectItem(root, "dataType");
     int data_type = item->valueint;
+    int judge_time, video_length, video_ratio, video_count, snap_count, offline_storage, attach_ratio;
+    int version_id;
+    char* version_no;
+    char* pack_url;
     switch(data_type)
     {
      case HXT_BASIC_CFG:
         utils_print("To process basic config...\n");
         item = cJSON_GetObjectItem(root, "data");
         sub_item = cJSON_GetObjectItem(item, "postureCountDuration");   //不良坐姿时长判定值
-        hxt_set_posture_judge_cfg(sub_item->valueint);
+        // hxt_set_posture_judge_cfg(sub_item->valueint);
+        judge_time = sub_item->valueint;
         sub_item = cJSON_GetObjectItem(item, "videoRecordDuration");    //视频记录时长
-        hxt_set_video_length_cfg(sub_item->valueint);
+        // hxt_set_video_length_cfg(sub_item->valueint);
+        video_length = sub_item->valueint;
         sub_item = cJSON_GetObjectItem(item, "videoRecordRatio");       //视频分辨率
-        hxt_set_video_ratio_cfg(sub_item->valueint);
+        // hxt_set_video_ratio_cfg(sub_item->valueint);
+        video_ratio = sub_item->valueint;
         sub_item = cJSON_GetObjectItem(item, "videoRecordCount");       //视频记录个数
-        hxt_set_video_count_cfg(sub_item->valueint);
+        // hxt_set_video_count_cfg(sub_item->valueint);
+        video_count = sub_item->valueint;
         sub_item = cJSON_GetObjectItem(item, "photoRecordCount");       //照片记录张数
-        hxt_set_photo_count_cfg(sub_item->valueint);
+        // hxt_set_photo_count_cfg(sub_item->valueint);
+        snap_count = sub_item->valueint;
         sub_item = cJSON_GetObjectItem(item, "offlineStorage");         //离线存储时长
-        hxt_set_offline_storage_cfg(sub_item->valueint);
+        // hxt_set_offline_storage_cfg(sub_item->valueint);
+        offline_storage = sub_item->valueint;
         sub_item = cJSON_GetObjectItem(item, "attachRatio");            //抽帧频次
-        hxt_set_attach_ratio_cfg(sub_item->valueint);
-        hxt_reload_cfg();
+        attach_ratio = sub_item->valueint;
+        // hxt_set_attach_ratio_cfg(sub_item->valueint);
+        // hxt_reload_cfg();
+        set_running_params(judge_time, video_length, video_ratio, video_count, snap_count, offline_storage, attach_ratio);
     break;
     case HXT_UPDATE_REMIND:
         utils_print("To process update...\n");
         item = cJSON_GetObjectItem(root, "data");
         if (item != NULL)
         {
-            old_ver = hxt_get_version_id_cfg();
+            old_ver = get_update_version_id();//hxt_get_version_id_cfg();
             sub_item = cJSON_GetObjectItem(item, "newVersionId");           //新版本id，大于0时有效
-            if (old_ver < sub_item->valueint)
+            version_id = sub_item->valueint;
+            if (old_ver < version_id)
             {
-                hxt_set_version_id_cfg(sub_item->valueint);
-                sub_item = cJSON_GetObjectItem(item, "newVersionNo");           //新版本号
-                hxt_set_version_cfg(sub_item->valuestring);
-                sub_item = cJSON_GetObjectItem(item, "upgradepackUrl");         //新版本文件地址
-                hxt_set_upgrade_pack_url_cfg(sub_item->valuestring);
-                hxt_reload_cfg();
+                //hxt_set_version_id_cfg(sub_item->valueint);
+                sub_item1 = cJSON_GetObjectItem(item, "newVersionNo");           //新版本号
+                // hxt_set_version_cfg(sub_item->valuestring);
+                version_no = sub_item1->valuestring;
+                sub_item2 = cJSON_GetObjectItem(item, "upgradepackUrl");         //新版本文件地址
+                // hxt_set_upgrade_pack_url_cfg(sub_item->valuestring);
+                pack_url = sub_item2->valuestring;
+                // hxt_reload_cfg();
+                set_update_params(version_id, version_no, pack_url);
                 //to upgrade
-
-                hxt_get_new_version_request(sub_item->valuestring);
+                hxt_get_new_version_request(pack_url);
             }
         }
     break;    
@@ -225,28 +245,29 @@ static void parse_server_config_data(void *data)
         utils_print("To process user data...\n");
         item = cJSON_GetObjectItem(root, "data");
         hxt_parse_user_data((void*)item);
-        hxt_reload_cfg();
+        // hxt_reload_cfg();
     break;       
     case HXT_ALARM_VARRY:
         utils_print("To varry alarm file...\n");
         item = cJSON_GetObjectItem(root, "data");
         hxt_update_children_alarm_files((void*)item);
-        hxt_reload_cfg();
+        // hxt_reload_cfg();
     break;
     case HXT_STUDY_MODE_VARRRY:
         //new studyMode
         utils_print("To varray study mode...\n");
         item = cJSON_GetObjectItem(root, "data");                           
-        sub_item = cJSON_GetObjectItem(item, "studyMode");               
-        hxt_set_study_mode_cfg(hxt_get_child_unid(), sub_item->valueint);
-        hxt_reload_cfg();
+        sub_item = cJSON_GetObjectItem(item, "studyMode");
+        update_study_mode(get_select_child_id(), sub_item->valueint);               
+        // hxt_set_study_mode_cfg(hxt_get_child_unid(), sub_item->valueint);
+        // hxt_reload_cfg();
     break;
     case HXT_BIND_CHILD_ID:
         // child unid
         utils_print("To bind child id...\n");
         item = cJSON_GetObjectItem(root, "data");
         hxt_update_children_alarm_files((void*)item);
-        hxt_reload_cfg();
+        // hxt_reload_cfg();
     break;
     case HXT_VARY_CHILD_ID:
         //
@@ -254,26 +275,38 @@ static void parse_server_config_data(void *data)
         item = cJSON_GetObjectItem(root, "data");
         sub_item = cJSON_GetObjectItem(item, "childrenUnid");               //设置/变更上报数据的孩子ID
         stop_posture_recognize();
-        hxt_set_child_unid(sub_item->valueint);
+        // hxt_set_child_unid(sub_item->valueint);
+        update_select_child(sub_item->valueint);
         sleep(1);
         start_posture_recognize();
     break;
     case HXT_GET_IFLYOS_TOKEN:
         utils_print("To update iflyos token or sn...\n");
         item = cJSON_GetObjectItem(root, "data");
-        sub_item = cJSON_GetObjectItem(item, "iflyosToken");
-        if (sub_item)
+        sub_item1 = cJSON_GetObjectItem(item, "iflyosToken");
+        // if (sub_item1)
+        // {
+            // hxt_set_iflyos_token_cfg(sub_item->valuestring);
+        // }
+        sub_item2 = cJSON_GetObjectItem(item, "iflyosID");
+        // if (sub_item2)
+        // {
+            // utils_print("to update iflyos id");
+            // hxt_set_iflyos_sn_cfg(sub_item->valuestring);
+        // }
+        // hxt_reload_cfg();
+        if (sub_item1 && sub_item2)
         {
-            utils_print("to update iflyos token");
-            hxt_set_iflyos_token_cfg(sub_item->valuestring);
-        }
-        sub_item = cJSON_GetObjectItem(item, "iflyosID");
-        if (sub_item)
+            set_iflyos_params(sub_item1->valuestring, sub_item2->valuestring);
+        }  
+        else if (sub_item1 && !sub_item2)
         {
-            utils_print("to update iflyos id");
-            hxt_set_iflyos_sn_cfg(sub_item->valuestring);
+            set_iflyos_params(sub_item1->valuestring, NULL);
         }
-        hxt_reload_cfg();
+        else if (!sub_item1 && sub_item2)
+        {
+            set_iflyos_params(NULL, sub_item2->valuestring);
+        }
     break;
     case HXT_STOP_STUDY:
         /* stop studying */
@@ -359,8 +392,8 @@ int hxt_websocket_start()
     struct uwsc_client *cl;
     struct ev_loop *loop;
 
-    char* hxt_url = hxt_get_websocket_url_cfg();
-    char* token = hxt_get_token_cfg();
+    char* hxt_url = get_websocket_url();
+    char* token = get_server_token();
     char extra_header[1024] = {0};
     strcpy(extra_header, "Sec-WebSocket-Protocol: ");
     strcat(extra_header, "Bearer ");
@@ -376,6 +409,8 @@ int hxt_websocket_start()
         return -1;
     }
          
+    utils_free(token);     
+    utils_free(hxt_url);     
 	utils_print("%s -- Hxt websocket start ...\n", utils_get_current_time());
 
     cl->onopen = hxt_wsc_onopen;

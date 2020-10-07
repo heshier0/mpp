@@ -3,23 +3,37 @@
 #include <string.h>
 #include <cJSON.h>
 
+
 #include "utils.h"
 #include "hxt_defines.h"
+#include "db.h"
+#include "hxt_client.h"
+#include "board_func.h"
+// typedef enum report_type
+// {
+//     START = 1,
+//     END,
+//     LEAVE,
+//     BACK,
+//     BAD
+// }ReportType;
 
-typedef enum report_type
-{
-    START = 1,
-    END,
-    LEAVE,
-    BACK,
-    BAD
-}ReportType;
+#define PERSONAL_ALARM_VOICE_COUNT      (5)
 
-typedef enum ext_type
+typedef enum 
 {
-    JPEG = 1,
-    MP4
-}ExtType;
+    MUTE = 0, 
+    BEEP = 1, 
+    ORIGNAL = 2,
+    PERSONAL = 3
+ };
+
+typedef enum
+{
+    LOW = 1, 
+    MEDIUM = 2,
+    STRICT = 3
+};
 
 static char* hxt_get_api_url(const char* api)
 {
@@ -27,22 +41,22 @@ static char* hxt_get_api_url(const char* api)
     {
         return NULL;
     }
-    char* server_url = hxt_get_server_url_cfg();
-    if(NULL == server_url)
-    {   
-        return NULL;
-    }
-    char* ver = hxt_get_api_version_cfg();
-    if(NULL == ver)
-    {
-        return NULL;
-    }
+    // char* server_url = hxt_get_server_url_cfg();
+    // if(NULL == server_url)
+    // {   
+    //     return NULL;
+    // }
+    // char* ver = hxt_get_api_version_cfg();
+    // if(NULL == ver)
+    // {
+    //     return NULL;
+    // }
 
     /* should be optimization */
     char request_url[256] = {0};
-    strcpy(request_url, server_url);
-    strcat(request_url, "/api/");
-    strcat(request_url, ver);
+    strcpy(request_url, HXT_SERVER_URL);
+    // strcat(request_url, "/api/");
+    // strcat(request_url, HXT_API_VER);
     strcat(request_url, api);
 
     char* ret_value = (char*)utils_calloc(strlen(request_url) + 1);
@@ -51,7 +65,7 @@ static char* hxt_get_api_url(const char* api)
         return NULL;
     }
     strcpy(ret_value, request_url);
-    ret_value[strlen(ret_value)] = '\0';
+    //ret_value[strlen(ret_value)] = '\0';
 
     return ret_value;
 }
@@ -62,22 +76,23 @@ static char* hxt_get_upload_url(const char* api)
     {
         return NULL;
     }
-    char* upload_host = hxt_get_upload_host_url_cfg();
+
+    char* upload_host = get_upload_url(); //hxt_get_upload_host_url_cfg();
     if(NULL == upload_host)
     {
         return NULL;
     }
 
-    char* ver = hxt_get_api_version_cfg();
-    if(NULL == ver)
-    {
-        return NULL;
-    }
+    // char* ver = hxt_get_api_version_cfg();
+    // if(NULL == ver)
+    // {
+    //     return NULL;
+    // }
     
     char request_url[512] = {0};
     strcpy(request_url, upload_host);
-    strcat(request_url, "/api/");
-    strcat(request_url, ver);
+    strcat(request_url, "/api/v1");
+    // strcat(request_url, ver);
     strcat(request_url, api);
 
     char* ret_value = (char*)utils_calloc(strlen(request_url) + 1);
@@ -86,6 +101,8 @@ static char* hxt_get_upload_url(const char* api)
         return NULL;
     }
     strcpy(ret_value, request_url);
+
+    utils_free(upload_host);
 
     return ret_value;
 }
@@ -113,6 +130,10 @@ static int hxt_get_reponse_status_code(void* data)
     {
         status_code = HXT_AUTH_FAILED;
     }
+    else if (strcmp(item->valuestring, HXT_RES_BIND_FAIL) == 0)
+    {
+        status_code = HXT_BIND_FAILED;
+    }
 
     if(root != NULL)
     {
@@ -134,7 +155,7 @@ static char* hxt_get_response_description(void *data)
     cJSON *item = cJSON_GetObjectItem(root, "desc");
     desc = (char*)utils_malloc(strlen(item->valuestring) + 1);
     strcpy(desc, item->valuestring);
-    desc[strlen(item->valuestring)] = '\0';
+    // desc[strlen(item->valuestring)] = '\0';
 
     if(root != NULL)
     {
@@ -207,7 +228,7 @@ static char* hxt_get_header_with_token()
 {
     char* header = NULL;
     
-    char* token = hxt_get_token_cfg();
+    char* token = get_server_token();
     if(NULL == token)
     {
         return NULL;
@@ -217,9 +238,102 @@ static char* hxt_get_header_with_token()
     strcat(header, "Bearer ");
     strcat(header, token);
     
+    utils_free(token);
+
     return header;
 }
 
+static void hxt_create_private_doc(int child_unid)
+{
+    /* posture video */
+    char mk_dir_cmd[256] = {0};
+    sprintf(mk_dir_cmd, "mkdir -p /user/child_%d/video", child_unid);
+    system(mk_dir_cmd);
+    /* posture snap */
+    memset(mk_dir_cmd, 0, 256);
+    sprintf(mk_dir_cmd, "mkdir -p /user/child_%d/snap", child_unid);
+    system(mk_dir_cmd);
+
+    /* self define voice */
+    memset(mk_dir_cmd, 0, 256);
+    sprintf(mk_dir_cmd, "mkdir -p /user/child_%d/alarm", child_unid);
+    system(mk_dir_cmd);
+
+    /* sample frame */
+    // system("mkdir -p /user/sample");  
+
+    return;
+}
+
+static void hxt_init_cfg(void* data)
+{
+    cJSON* item = NULL; 
+    if (NULL == data)
+    {
+        return;
+    }
+    
+    cJSON* root = cJSON_Parse(data);
+    if(NULL == root)
+    {
+        return;
+    }
+    cJSON* returnObject = cJSON_GetObjectItem(root, "returnObject");
+    if (NULL == returnObject)
+    {
+        utils_print("No return objects\n");
+        return;
+    }
+
+
+    cJSON* item1 = cJSON_GetObjectItem(returnObject, "websocketUrl");
+    cJSON* item2 = cJSON_GetObjectItem(returnObject, "uploadHostUrl");
+    set_server_params(item1->valuestring, item2->valuestring);
+
+    char *tmp1 = NULL, *tmp2 = NULL;
+    item1 = cJSON_GetObjectItem(returnObject, "iflyosToken");
+    item2 = cJSON_GetObjectItem(returnObject, "iflyosID");
+    if(item1)
+    {
+        tmp1 = item1->valuestring;
+    }
+    if(item2)
+    {
+        tmp2 = item2->valuestring;
+    }
+    set_iflyos_params(tmp1, tmp2);
+    
+    item = cJSON_GetObjectItem(returnObject, "postureCountDuration");
+    int judge_time = item->valueint;
+    item = cJSON_GetObjectItem(returnObject, "videoRecordDuration");
+    int video_length = item->valueint;
+    item = cJSON_GetObjectItem(returnObject, "videoRecordRatio");
+    int video_ratio = item->valueint;
+    item = cJSON_GetObjectItem(returnObject, "videoRecordCount");
+    int video_count = item->valueint;
+    item = cJSON_GetObjectItem(returnObject, "photoRecordCount");
+    int snap_count = item->valueint;
+    item = cJSON_GetObjectItem(returnObject, "offlineStorage");
+    int offline_count = item->valueint;
+    item = cJSON_GetObjectItem(returnObject, "attachRatio");
+    int attach_ratio = item->valueint;
+    set_running_params(judge_time, video_length, video_ratio, video_count, snap_count, offline_count, attach_ratio);
+
+    item = cJSON_GetObjectItem(returnObject, "newVersionId");
+    item1 = cJSON_GetObjectItem(returnObject, "newVersionNo");
+    item2 = cJSON_GetObjectItem(returnObject, "upgradePackUrl");
+    set_update_params(item->valueint, item1->valuestring, item2->valuestring);
+
+    hxt_parse_user_data((void*)returnObject);
+
+    if (root != NULL)
+    {
+        cJSON_Delete(root);
+        root = NULL;
+    }
+
+    return;
+}
 
 BOOL hxt_query_wifi_info(void *data)
 {
@@ -235,571 +349,24 @@ BOOL hxt_query_wifi_info(void *data)
     }
     
     cJSON *ssid_node = cJSON_GetObjectItem(root, "ssid");
-    if (NULL == ssid_node)
-    {
-        return FALSE;
-    }
-    hxt_set_wifi_ssid_cfg(ssid_node->valuestring);
-
     cJSON *pwd_node = cJSON_GetObjectItem(root, "pwd");
-    if(NULL == pwd_node)
-    {
-        return FALSE;
-    }
-    hxt_set_wifi_pwd_cfg(pwd_node->valuestring);
-
     cJSON *checkCode_node = cJSON_GetObjectItem(root, "checkCode");
-    if(NULL == checkCode_node)
+    if((NULL == ssid_node) || (NULL == pwd_node) || (NULL == checkCode_node))
     {
+        if (root != NULL)
+        {
+            cJSON_Delete(root);
+        }
         return FALSE;
     }
-    hxt_set_wifi_check_code_cfg(checkCode_node->valuestring);
+    set_wifi_params(ssid_node->valuestring, pwd_node->valuestring, checkCode_node->valuestring);
 
     if (root != NULL)
     {
         cJSON_Delete(root);
     }
     
-    hxt_reload_cfg();
-    
     return TRUE;
-}
-
-BOOL hxt_get_token_request()
-{
-    BOOL reported = FALSE;
-    char* api_url = hxt_get_api_url(HXT_GET_TOKEN);
-    if(NULL == api_url)
-    {
-        goto CLEANUP4;
-    }
-
-    char* uuid = hxt_get_desk_uuid_cfg(); 
-    if(NULL == uuid)
-    {
-        goto CLEANUP4;
-    }
-    //post json data to server
-    cJSON *root = cJSON_CreateObject();    
-    if (NULL == root)
-    {
-        goto CLEANUP3;
-    }
-    cJSON_AddStringToObject(root, "deskCode", uuid);
-    cJSON_AddStringToObject(root, "snCode", board_get_sn());
-
-    char* json_data = cJSON_PrintUnformatted(root);
-    if (NULL == json_data)
-    {
-        goto CLEANUP2;
-    }
-    //save response data
-    char *out = (char*)utils_malloc(1024);
-    if(!utils_post_json_data(api_url, NULL, json_data, out, 1024))
-    {
-        utils_print("post data send failed\n");
-        goto CLEANUP1;
-    } 
-
-    int status_code = hxt_get_reponse_status_code((void*)out);
-    if (status_code == HXT_OK)
-    {
-        /* write token into cfg */   
-        hxt_init_token(out);
-        reported = TRUE;
-    }
-    else if(status_code == HXT_NO_REGISTER)
-    {
-        //clear wifi info, to prevent user connect to server
-
-    } 
-
-CLEANUP1:    
-    utils_free(out);
-CLEANUP2:    
-    cJSON_Delete(root);
-CLEANUP3:
-    utils_free(api_url);
-CLEANUP4:
-    return reported;
-}
-
-BOOL hxt_report_info_request(int reportType, int cameraStatus)
-{
-    BOOL reported = FALSE;
-    char* api_url = hxt_get_api_url(HXT_STATUS_REPORT);
-    if(NULL == api_url)
-    {
-        goto CLEANUP5;
-    }
-
-    char* header = hxt_get_header_with_token();
-
-    //post json data to server
-    cJSON *root = cJSON_CreateObject();    
-    if (NULL == root)
-    {
-        goto CLEANUP4;
-    }
-    cJSON_AddNumberToObject(root, "reportType", reportType);
-    cJSON_AddNumberToObject(root, "cameraStatus", cameraStatus);
-    
-    char* json_data = cJSON_PrintUnformatted(root);
-    if (NULL == json_data)
-    {
-        goto CLEANUP3;
-    }
-    utils_print("%s\n", json_data);
-    //save response data
-    char *out = (char*)utils_malloc(1024);
-    if(!utils_post_json_data(api_url, header, json_data, out, 1024))
-    {
-        utils_print("post data send failed\n");
-        goto CLEANUP1;
-    } 
-    utils_print("response length is [%s]\n", out);
-    int status_code = hxt_get_reponse_status_code((void *)out);
-    if (status_code == HXT_OK)
-    {
-        reported = TRUE;
-    }
-    else if(status_code == HXT_AUTH_FAILED)
-    {
-        hxt_get_token_request();
-    }    
-
-CLEANUP1:  
-    utils_free(out);
-    //utils_free(json_data);
-CLEANUP3:   
-    cJSON_Delete(root);
-CLEANUP4:
-    utils_free(header);
-CLEANUP5: 
-    utils_free(api_url);
-
-    return reported;
-}
-
-BOOL hxt_file_upload_request(const char* filename, const char* study_date, char* server_file_path)
-{
-    BOOL uploaded = FALSE;
-    int retry_count = 0;
-    char* upload_url = NULL;
-    char* header = NULL;
-    char* out = NULL;
-
-    if(NULL == filename || 0 == strlen(filename) || NULL == server_file_path || NULL == study_date)
-    {
-        return FALSE;
-    }
-    
-    /* create json data*/
-    int child_unid = hxt_get_child_unid();
-
-    char url[256] = {0};
-    sprintf(url, HXT_UPLOAD_FILE, child_unid, study_date);
-    // utils_print("url is %s\n",url);
-    
-    while((!uploaded) && (retry_count < 3))
-    {
-        upload_url = hxt_get_upload_url(url);
-        if(NULL == upload_url)
-        {
-            return FALSE;
-        }
-        // utils_print("upload url is %s\n", upload_url);
-        header = hxt_get_header_with_token();
-
-        if (out != NULL)
-        {
-            utils_free(out);
-            out = NULL;
-        }
-        out = (char*)utils_malloc(1024);
-        utils_upload_file(upload_url, header, filename, out, 1024);
-        // utils_print("[%s]\n", out);
-        if (strlen(out) == 0)
-        {
-            retry_count ++;
-            continue;
-        }
-
-        int status_code = hxt_get_reponse_status_code((void*)out);
-        if (status_code == HXT_OK)
-        {
-            char* file_path = hxt_get_response_description((void*)out);
-            if( file_path != NULL)
-            {
-                strcpy(server_file_path, file_path);
-                uploaded = TRUE;
-                free(file_path);
-            }
-        }
-        else if (status_code == HXT_AUTH_FAILED)
-        {
-            uploaded = FALSE;
-            retry_count ++;
-            hxt_get_token_request();
-        }
-    }
-
-    if (out != NULL)
-    {
-        utils_free(out);
-    }
-    
-    utils_free(header);
-    utils_free(upload_url);
-    
-    return uploaded;
-}
-
-BOOL hxt_sample_snap_upload_request(const char* filename, const char* study_date, char* server_file_path)
-{
-    BOOL uploaded = FALSE;
-    int retry_count = 0;
-    char* upload_url = NULL;
-    char* header = NULL;
-    char* out = NULL;
-
-    if(NULL == filename || NULL == server_file_path || NULL == study_date)
-    {
-        return FALSE;
-    }
-    
-    /* create json data*/
-    int child_unid = hxt_get_child_unid();
-    char url[256] = {0};
-    sprintf(url, HXT_UPLOAD_SAMPLE_SNAP, child_unid, study_date);
-
-    utils_print("To upload %s ...\n", filename);
-    while((!uploaded) && (retry_count < 3))
-    {
-        upload_url = hxt_get_upload_url(url);
-        if(NULL == upload_url)
-        {
-            return FALSE;
-        }
-
-        header = hxt_get_header_with_token();
-        utils_print("[%s]\n", header);
-
-        out = (char*)utils_malloc(1024);
-        utils_upload_file(upload_url, header, filename, out, 1024);
-        utils_print("[%s]\n", out);
-
-        int status_code = hxt_get_reponse_status_code((void*)out);
-        if (status_code == HXT_OK)
-        {
-            uploaded = TRUE;
-            server_file_path = hxt_get_response_description((void*)out);
-        }
-        else if (status_code == HXT_AUTH_FAILED)
-        {
-            uploaded = FALSE;
-            retry_count ++;
-            hxt_get_token_request();
-        }
-    }
-
-    utils_free(out);
-    utils_free(header);
-    utils_free(upload_url);
-
-    return uploaded;
-}
-
-BOOL hxt_study_report_request(int unid, ReportType type, int duration, const char* video_path, const char* photo_path)
-{
-    BOOL reported = FALSE;
-    char* api_url = hxt_get_api_url(HXT_STUDY_REPORT);
-    if(NULL == api_url)
-    {
-        goto CLEANUP5;
-    }
-
-    char* header = hxt_get_header_with_token();
-
-    //post json data to server
-    cJSON *root = cJSON_CreateObject();    
-    if (NULL == root)
-    {
-        goto CLEANUP4;
-    }
-    //post data in json
-    cJSON_AddNumberToObject(root, "childrenUnid", unid);
-    cJSON_AddNumberToObject(root, "parentUnid", hxt_get_parent_unid_cfg());
-    cJSON_AddNumberToObject(root, "reportType", type);
-    cJSON_AddStringToObject(root, "studyDate", utils_date_to_string);
-    cJSON_AddStringToObject(root, "reportTime", utils_time_to_string);
-    cJSON_AddNumberToObject(root, "studyMode", hxt_get_study_mode_cfg(unid));
-    if(type == BAD)
-    {
-        cJSON_AddNumberToObject(root, "duration", duration);
-        cJSON_AddStringToObject(root, "videoUrl", video_path);
-        cJSON_AddStringToObject(root, "videoUrl", photo_path);
-    }
-    
-    char* json_data = cJSON_PrintUnformatted(root);
-    if (NULL == json_data)
-    {
-        goto CLEANUP3;
-    }
-    utils_print("%s\n", json_data);
-    //save response data
-    char *out = (char*)utils_malloc(1024);
-    if(!utils_post_json_data(api_url, header, json_data, out, 1024))
-    {
-        utils_print("post data send failed\n");
-        goto CLEANUP1;
-    } 
-    utils_print("response length is [%s]\n", out);
-    int status_code = hxt_get_reponse_status_code(out);
-    if (status_code == HXT_OK)
-    {
-        reported = TRUE;
-    }
-    else if(status_code == HXT_AUTH_FAILED)
-    {
-        hxt_get_token_request();
-    }    
-
-CLEANUP1:  
-    utils_free(out);
-    // utils_free(json_data);
-CLEANUP3:   
-    cJSON_Delete(root);
-CLEANUP4:
-    utils_free(header);
-CLEANUP5: 
-    utils_free(api_url);
-    return reported;
-}
-
-BOOL hxt_study_batch_report_request()
-{
-    BOOL reported = FALSE;
-
-    return reported;
-}
-
-int hxt_get_max_chunk_request(const char* file_md5, const ExtType type)
-{
-    int max_chunk = 0;
-    char file_type[8] = {0};
-    char uri[256] = {0};
-    
-    if(NULL == file_md5 || NULL == file_type)
-    {
-        return max_chunk;
-    }
-
-    switch (type)
-    {
-    case JPEG:
-        strcpy(file_type, "jpeg");
-    break;
-    case MP4:
-        strcpy(file_type, "mp4");
-    break;    
-    default:
-        strcpy(file_type, "mp4");
-    break;
-    }
-    sprintf(uri, HXT_GETMAX_CHUNK, file_md5, file_type);
-    char* api_url = hxt_get_upload_url(uri);
-    if(NULL == api_url)
-    {
-        return max_chunk;
-    }
-    char* header = hxt_get_header_with_token();
-
-    //save response data
-    char *out = (char*)utils_malloc(1024);
-    if(!utils_post_json_data(api_url, header, NULL, out, 1024))
-    {
-        utils_print("post data send failed\n");
-        goto EXIT;
-    } 
-    utils_print("response length is [%s]\n", out);
-    int status_code = hxt_get_reponse_status_code(out);
-    BOOL passed = hxt_get_response_pass_status(out);
-    if (status_code == HXT_OK && passed)
-    {
-        char* desc = hxt_get_response_description(out);
-        if(NULL == desc)
-        {
-            max_chunk = 0;
-        }
-        max_chunk = atoi(desc);
-
-        utils_free(desc);
-    }
-    else if(status_code == HXT_AUTH_FAILED)
-    {
-        hxt_get_token_request();
-    }    
-
-EXIT:  
-    utils_free(out);
-    utils_free(api_url);
-    utils_free(header);
-
-    return max_chunk;
-}
-
-char* hxt_send_chunk_request(const char* file_md5, int chunk_idx, int max_chunk)
-{
-    char* server_file_path = NULL;
-
-    if(NULL == file_md5)
-    {
-        return FALSE;
-    }
-
-    char uri[256] = {0};
-    sprintf(uri, HXT_UPLOAD_CHUNK, file_md5, chunk_idx, max_chunk);    
-    char* upload_url = hxt_get_upload_url(uri);
-    if(NULL == upload_url)
-    {
-        return FALSE;
-    }
-    utils_print("auth:%s\n", upload_url);   
-
-    char* header = hxt_get_header_with_token();
-    utils_print("auth:%s\n", header);
-
-    char *out = (char*)utils_malloc(1024);
-
-    //TODO get file name 
-    char chunk_file[256] = {0};
-    //???
-    utils_upload_file(chunk_file, header, chunk_file, out, 1024);
-    utils_print("[%s]\n", out);
-
-    int status_code = hxt_get_reponse_status_code((void*)out);
-    if (status_code == HXT_OK)
-    {
-        server_file_path = hxt_get_response_description((void*)out);
-    }
-
-    utils_free(out);
-    utils_free(header);
-    utils_free(upload_url);
-
-    return server_file_path;
-}
-
-BOOL hxt_merge_chunks_request(const char* file_path, ExtType type)
-{
-    BOOL reported =FALSE;
-    char uri[256] = {0};
-    char file_type[8] = {0};
-    char type_name[16] = {0};   
-
-    if(NULL == file_path)
-    {
-        return FALSE;
-    }
-    char* md5 = utils_get_file_md5sum(file_path);
-    unsigned long size = utils_get_file_size(file_path);
-
-    switch (type)
-    {
-    case JPEG:
-        strcpy(file_type, "jpeg");
-        strcpy(type_name, "photo");
-    break;
-    case MP4:
-    default:
-        strcpy(file_type, "mp4");
-        strcpy(type_name, "video");
-    break;    
-    }
-
-    sprintf(uri, HXT_MERGE_FILES, md5, file_type, size, type_name);
-    char* api_url = hxt_get_upload_url(uri);
-    if(NULL == api_url)
-    {
-        return FALSE;
-    }
-    char* header = hxt_get_header_with_token();
-
-    //save response data
-    char *out = (char*)utils_malloc(1024);
-    if(!utils_post_json_data(api_url, header, "", out, 1024))
-    {
-        utils_print("post data send failed\n");
-        goto EXIT;
-    } 
-    utils_print("response length is [%s]\n", out);
-    int status_code = hxt_get_reponse_status_code(out);
-    hxt_get_response_pass_status(out);
-    if (status_code == HXT_OK)
-    {
-        //
-        reported = TRUE;
-    }
-    else if(status_code == HXT_AUTH_FAILED)
-    {
-        hxt_get_token_request();
-    }    
-
-EXIT:  
-    utils_free(out);
-    utils_free(api_url);
-    utils_free(header);
-
-    return reported;
-}
-
-BOOL hxt_confirm_desk_bind_request()
-{
-    BOOL reported = FALSE;
-    char* api_url = hxt_get_api_url(HXT_CONFIRM_DESK_BIND);
-    if(NULL == api_url)
-    {
-        goto CLEANUP4;
-    }
-
-    //post json data to server
-    cJSON *root = cJSON_CreateObject();    
-    if (NULL == root)
-    {
-        goto CLEANUP3;
-    }
-    cJSON_AddStringToObject(root, "deskCode", hxt_get_desk_uuid_cfg());
-    cJSON_AddStringToObject(root, "snCode", board_get_sn());
-    cJSON_AddStringToObject(root, "checkCode", hxt_get_wifi_check_code_cfg());
-    char* json_data = cJSON_PrintUnformatted(root);
-    if (NULL == json_data)
-    {
-        goto CLEANUP2;
-    }
-    utils_print("%s\n", json_data);
-    //save response data
-    char* out = (char*)utils_malloc(1024);
-    if(!utils_post_json_data(api_url, "", json_data, out, 1024))
-    {
-        utils_print("post data send failed\n");
-        goto CLEANUP1;
-    } 
-    utils_print("response length is [%s]\n", out);
-    int status_code = hxt_get_reponse_status_code(out);
-    if (status_code == HXT_OK)
-    {
-        reported = TRUE;
-    } 
-
-CLEANUP1:  
-    utils_free(out);
-CLEANUP2:   
-    cJSON_Delete(root);
-CLEANUP3:
-    utils_free(api_url);
-CLEANUP4:
-    return reported;
 }
 
 BOOL hxt_bind_desk_with_wifi_request()
@@ -818,9 +385,10 @@ BOOL hxt_bind_desk_with_wifi_request()
     {
         goto CLEANUP3;
     }
-    cJSON_AddStringToObject(root, "checkCode", hxt_get_wifi_check_code_cfg());
+    char* desk_uunid_tmp = get_device_id(); 
+    char* check_code = get_wifi_check_code();
+    cJSON_AddStringToObject(root, "checkCode", check_code);
     cJSON_AddStringToObject(root, "snCode", board_get_sn());
-    char* desk_uunid_tmp = hxt_get_init_desk_uuid();
     if(desk_uunid_tmp != NULL && strlen(desk_uunid_tmp) != 0)
     {
         cJSON_AddStringToObject(root, "deskCode", desk_uunid_tmp);
@@ -854,11 +422,8 @@ BOOL hxt_bind_desk_with_wifi_request()
         {
             char *uuid = hxt_get_response_description(out);
             utils_print("desk uuid is %s\n", uuid);
-            hxt_set_desk_uuid_cfg(uuid);
-            hxt_reload_cfg();
-            /* write into init config,and never erase it*/
-            hxt_store_desk_uuid(uuid);
-            free(uuid);
+            set_device_id(uuid);
+            utils_free(uuid);
         }
         
         reported = TRUE;
@@ -872,7 +437,144 @@ BOOL hxt_bind_desk_with_wifi_request()
 CLEANUP1:  
     utils_free(out);
 CLEANUP2:   
+    utils_free(check_code);
+    utils_free(desk_uunid_tmp);
+    utils_free(json_data);
+CLEANUP3:
     cJSON_Delete(root);
+    utils_free(api_url);
+CLEANUP4:
+    return reported;
+}
+
+BOOL hxt_confirm_desk_bind_request()
+{
+    BOOL reported = FALSE;
+    char* api_url = hxt_get_api_url(HXT_CONFIRM_DESK_BIND);
+    if(NULL == api_url)
+    {
+        goto CLEANUP4;
+    }
+
+    //post json data to server
+    cJSON *root = cJSON_CreateObject();    
+    if (NULL == root)
+    {
+        goto CLEANUP3;
+    }
+    char* desk_code = get_device_id();
+    char* check_code = get_wifi_check_code();
+    cJSON_AddStringToObject(root, "deskCode", desk_code);
+    cJSON_AddStringToObject(root, "snCode", board_get_sn());
+    cJSON_AddStringToObject(root, "checkCode", check_code);
+    char* json_data = cJSON_PrintUnformatted(root);
+    if (NULL == json_data)
+    {
+        goto CLEANUP2;
+    }
+    utils_print("%s\n", json_data);
+    //save response data
+    char* out = (char*)utils_malloc(1024);
+    if(!utils_post_json_data(api_url, "", json_data, out, 1024))
+    {
+        utils_print("post data send failed\n");
+        goto CLEANUP1;
+    } 
+    utils_print("response length is [%s]\n", out);
+    int status_code = hxt_get_reponse_status_code(out);
+    if (status_code == HXT_OK)
+    {
+        reported = TRUE;
+    } 
+
+CLEANUP1:  
+    utils_free(out);
+    utils_free(json_data);
+CLEANUP2:   
+    cJSON_Delete(root);
+    utils_free(desk_code);
+    utils_free(check_code);
+CLEANUP3:
+    utils_free(api_url);
+CLEANUP4:
+    return reported;
+}
+
+BOOL hxt_get_token_request()
+{
+    BOOL reported = FALSE;
+    char* api_url = hxt_get_api_url(HXT_GET_TOKEN);
+    if(NULL == api_url)
+    {
+        goto CLEANUP4;
+    }
+
+    char* uuid = get_device_id(); 
+    if(NULL == uuid)
+    {
+        goto CLEANUP4;
+    }
+
+    //post json data to server
+    cJSON *root = cJSON_CreateObject();    
+    if (NULL == root)
+    {
+        goto CLEANUP3;
+    }
+    cJSON_AddStringToObject(root, "deskCode", uuid);
+    cJSON_AddStringToObject(root, "snCode", board_get_sn());
+    char* json_data = cJSON_PrintUnformatted(root);
+    if (NULL == json_data)
+    {
+        goto CLEANUP2;
+    }
+
+    //save response data
+    char *out = (char*)utils_malloc(1024);
+    if(!utils_post_json_data(api_url, NULL, json_data, out, 1024))
+    {
+        utils_print("post data send failed\n");
+        goto CLEANUP1;
+    } 
+
+    int status_code = hxt_get_reponse_status_code((void*)out);
+    if (status_code == HXT_OK)
+    {
+        /* write token into cfg */   
+        // hxt_init_token(out);
+        cJSON* token_root = cJSON_Parse(out);
+        if(NULL == token_root)
+        {
+            goto CLEANUP1;
+        }
+        cJSON* returnObject = cJSON_GetObjectItem(token_root, "returnObject");
+        if (NULL == returnObject)
+        {
+            utils_print("No return objects\n");
+            cJSON_Delete(token_root);
+            goto CLEANUP1;
+        }
+        cJSON* token_item = cJSON_GetObjectItem(returnObject, "token");  
+        cJSON* time_item = cJSON_GetObjectItem(returnObject, "tokenExpireTime");
+        utils_print("token time is %d\n", time_item->valueint/1000);
+        set_connect_params(token_item->valuestring, time_item->valueint/1000);
+
+        cJSON_Delete(token_root);
+        reported = TRUE;
+    }
+    else if(status_code == HXT_NO_REGISTER)
+    {
+        //clear wifi info, to prevent user connect to server
+        deinit_wifi_params();
+        //
+    } 
+
+CLEANUP1:    
+    utils_free(out);
+    utils_free(json_data);
+CLEANUP2:    
+    cJSON_Delete(root);
+    utils_free(uuid);
 CLEANUP3:
     utils_free(api_url);
 CLEANUP4:
@@ -883,32 +585,21 @@ BOOL hxt_refresh_token_request()
 {
     BOOL token_required = TRUE;
 
-    long expire_time = hxt_get_token_expire_time_cfg();
+    long expire_time = get_server_token_expired_time();
     time_t now = time(0);
     
     long valid_time = now - expire_time;
     utils_print("now %ld - expire_time %ld = %ld\n", now, expire_time, valid_time);
     
-    if ( (hxt_get_token_cfg() == NULL) || (valid_time >=0) )
+    char* server_token = get_server_token();
+    if ( (NULL == server_token) || (valid_time >= 0))
     {
         utils_print("require token....\n");
         token_required = hxt_get_token_request();
     }
 
+    utils_free(server_token);
     return token_required;
-}
-
-BOOL hxt_get_new_version_request(const char* update_url)
-{
-    if (NULL == update_url)
-    {
-        return FALSE;
-    }
-
-    /*download file*/
-    utils_download_file(update_url, UPDATE_FILES);
-
-    return TRUE;
 }
 
 BOOL hxt_get_desk_cfg_request()
@@ -966,3 +657,406 @@ BOOL hxt_get_desk_cfg_request()
     
     return reported;
 }
+
+BOOL hxt_get_new_version_request(const char* update_url)
+{
+    if (NULL == update_url)
+    {
+        return FALSE;
+    }
+
+    /*download file*/
+    utils_download_file(update_url, UPDATE_FILES);
+
+    return TRUE;
+}
+
+BOOL hxt_file_upload_request(const char* filename, const char* study_date, char* server_file_path)
+{
+    BOOL uploaded = FALSE;
+    int retry_count = 0;
+    char* upload_url = NULL;
+    char* header = NULL;
+    char* out = NULL;
+
+    if(NULL == filename || 0 == strlen(filename) || NULL == server_file_path || NULL == study_date)
+    {
+        return FALSE;
+    }
+    
+    /* create json data*/
+    // int child_unid = hxt_get_child_unid();
+    int child_unid = get_select_child_id();
+
+    char url[256] = {0};
+    sprintf(url, HXT_UPLOAD_FILE, child_unid, study_date);
+    // utils_print("url is %s\n",url);
+    
+    while((!uploaded) && (retry_count < 3))
+    {
+        upload_url = hxt_get_upload_url(url);
+        if(NULL == upload_url)
+        {
+            return FALSE;
+        }
+        // utils_print("upload url is %s\n", upload_url);
+        header = hxt_get_header_with_token();
+
+        if (out != NULL)
+        {
+            utils_free(out);
+            out = NULL;
+        }
+        out = (char*)utils_malloc(1024);
+        utils_upload_file(upload_url, header, filename, out, 1024);
+        // utils_print("[%s]\n", out);
+        if (strlen(out) == 0)
+        {
+            retry_count ++;
+            continue;
+        }
+
+        int status_code = hxt_get_reponse_status_code((void*)out);
+        if (status_code == HXT_OK)
+        {
+            char* file_path = hxt_get_response_description((void*)out);
+            if( file_path != NULL)
+            {
+                strcpy(server_file_path, file_path);
+                uploaded = TRUE;
+                utils_free(file_path);
+            }
+        }
+        else if (status_code == HXT_AUTH_FAILED)
+        {
+            uploaded = FALSE;
+            retry_count ++;
+            hxt_get_token_request();
+        }
+    }
+
+    if (out != NULL)
+    {
+        utils_free(out);
+    }
+    
+    utils_free(header);
+    utils_free(upload_url);
+    
+    return uploaded;
+}
+
+BOOL hxt_sample_snap_upload_request(const char* filename, const char* study_date, char* server_file_path)
+{
+    BOOL uploaded = FALSE;
+    int retry_count = 0;
+    char* upload_url = NULL;
+    char* header = NULL;
+    char* out = NULL;
+
+    if(NULL == filename || NULL == server_file_path || NULL == study_date)
+    {
+        return FALSE;
+    }
+    
+    /* create json data*/
+    // int child_unid = hxt_get_child_unid();
+    int child_unid = get_select_child_id();
+
+    char url[256] = {0};
+    sprintf(url, HXT_UPLOAD_SAMPLE_SNAP, child_unid, study_date);
+
+    utils_print("To upload %s ...\n", filename);
+    while((!uploaded) && (retry_count < 3))
+    {
+        upload_url = hxt_get_upload_url(url);
+        if(NULL == upload_url)
+        {
+            return FALSE;
+        }
+
+        header = hxt_get_header_with_token();
+        utils_print("[%s]\n", header);
+
+        out = (char*)utils_malloc(1024);
+        utils_upload_file(upload_url, header, filename, out, 1024);
+        utils_print("[%s]\n", out);
+
+        int status_code = hxt_get_reponse_status_code((void*)out);
+        if (status_code == HXT_OK)
+        {
+            uploaded = TRUE;
+            server_file_path = hxt_get_response_description((void*)out);
+        }
+        else if (status_code == HXT_AUTH_FAILED)
+        {
+            uploaded = FALSE;
+            retry_count ++;
+            hxt_get_token_request();
+        }
+    }
+
+    utils_free(out);
+    utils_free(header);
+    utils_free(upload_url);
+
+    return uploaded;
+}
+
+BOOL hxt_update_children_alarm_files(void* data)
+{
+    int child_unid, study_mode, alarm_type; 
+    if (NULL == data)
+    {
+        return FALSE;
+    }
+ 
+    cJSON *node = (cJSON*)data;
+    cJSON *node_item = cJSON_GetObjectItem(node, "childrenUnid");
+    child_unid = node_item->valueint;
+    node_item = cJSON_GetObjectItem(node, "studyMode");
+    if (node_item == NULL)
+    {
+        study_mode = get_study_mode(child_unid);
+    }
+    else
+    {
+        study_mode = node_item->valueint;
+    }
+    node_item = cJSON_GetObjectItem(node, "alarmType");
+    alarm_type = node_item->valueint;
+
+    if (get_select_child_id() == -1)
+    {
+        set_user_params(child_unid, study_mode, alarm_type, TRUE);
+    }
+
+    if (child_unid != get_select_child_id())
+    {
+        set_user_params(child_unid, study_mode, alarm_type, FALSE);
+    }
+    
+    /* create documents for save mp4 and snap file */
+    hxt_create_private_doc(child_unid);
+
+    /* self defines alarm voice */
+    if (alarm_type == PERSONAL)
+    {
+        char alarm_file[128] = {0};
+        char old_alarm_file[128] = {0};
+        char replace_cmd[512] = {0};
+
+        cJSON *alarm_file_node = cJSON_GetObjectItem(node, "filePaths");
+        int alarm_file_count = cJSON_GetArraySize(alarm_file_node);
+        for (int count = 0; count < PERSONAL_ALARM_VOICE_COUNT; count ++)
+        {
+            cJSON *file_item = cJSON_GetArrayItem(alarm_file_node, count);
+            if (!file_item)
+            {
+                continue;
+            }
+            node_item = cJSON_GetObjectItem(file_item, "priority");
+            int idx = node_item->valueint;
+            bzero(alarm_file, 128);
+            sprintf(alarm_file, HXT_CHILD_ALARM_FILE_TMP, child_unid, idx);
+            node_item = cJSON_GetObjectItem(file_item, "filePath");
+            utils_download_file(node_item->valuestring, alarm_file);
+            
+            /*replace old file*/
+            bzero(old_alarm_file, 128);
+            sprintf(old_alarm_file, HXT_CHILD_ALARM_FILE, child_unid, idx);
+            sprintf(replace_cmd, "mv %s %s", alarm_file, old_alarm_file);
+            system(replace_cmd);    
+        }
+    }   
+   
+    return TRUE;
+}
+
+BOOL hxt_parse_user_data(void* data)
+{
+    BOOL result = FALSE;
+    if(NULL == data)
+    {
+        return FALSE;
+    }
+    cJSON* returnObject = (cJSON*)data;
+
+    cJSON* item = cJSON_GetObjectItem(returnObject, "parentUnid");
+    set_parent_id(item->valueint);
+
+    item = cJSON_GetObjectItem(returnObject, "childrenData");
+    int item_count = cJSON_GetArraySize(item);
+    utils_print("child data count is %d\n", item_count);
+    /* if children data is empty,remove it from config*/
+    if (item_count == 0)
+    {
+        deinit_user_params();
+        /* remove data ???? */
+    }
+    else
+    {
+        for(int i = 0; i < item_count; i ++)
+        {
+            cJSON *node = cJSON_GetArrayItem(item, i);
+            if (!node)
+            {
+                continue;
+            }
+            hxt_update_children_alarm_files((void*)node);
+        }
+    }
+    
+    return result;
+}
+
+char* hxt_get_posture_detect_model_path(int study_mode)
+{
+    switch (study_mode)
+    {
+    case LOW:
+        return LOW_CLASS_DETECT_FILE;
+    case MEDIUM:
+        return MEDIUM_CLASS_DETECT_FILE;
+    case STRICT:
+    default:
+        return HIGH_CLASS_DETECT_FILE;
+    }
+}
+
+char* hxt_get_posture_class_model_path(int study_mode)
+{
+    switch (study_mode)
+    {
+    case LOW:
+        return LOW_CLASS_SAMPLE_FILE;
+    case MEDIUM:
+        return MEDIUM_CLASS_SAMPLE_FILE;
+    case STRICT:
+    default:
+        return HIGH_CLASS_SAMPLE_FILE;
+    }
+}
+
+int hxt_get_video_width()
+{
+    int video_width = 0;
+    int video_ratio = get_video_ratio();
+    switch (video_ratio)
+    {
+    case 1:
+        video_width = 1280;
+        break;
+    case 2:
+        video_width = 960;
+        break;
+    case 3:
+        video_width = 640;
+        break;    
+    default:
+        video_width = 960;
+        break;
+    }
+
+    return video_width;
+}
+
+int hxt_get_video_height()
+{
+    int video_height =0;
+    int video_ratio = get_video_ratio();
+    switch (video_ratio)
+    {
+    case 1:
+        video_height = 720;
+    break;
+    case 2:
+        video_height = 540;
+    break;
+    case 3:
+        video_height = 360;
+    break;
+    default:
+        video_height = 540;
+    break;
+    }
+
+    return video_height;
+}
+
+#if 0
+int hxt_get_selfdef_voice_count()
+{
+    int file_count = 0;
+    int child_unid = hxt_get_child_unid();
+    char CMD_GET_VOICE_COUNT[256] = {0};
+    sprintf(CMD_GET_VOICE_COUNT, "ls /user/child_%d/alarm/ | wc -l", child_unid);
+    system(CMD_GET_VOICE_COUNT);
+
+    char line[64] = {0};
+    FILE *fp = NULL;
+    fp = popen(CMD_GET_VOICE_COUNT, "r");
+    if(NULL != fp)
+    {
+        if(fgets(line, sizeof(line), fp) == NULL)
+        {
+            pclose(fp);
+            return 0;
+        }
+        file_count = atoi(line);
+    }
+    pclose(fp);
+
+    return file_count;
+}
+
+BOOL hxt_get_snap_count()
+{
+    int file_count = 0;
+    int child_unid = hxt_get_child_unid();
+    char CMD_GET_SNAP_COUNT[256] = {0};
+    sprintf(CMD_GET_SNAP_COUNT, "ls /user/child_%d/snap/ | wc -l", child_unid);
+    system(CMD_GET_SNAP_COUNT);
+
+    char line[64] = {0};
+    FILE *fp = NULL;
+    fp = popen(CMD_GET_SNAP_COUNT, "r");
+    if(NULL != fp)
+    {
+        if(fgets(line, sizeof(line), fp) == NULL)
+        {
+            pclose(fp);
+            return 0;
+        }
+        file_count = atoi(line);
+    }
+    pclose(fp);
+
+    return file_count;
+}
+
+BOOL hxt_get_video_count()
+{
+    int file_count = 0;
+    int child_unid = hxt_get_child_unid();
+    char CMD_GET_VIDEO_COUNT[256] = {0};
+    sprintf(CMD_GET_VIDEO_COUNT, "ls /user/child_%d/video/ | wc -l", child_unid);
+    system(CMD_GET_VIDEO_COUNT);
+
+    char line[64] = {0};
+    FILE *fp = NULL;
+    fp = popen(CMD_GET_VIDEO_COUNT, "r");
+    if(NULL != fp)
+    {
+        if(fgets(line, sizeof(line), fp) == NULL)
+        {
+            pclose(fp);
+            return 0;
+        }
+        file_count = atoi(line);
+    }
+    pclose(fp);
+
+    return file_count;
+}
+#endif

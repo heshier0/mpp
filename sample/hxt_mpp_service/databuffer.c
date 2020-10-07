@@ -8,6 +8,7 @@
 #include <pthread.h>
 
 #include "databuffer.h"
+#include "defines.h"
 
 #define RESERVED_BUF_SIZE 	(8*1024*1024)
 
@@ -34,7 +35,7 @@ int create_buffer(DATABUFFER* buf, int buf_size)
 		return -1;
 	}
 
-	buf->data_buf = (char*)malloc(buf_size+RESERVED_BUF_SIZE);
+	buf->data_buf = (char*)utils_malloc(buf_size+RESERVED_BUF_SIZE);
 	memset(buf->data_buf, 0x0, buf_size);
 
 	buf->buffer_size = buf_size;
@@ -56,7 +57,7 @@ int destroy_buffer(DATABUFFER* buf)
 
 	if (buf->data_buf != NULL)
 	{
-		free(buf->data_buf);
+		utils_free(buf->data_buf);
 		buf->data_buf = NULL;
 	}
 

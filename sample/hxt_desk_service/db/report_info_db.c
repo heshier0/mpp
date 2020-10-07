@@ -2,40 +2,14 @@
 #include "common.h"
 #include "utils.h"
 
-
-BOOL create_report_info_table()
-{
-    char *err_msg;
-    char *sql;
-    int result;
-    sql = "CREATE TABLE IF NOT EXISTS report_table( id INTEGER PRIMARY KEY ASC NOT NULL,\
-                                                    parent INTEGER NOT NULL,\
-                                                    child INTEGER NOT NULL,\
-                                                    type INTEGER NOT NULL,\
-                                                    reportTime INTEGER,\
-                                                    mode INTEGER,\
-                                                    camera INTEGER,\
-                                                    duration INTEGER,\
-                                                    videoUrl TEXT, \
-                                                    snapVrl TEXT)";
-    result = sqlite3_exec(g_hxt_service_db, sql, NULL, NULL, &err_msg);
-    if (result != SQLITE_OK)
-    {
-        utils_print("create table failed:%s\n", err_msg);
-        sqlite3_free(err_msg);
-
-        return FALSE;
-    }
-         
-    return TRUE;
-}
+extern sqlite3 *g_hxt_service_db;
 
 BOOL add_report_info(void* data)
 {
-    char *err_msg;
-    char sql[1024] = {0};
     int result;
-
+    char *err_msg;
+    char *sql = NULL;
+    
     if (NULL == data)
     {
         return FALSE;
@@ -43,9 +17,10 @@ BOOL add_report_info(void* data)
     ReportInfo *info = (ReportInfo *)data;
 
     /* change date from string to int */
-    const char* insert_sql = "INSERT INTO report_table VALUES(NULL, %d, %d, %d, \"%s\", %d, %d, %d, \"%s\", \"%s\")";
+    const char* insert_sql = "INSERT INTO %s VALUES(NULL, %d, %d, %d, \"%s\", %d, %d, %d, \"%s\", \"%s\")";
     sprintf(sql, insert_sql, info->parent_unid, info->child_unid, info->report_type, info->report_time, 
                                 info->study_mode, info->camera_status, info->duration, info->video_url, info->snap_url);
+
     utils_print("sql:[%s]\n", sql);
     result = sqlite3_exec(g_hxt_service_db, sql, NULL, NULL, &err_msg);
     if (result != SQLITE_OK)

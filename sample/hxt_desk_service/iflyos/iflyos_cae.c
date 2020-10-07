@@ -5,11 +5,10 @@
 
 
 #include <uwsc/uwsc.h>
-
 #include "utils.h"
 #include "hlw.h"
-
-
+#include "db.h"
+#include "iflyos_func.h"
 
 #define CONF_PATH   "/userdata/config/iflyos/hlw.ini"
 #define PARAM_PATH  "/userdata/config/iflyos/hlw.param"
@@ -24,6 +23,7 @@ static void ivw_fn(short angle, short channel, float power, short CMScore, short
     utils_print("angle=%d, channel=%d, power=%f, CMScore=%d, beam=%d, param1=%s\n",
                     angle, channel, power, CMScore, beam, param1);
 
+	utils_send_local_voice(VOICE_WARNING_BUZZ);
 	wake_up = TRUE;
 }
 
@@ -46,7 +46,7 @@ static void ivw_audio_fn(const void* audio_data, unsigned int audio_len, int par
 			return;
 		}
 		cl->send(cl, req, strlen(req), UWSC_OP_TEXT);
-		free(req);
+		utils_free(req);
 		wake_up = FALSE;
 		utils_print("to send voice...\n");
 	}
@@ -65,7 +65,7 @@ int iflyos_init_cae_lib(void* data)
 {
     int rv, i;
     char buffer[1024] = {0};
-    int flag = 2;
+    int flag = 1;
 
     utils_print("version: %s\n", CAEGetVersion());
 #ifdef DEBUG
@@ -78,12 +78,13 @@ int iflyos_init_cae_lib(void* data)
         return -1;
     }
 
-    char *sn = hxt_get_iflyos_cae_sn();
+    char *sn = get_iflyos_sn();
     if (CAEAuth(sn))
     {
         utils_print("CAE auth error\n");
     }
 
+	utils_free(sn);
     return 0;
 }
 

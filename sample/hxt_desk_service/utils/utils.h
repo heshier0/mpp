@@ -7,16 +7,6 @@
 
 char *utils_get_current_time();
 
-cJSON* utils_load_cfg(const char* cfg);
-void utils_unload_cfg(cJSON* root);
-BOOL utils_reload_cfg(const char* cfg, cJSON* root);
-char* utils_get_cfg_str_value(cJSON* root, const char* params_item, const char* prop_item);
-double utils_get_cfg_number_value(cJSON* root, const char* params_item, const char* prop_item);
-BOOL utils_set_cfg_str_value(cJSON* root, const char* cfg, const char* params_item, const char* prop_item, const char* value);
-BOOL utils_set_cfg_number_value(cJSON* root, const char* cfg, const char* params_item, const char* prop_item, const double value);
-
-char* utils_get_response_value(const char* json_data, const char* root_name, const char* item_name, const char* sub_name, const char* last_node);
-
 BOOL utils_send_mp3_voice(const char *url);
 BOOL utils_send_local_voice(const char *path);
 
