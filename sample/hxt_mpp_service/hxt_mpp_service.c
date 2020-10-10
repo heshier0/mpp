@@ -10,18 +10,21 @@
 #include <signal.h>
 #include <sys/file.h>
 #include <fcntl.h>
+#include <sys/prctl.h>
 
 #include "databuffer.h"
 #include "board_mpp.h"
 #include "command.h"
 
+#define HXT_MPP_SERVICE_VERSION ("1.0.0")
 #define MPP_SERVICE_PORT        (10086)
-
 #define BUFFER_SIZE             (5*1024)
 
 int g_last_sock = -1;
 DATABUFFER g_client_data;
 
+static BOOL posturing = FALSE;
+static BOOL sampling = FALSE;
 
 static int create_local_tcp_server()
 {
@@ -66,6 +69,9 @@ static void* receive_client_data_thread(void *args)
 
     int new_sock = (int)args;
     char buf[256] = {0};
+
+    prctl(PR_SET_NAME, "read_client_data");
+
     while(1)
     {   
         memset(buf, 0, 256);
@@ -96,13 +102,13 @@ static void* receive_client_data_thread(void *args)
 
 static void* process_desk_business_thread(void *args)
 {
-    BOOL posturing = FALSE;
-    BOOL sampling = FALSE;
-
     cmd_header_t header;
     int len = sizeof(cmd_header_t);
     video_ratio_t video_ratio;
     study_video_t study_video;
+    BOOL video_started = FALSE;
+
+    prctl(PR_SET_NAME, "process_cmd");
 
     while(1)
     {
@@ -175,16 +181,24 @@ static void* process_desk_business_thread(void *args)
             }
         break;      
         case CMD_START_VIDEO_RECORD:
-            bzero(&study_video, sizeof(study_video_t));
-            ptr = get_buffer(&g_client_data, sizeof(study_video_t));
-            memcpy(&study_video, ptr, sizeof(study_video_t));
-            release_buffer(&g_client_data, sizeof(study_video_t));
-            utils_print("video is %s, snap is %s\n", study_video.video_name, study_video.snap_name);
-            start_video_recording(study_video.video_name);
+            if (!video_started)
+            {
+                bzero(&study_video, sizeof(study_video_t));
+                ptr = get_buffer(&g_client_data, sizeof(study_video_t));
+                memcpy(&study_video, ptr, sizeof(study_video_t));
+                release_buffer(&g_client_data, sizeof(study_video_t));
+                utils_print("video is %s, snap is %s\n", study_video.video_name, study_video.snap_name);
+                start_video_recording(study_video.video_name);
+                video_started = TRUE;
+            }
         break;
         case CMD_STOP_VIDEO_RECORD:
-            stop_video_recording();
-            board_get_snap_from_venc_chn(study_video.snap_name);
+            if (video_started)
+            {
+                stop_video_recording();
+                board_get_snap_from_venc_chn(study_video.snap_name);
+                video_started = FALSE;
+            }
         break;
         case CMD_DEL_VIDEO_FILE:
             delete_video();
@@ -214,13 +228,28 @@ static void start_process_desk_business()
 
 static void handle_signal(int signo)
 {
-    //   system("/userdata/bin/HxtDeskService");
+    if (posturing)
+    {
+        // stop_sample_video_thread();
+        posturing = FALSE;
+        //???
+        stop_video_recording();
+        delete_video();
+    }
+
+    if (sampling)
+    {
+        sampling = FALSE;
+        stop_sample_voice_thread();
+    }
 }
 
 int main(int argc, char **argv)
 {
     int client_fd = -1;
     struct sockaddr_in client_addr;
+
+    utils_print("%s\n", HXT_MPP_SERVICE_VERSION);
 
     int lock_fd = open("/tmp/.single.lock", O_RDWR | O_CREAT, 0666);
     if(lock_fd < 1)
@@ -254,14 +283,13 @@ int main(int argc, char **argv)
         utils_print("init mpp subsystem error.\n");
         goto ERR_INIT_MPP;
     }
-    if (!start_video_system(960, 540))
+    if (!start_video_system(640, 360))
     {
         utils_print("init video system error.\n");
         goto ERR_INIT_VIDEO_SYS;
     }
     /* 系统起来就需要播放mp3 */
     start_play_mp3_thread();
-    // start_sample_voice_thread();
 
     /* to process hxt_desk_service */
     while(1)

@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
+#include <sys/prctl.h>
 
 #include <uwsc/uwsc.h>
 
@@ -38,6 +39,8 @@ static void* thread_read_pcm_cb(void *data)
     char pcm_buf[PCM_LENGTH] = {0};
     memset(pcm_buf, 0, PCM_LENGTH);
         
+    prctl(PR_SET_NAME, "read_pcm_cb");
+
     int fd = open(PCM_FIFO, O_RDONLY);
     if (-1 == fd)
     {
@@ -75,6 +78,8 @@ static void* thread_send_pcm_cb(void *data)
     {
         return NULL;
     }    
+
+    prctl(PR_SET_NAME, "send_pcm_cb");
 
     BOOL requested = FALSE;
     struct uwsc_client *cl = (struct uwsc_client *)data;
@@ -171,9 +176,6 @@ static void iflyos_uwsc_onerror(struct uwsc_client *cl, int err, const char *msg
     {
         g_sampling = FALSE;
         send_voice_sample_stop_cmd();
-
-        // pthread_join(read_pcm_tid, NULL);
-        // pthread_join(send_pcm_tid, NULL);
     }
 
     ev_break(cl->loop, EVBREAK_ALL);
@@ -186,9 +188,6 @@ static void iflyos_uwsc_onclose(struct uwsc_client *cl, int code, const char *re
     {
         g_sampling = FALSE;
         send_voice_sample_stop_cmd();
-
-        // pthread_join(read_pcm_tid, NULL);
-        // pthread_join(send_pcm_tid, NULL);
     }
 
     ev_break(cl->loop, EVBREAK_ALL);
@@ -199,6 +198,8 @@ int iflyos_websocket_start()
 	int ping_interval = -1;	/* second */
     struct uwsc_client *cl;
     struct ev_loop *loop;
+
+    prctl(PR_SET_NAME, "iflyos_websocket");
 
     create_buffer(&g_voice_buffer, BUFFER_SIZE);
 
@@ -229,13 +230,15 @@ int iflyos_websocket_start()
     cl->onclose = iflyos_uwsc_onclose;
    
     ev_run(loop, 0);
-    utils_print("iflyos process exit....\n");
-
+    
     g_iflyos_wbsc_running = FALSE;
     iflyos_deinit_cae_lib();
-    free(cl);
+    utils_free(cl);
     destroy_buffer(&g_voice_buffer);
     
+
+    utils_print("iflyos process exit....\n");
+
     return 0;
 }
 

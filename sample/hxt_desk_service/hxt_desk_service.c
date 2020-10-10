@@ -6,6 +6,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <signal.h>
+#include <sys/prctl.h>
 
 #include <sitting_posture.h>
 
@@ -16,6 +17,7 @@
 #include "db.h"
 #include "hxt_client.h"
 #include "board_func.h"
+#include "posture_check.h"
 
 volatile BOOL g_hxt_wbsc_running = FALSE;
 volatile BOOL g_iflyos_wbsc_running = FALSE;
@@ -59,7 +61,6 @@ static void start_iflyos_websocket_thread()
     }
 
     pthread_t iflyos_tid;
-    // if(hxt_get_iflyos_token_cfg() != NULL && hxt_get_iflyos_cae_sn() != NULL)
     char *token = get_iflyos_token();
     char *sn = get_iflyos_sn();
     if (token != NULL && sn != NULL)
@@ -80,7 +81,7 @@ static void check_websocket_running()
     while(g_processing)
     {
         end = time(NULL);
-        if (end - begin >= 10)
+        if (end - begin >= 20)
         {
             if(!g_hxt_wbsc_running)
             {
@@ -92,7 +93,7 @@ static void check_websocket_running()
                 start_iflyos_websocket_thread();
             }
         }
-        sleep(20);
+        sleep(30);
     }
 }
 
@@ -109,11 +110,10 @@ static void  hxt_bind_user()
     BOOL first_notice = TRUE;
 
     /* check if wifi info in cfg */
-    while (1)
+    while (g_processing)
     {
         char* ssid = get_wifi_ssid();
         char* pwd = get_wifi_pwd();
-
         if(ssid == NULL || pwd == NULL)
         {
             /* step into qrcode scan */
@@ -121,29 +121,29 @@ static void  hxt_bind_user()
             sleep(3);
             continue;
         }
+        
         utils_send_local_voice(VOICE_QUERY_WIFI_INFO);
         /* to connect wifi */
         if (!utils_check_wifi_state())
         {
-            // utils_link_wifi(hxt_get_wifi_ssid_cfg(), hxt_get_wifi_pwd_cfg());
             utils_link_wifi(ssid, pwd);
             sleep(10);
         }
         utils_free(ssid);
-        utils_free(pwd);
+        utils_free(pwd); 
 
         /*link ok, play voice*/
         if (utils_check_wifi_state())
         {
-            //check desk bind status 
+            //device already bind
             if (get_desk_bind_status() == 1)
             {
                 break;
             }
-            else
+            
+            while(1)
             {
-                utils_send_local_voice(VOICE_SERVER_CONNECT_OK);
-
+                utils_send_local_voice(VOICE_SERVER_CONNECT_OK);//联网成功，正在绑定
                 if(!board_get_qrcode_scan_status())
                 {
                     if (hxt_bind_desk_with_wifi_request())
@@ -157,6 +157,7 @@ static void  hxt_bind_user()
                     sleep(5);
                 }
             }
+            break;
         }
         else
         {
@@ -215,12 +216,15 @@ int main(int argc, char **argv)
         start_hxt_websocket_thread();
         start_iflyos_websocket_thread();
 
+        init_posture_model();
+
         check_websocket_running();
     }  
 
  EXIT:
     board_gpio_uninit();
     destroy_buffer(&g_msg_buffer);
+    deinit_posture_model();
 #endif
     close_hxt_service_db();
 

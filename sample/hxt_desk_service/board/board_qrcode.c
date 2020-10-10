@@ -34,9 +34,11 @@ static void sample_yuv_8bit_dump(VIDEO_FRAME_S* pVBuf, void** pOutBuf)
     HI_U32 u32UvHeight = 0;/*When the storage format is a planar format, this variable is used to keep the height of the UV component */
     HI_BOOL bUvInvert;
     HI_CHAR* pUserPageAddr[2] = {HI_NULL, HI_NULL};
+    
     HI_U32 u32Size = (pVBuf->u32Stride[0]) * (pVBuf->u32Height) * 3 / 2;
     u32UvHeight = pVBuf->u32Height / 2;
     phy_addr = pVBuf->u64PhyAddr[0];
+
     pUserPageAddr[0] = (HI_CHAR*) HI_MPI_SYS_Mmap(phy_addr, u32Size);
     if (HI_NULL == pUserPageAddr[0])
     {
@@ -131,7 +133,10 @@ BOOL board_get_qrcode_yuv_buffer()
         yuv_data = NULL;
     }
 
-    hxt_query_wifi_info((void*)qrcode_info);
+    if (hxt_query_wifi_info((void*)qrcode_info))
+    {
+        board_set_led_status(NORMAL);
+    }
     
     return TRUE;
 }

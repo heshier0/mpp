@@ -8,6 +8,7 @@
 #include <sys/ipc.h>
 #include <sys/msg.h>
 #include <errno.h>
+#include <sys/prctl.h>
 
 #include <sitting_posture.h>
 
@@ -71,6 +72,9 @@ static char g_mp4_file[128] = {0};
 static char g_snap_file[128] = {0};
 // static int g_msg_qid;
 
+static pthread_t proc_yuv_tid = NULL;
+pthread_mutex_t g_handle_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 static void play_random_warn_voice()
 {
     char* voice[5] = {VOICE_SITTING_WARM1, VOICE_SITTING_WARM2, VOICE_SITTING_WARM3, VOICE_SITTING_WARM4, VOICE_SITTING_WARM5};  
@@ -84,7 +88,7 @@ static void play_random_warn_voice()
             /* mute */
         break;
         case 1:
-            utils_send_local_voice(VOICE_WARNING_BUZZ);
+            utils_send_local_voice(VOICE_BEEP);
         break;
         case 2:
             utils_send_local_voice(voice[idx]);
@@ -151,7 +155,6 @@ static BOOL begin_recording()
                                 _tm->tm_min,
                                 _tm->tm_sec);
         send_recording_mp4_cmd(g_mp4_file, g_snap_file);
-        g_is_recording = TRUE;
         utils_print("%s -----> Begin record\n", utils_get_current_time());
     }
     
@@ -191,13 +194,6 @@ static BOOL send_study_report_type(StudyInfo *info)
     if (g_hxt_wbsc_running)
     {
         /* online mode */
-        // info->msg_type = 1;
-        // if (msgsnd(g_msg_qid, (void*)info, sizeof(StudyInfo) - sizeof(long), 0) < 0)
-        // {
-        //     utils_print("send study info msg failed, %s\n", strerror(errno));
-        //     return FALSE;
-        // }
-        
         char *ptr = get_free_buffer(&g_msg_buffer, sizeof(StudyInfo));
         if (NULL == ptr)
         {
@@ -267,6 +263,7 @@ static BOOL check_posture_changed(struct check_status_t *check_status, int check
                 check_status->_last_record_time = now;
             }
             begin_recording();
+            g_is_recording = TRUE;
         }
         else
         {
@@ -298,7 +295,7 @@ static BOOL check_posture_changed(struct check_status_t *check_status, int check
                     check_status->_last_record_time = now;
                 }
                 begin_recording(); 
-                
+                g_is_recording = TRUE;
             }
             
             if (check_status->_start_posture == BAD_POSTURE_STATUS)
@@ -445,13 +442,22 @@ static void* thread_proc_yuv_data_cb(void *param)
         return NULL;
     }
 
-    int alarm_interval = 0, video_duration = 0, study_mode = 0,width = 0, height = 0;
+    prctl(PR_SET_NAME, "proc_yuv_data");
+
+    if (g_recog_handle == NULL)
+    {
+        utils_print("uninit posture model\n");
+        return NULL;
+    }
+
+    int alarm_interval = 0, video_duration = 0, study_mode = 0, width = 0, height = 0;
+
     PostureParams *params = (PostureParams *)param;
     alarm_interval = params->alarm_interval;
     video_duration = params->video_duration;
     study_mode = params->study_mode;
-    width = params->width;
-    height = params->height;
+    width = params->height;
+    height = params->width;
 
     if (alarm_interval == 0)
     {
@@ -465,16 +471,10 @@ static void* thread_proc_yuv_data_cb(void *param)
     {
         study_mode = 3;
     }
-    
+    utils_free(params);    
+
     struct check_status_t check_status;
     memset(&check_status, 0, sizeof(struct check_status_t));
-
-    // g_msg_qid = msgget(STUDY_INFO_MQ_KEY, 0666 | IPC_CREAT);
-    // if(g_msg_qid < 0)
-    // {
-    //     utils_print("create message queue error\n");
-    //     return -1;
-    // }
 
     StudyInfo info;
     memset(&info, 0, sizeof(StudyInfo));
@@ -498,46 +498,57 @@ static void* thread_proc_yuv_data_cb(void *param)
         /* 2 : away */
         one_check_result = run_sit_posture(g_recog_handle, yuv_buf, width, height, 5);
         utils_print("%s -----> %d\n", utils_get_current_time(), one_check_result);
+        
         if (init_check_status(&check_status, one_check_result))
         {
+            utils_free(yuv_buf);
+            yuv_buf = NULL;
             continue;
         }
 
         if(check_posture_changed(&check_status, one_check_result))
         {
             utils_print("POSTURE CHANGED\n");
-            continue;
-        }
-        check_posture_alarm(&check_status, one_check_result, video_duration, alarm_interval);
-
-        if (yuv_buf != NULL)
-        {
             utils_free(yuv_buf);
             yuv_buf = NULL;
+            continue;
         }
+       
+        check_posture_alarm(&check_status, one_check_result, video_duration, alarm_interval);
+        
+        utils_free(yuv_buf);
+        yuv_buf = NULL;
 
-        // take_rest(100); 
+        take_rest(200);
     }
+    g_is_inited = FALSE;
+
     /* prevent some fragmentary video*/
     delete_recorded();
     /**/
-    if (g_recog_handle != NULL)
-    {
-        utils_print("To release recog mem...\n");
-        uninit_sit_posture(&g_recog_handle);
-    }
+    // if (g_recog_handle != NULL)
+    // {
+    //     uninit_sit_posture(&g_recog_handle);
+    //     g_recog_handle = NULL;
+    // }
 
     /* send msg to notify ending */
     memset(&info, 0, sizeof(StudyInfo));
     info.info_type = STUDY_END;
     send_study_report_type(&info);
     
+    /* send cmd to mpp service */
+    send_posture_stop_cmd();
+    /* play voice and change led status */
     utils_send_local_voice(VOICE_CAMERA_SLEEP);
+    board_set_led_status(NORMAL);
 
     utils_print("rocognize thread exit...\n");
 
     return NULL;
 }
+
+
 
 void start_posture_recognize()
 {
@@ -548,6 +559,12 @@ void start_posture_recognize()
         return;
     }
 
+    // if (g_recog_handle)
+    // {
+    //     utils_print("recog handle is still valid\n");
+    //     return;
+    // }
+
     if (g_keep_processing)
     {
         return;
@@ -555,47 +572,48 @@ void start_posture_recognize()
     g_keep_processing = TRUE;
 
     /* get config */
-    if (!hxt_get_desk_cfg_request())
+    if (g_hxt_wbsc_running)
     {
-        utils_print("Get config from server failed\n");
-        return;
+        if (!hxt_get_desk_cfg_request())
+        {
+            utils_print("Get config from server failed\n");
+            return;
+        }
     }
-
-    PostureParams params;
-    memset(&params, 0, sizeof(PostureParams));
-    params.video_duration = get_video_length(); 
-    params.alarm_interval = get_judge_time(); 
-    params.width = hxt_get_video_height();
-    params.height = hxt_get_video_width();
-    params.snap_freq = get_attach_ratio();
-    params.study_mode = get_study_mode(get_select_child_id()); 
-    //for test
-    params.study_mode = 3;
     
-    char *model_path1 = hxt_get_posture_detect_model_path(params.study_mode);
-    char *model_path2 = hxt_get_posture_class_model_path(params.study_mode);
-    if(NULL == model_path1 || NULL == model_path2)
-    {
-        return;
-    }
-    // init 
-    utils_print("To start recognize....\n");
-    g_recog_handle = init_sit_posture(model_path1, model_path2);
-    if (NULL == g_recog_handle)
-    {
-        utils_print("posture model init failed\n");
-        g_keep_processing = FALSE;
-        return;
-    }
+    PostureParams *params = utils_malloc(sizeof(PostureParams));
+    // memset(&params, 0, sizeof(PostureParams));
+    params->video_duration = get_video_length(); 
+    params->alarm_interval = get_judge_time(); 
+    params->width = hxt_get_video_width();
+    params->height = hxt_get_video_height();
+    params->snap_freq = get_attach_ratio();
+    params->study_mode = get_study_mode(get_select_child_id()); 
+    //for test
+    params->study_mode = 3;
 
-    send_posture_start_cmd(params.height, params.width);
+    // char *model_path1 = hxt_get_posture_detect_model_path(params->study_mode);
+    // char *model_path2 = hxt_get_posture_class_model_path(params->study_mode);
+    // if(NULL == model_path1 || NULL == model_path2)
+    // {
+    //     return;
+    // }
 
+    board_set_led_status(CHECKING);
+    // load model
+    // g_recog_handle = init_sit_posture(model_path1, model_path2);
+    // if (NULL == g_recog_handle)
+    // {
+    //     utils_print("posture model init failed\n");
+    //     g_keep_processing = FALSE;
+    //     return;
+    // }
+
+    send_posture_start_cmd(params->height, params->width);
     utils_send_local_voice(VOICE_NORMAL_STATUS);
-
-    pthread_t proc_yuv_tid = NULL;
-    pthread_create(&proc_yuv_tid, NULL, thread_proc_yuv_data_cb, (void*)&params);
-    pthread_detach(proc_yuv_tid);
-
+    utils_print("To start recognize....\n");
+    pthread_create(&proc_yuv_tid, NULL, thread_proc_yuv_data_cb, (void*)params);
+    // pthread_detach(&proc_yuv_tid);
     return;
 }
 
@@ -603,9 +621,54 @@ void stop_posture_recognize()
 {
     if (g_keep_processing)
     {
-        send_posture_stop_cmd();
         /* to tell mpp service stop video system */
-        utils_print("To stop recognize....\n");
         g_keep_processing = FALSE;
+        pthread_join(proc_yuv_tid, NULL);
+        utils_print("To stop recognize....\n");
     }
+}
+
+BOOL init_posture_model()
+{
+    int study_mode = get_study_mode(get_select_child_id());
+    if (study_mode == -1)
+    {
+        study_mode = 3;
+    }
+
+    char *model_path1 = hxt_get_posture_detect_model_path(study_mode);
+    char *model_path2 = hxt_get_posture_class_model_path(study_mode);
+    if(NULL == model_path1 || NULL == model_path2)
+    {
+        return FALSE;
+    }
+
+    if (g_recog_handle != NULL)
+    {
+        return FALSE;
+    }
+
+    pthread_mutex_lock(&g_handle_mutex);
+    g_recog_handle = init_sit_posture(model_path1, model_path2);
+    if (NULL == g_recog_handle)
+    {
+        utils_print("posture model init failed\n");
+        pthread_mutex_unlock(&g_handle_mutex);
+        return FALSE;
+    }
+    pthread_mutex_unlock(&g_handle_mutex);
+    return TRUE;
+}
+
+
+BOOL deinit_posture_model()
+{
+    pthread_mutex_lock(&g_handle_mutex);
+    if (g_recog_handle != NULL)
+    {
+        uninit_sit_posture(&g_recog_handle);
+        g_recog_handle = NULL;
+    }
+    pthread_mutex_unlock(&g_handle_mutex);
+    return TRUE;
 }

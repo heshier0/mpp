@@ -3,7 +3,7 @@
 #include <string.h>
 #include <sys/ipc.h>
 #include <sys/msg.h>
-
+#include <sys/prctl.h>
 
 #include <uwsc/uwsc.h>
 
@@ -12,6 +12,7 @@
 #include "databuffer.h"
 #include "db.h"
 #include "hxt_client.h"
+#include "posture_check.h"
 
 typedef enum 
 {
@@ -107,6 +108,9 @@ static void* send_study_info_cb(void *params)
     {
         return NULL;
     }    
+
+    prctl(PR_SET_NAME, "hxt_send_study_info");
+
     struct uwsc_client *cl = (struct uwsc_client *)params;
 
     while (g_recv_running)
@@ -223,14 +227,10 @@ static void parse_server_config_data(void *data)
             version_id = sub_item->valueint;
             if (old_ver < version_id)
             {
-                //hxt_set_version_id_cfg(sub_item->valueint);
                 sub_item1 = cJSON_GetObjectItem(item, "newVersionNo");           //新版本号
-                // hxt_set_version_cfg(sub_item->valuestring);
                 version_no = sub_item1->valuestring;
                 sub_item2 = cJSON_GetObjectItem(item, "upgradepackUrl");         //新版本文件地址
-                // hxt_set_upgrade_pack_url_cfg(sub_item->valuestring);
                 pack_url = sub_item2->valuestring;
-                // hxt_reload_cfg();
                 set_update_params(version_id, version_no, pack_url);
                 //to upgrade
                 hxt_get_new_version_request(pack_url);
@@ -245,13 +245,11 @@ static void parse_server_config_data(void *data)
         utils_print("To process user data...\n");
         item = cJSON_GetObjectItem(root, "data");
         hxt_parse_user_data((void*)item);
-        // hxt_reload_cfg();
     break;       
     case HXT_ALARM_VARRY:
         utils_print("To varry alarm file...\n");
         item = cJSON_GetObjectItem(root, "data");
         hxt_update_children_alarm_files((void*)item);
-        // hxt_reload_cfg();
     break;
     case HXT_STUDY_MODE_VARRRY:
         //new studyMode
@@ -259,42 +257,28 @@ static void parse_server_config_data(void *data)
         item = cJSON_GetObjectItem(root, "data");                           
         sub_item = cJSON_GetObjectItem(item, "studyMode");
         update_study_mode(get_select_child_id(), sub_item->valueint);               
-        // hxt_set_study_mode_cfg(hxt_get_child_unid(), sub_item->valueint);
-        // hxt_reload_cfg();
     break;
     case HXT_BIND_CHILD_ID:
         // child unid
         utils_print("To bind child id...\n");
         item = cJSON_GetObjectItem(root, "data");
         hxt_update_children_alarm_files((void*)item);
-        // hxt_reload_cfg();
     break;
     case HXT_VARY_CHILD_ID:
         //
         utils_print("To varry child id...\n");
         item = cJSON_GetObjectItem(root, "data");
         sub_item = cJSON_GetObjectItem(item, "childrenUnid");               //设置/变更上报数据的孩子ID
-        stop_posture_recognize();
-        // hxt_set_child_unid(sub_item->valueint);
+        // stop_posture_recognize();
         update_select_child(sub_item->valueint);
         sleep(1);
-        start_posture_recognize();
+        // start_posture_recognize();
     break;
     case HXT_GET_IFLYOS_TOKEN:
         utils_print("To update iflyos token or sn...\n");
         item = cJSON_GetObjectItem(root, "data");
         sub_item1 = cJSON_GetObjectItem(item, "iflyosToken");
-        // if (sub_item1)
-        // {
-            // hxt_set_iflyos_token_cfg(sub_item->valuestring);
-        // }
         sub_item2 = cJSON_GetObjectItem(item, "iflyosID");
-        // if (sub_item2)
-        // {
-            // utils_print("to update iflyos id");
-            // hxt_set_iflyos_sn_cfg(sub_item->valuestring);
-        // }
-        // hxt_reload_cfg();
         if (sub_item1 && sub_item2)
         {
             set_iflyos_params(sub_item1->valuestring, sub_item2->valuestring);
@@ -391,6 +375,8 @@ int hxt_websocket_start()
 	int ping_interval = 120;	        /* second */
     struct uwsc_client *cl;
     struct ev_loop *loop;
+
+    prctl(PR_SET_NAME, "hxt_websocket");
 
     char* hxt_url = get_websocket_url();
     char* token = get_server_token();

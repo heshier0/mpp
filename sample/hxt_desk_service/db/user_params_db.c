@@ -18,6 +18,7 @@ BOOL set_user_params(int child_id, int study_mode, int alarm_type, int selected)
                             USER_PARAMS_TABLE, USER_PARAMS_TABLE, 
                             child_id,
                             child_id, study_mode, alarm_type, selected);
+    utils_print("%s\n", sql);
     result = sqlite3_exec(g_hxt_service_db, sql, NULL, NULL, &err_msg);
     if (result != SQLITE_OK)
     {
@@ -38,6 +39,7 @@ BOOL set_all_unselected()
     char *sql = NULL;
     /* first set unselect every child*/
     sql = sqlite3_mprintf("update %s set isSelect=0 where isSelect=1", USER_PARAMS_TABLE);
+    utils_print("%s\n", sql);
     result = sqlite3_exec(g_hxt_service_db, sql, NULL, NULL, &err_msg);
     if (result != SQLITE_OK)
     {
@@ -61,6 +63,7 @@ BOOL update_select_child(int child_id)
 
     /* first set unselect every child*/
     sql = sqlite3_mprintf("update %s set isSelect=0 where childID=%d", USER_PARAMS_TABLE, child_id);
+    utils_print("%s\n", sql);
     result = sqlite3_exec(g_hxt_service_db, sql, NULL, NULL, &err_msg);
     if (result != SQLITE_OK)
     {
@@ -84,6 +87,7 @@ BOOL update_study_mode(int child_id, int study_mode)
 
     /* first set unselect every child*/
     sql = sqlite3_mprintf("update %s set studyMode=%d where childID=%d", USER_PARAMS_TABLE, study_mode, child_id);
+    utils_print("%s\n", sql);
     result = sqlite3_exec(g_hxt_service_db, sql, NULL, NULL, &err_msg);
     if (result != SQLITE_OK)
     {
@@ -107,6 +111,7 @@ int get_select_child_id()
     int value = 0;
 
     sql = sqlite3_mprintf("select childID from %s where isSelect=1", USER_PARAMS_TABLE);
+    utils_print("%s\n", sql);
     result = sqlite3_get_table(g_hxt_service_db, sql, &db_result, &row_count, &col_count, &err_msg);
     if (result != SQLITE_OK)
     {
@@ -140,6 +145,7 @@ int get_study_mode(int child_unid)
     int value = 0;
 
     sql = sqlite3_mprintf("select studyMode from %s where childID=%d", USER_PARAMS_TABLE, child_unid);
+    utils_print("%s\n", sql);
     result = sqlite3_get_table(g_hxt_service_db, sql, &db_result, &row_count, &col_count, &err_msg);
     if (result != SQLITE_OK)
     {
@@ -173,6 +179,7 @@ int get_alarm_type(int child_unid)
     int value = 0;
 
     sql = sqlite3_mprintf("select alarmType from %s where childID=%d", USER_PARAMS_TABLE, child_unid);
+    utils_print("%s\n", sql);
     result = sqlite3_get_table(g_hxt_service_db, sql, &db_result, &row_count, &col_count, &err_msg);
     if (result != SQLITE_OK)
     {

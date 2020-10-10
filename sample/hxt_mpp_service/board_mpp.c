@@ -10,6 +10,7 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <errno.h>
+#include <sys/prctl.h>
 
 #include <sample_comm.h>
 #include <acodec.h>
@@ -661,7 +662,6 @@ void stop_video_system()
     stop_all_venc();
     unbind_vi_vpss();
     stop_all_vpss();
-    // stop_vi();
 }
 
 static void sample_yuv_8bit_dump(VIDEO_FRAME_S* pVBuf, void** pOutBuf)
@@ -843,6 +843,8 @@ static void* sample_pcm_cb(void *data)
     AEC_FRAME_S   stAecFrm;
     AUDIO_FRAME_S stFrame;
 
+    prctl(PR_SET_NAME, "mpp_sample_voice");
+
     while(g_sample_pcm_status)
     {
         TimeoutVal.tv_sec = 1;
@@ -924,6 +926,9 @@ static void* play_mp3_cb(void* data)
         utils_print("malloc failed!\n");
         return NULL;
     }
+
+    prctl(PR_SET_NAME, "mpp_play_mp3");
+
     while (g_play_mp3_status)
     {
         stAudioStream.pStream = pu8AudioStream;
@@ -1090,6 +1095,8 @@ void board_get_stream_from_venc_chn(int width, int height)
     HI_S32 ret_val = HI_FAILURE;
     fd_set read_fds;
     struct timeval timout_val; 
+
+    prctl(PR_SET_NAME, "board_get_stream_from_venc_chn");
 
     g_enc_stream_status = TRUE;
     ret_val = HI_MPI_VENC_GetChnAttr(venc_chn, &venc_chn_attrs);

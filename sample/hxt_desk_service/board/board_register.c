@@ -134,9 +134,8 @@ static int mem_unmap(void* addr_mapped)
 
     do
     {
-       // if( ((unsigned long)addr_mapped >= pTmp->Start_V) && 
-        //     ((unsigned long)addr_mapped <= (pTmp->Start_V + pTmp->length)) )
-        if (pTmp != NULL)
+       if( ((unsigned long)addr_mapped >= pTmp->Start_V) && 
+            ((unsigned long)addr_mapped <= (pTmp->Start_V + pTmp->length)) )
         {
             pTmp->refcount --;
             if (0 == pTmp->refcount)
@@ -195,6 +194,7 @@ char* board_get_sn()
     code6 = get_register_4bytes(DIE_ID5);
 
     sprintf(sn, "%x-%x-%x-%x-%x-%x", code1, code2, code3, code4, code5, code6);
+    utils_print("board sn is %s\n", sn);
 
     mem_unmap(DIE_ID0);
     mem_unmap(DIE_ID1);

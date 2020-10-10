@@ -35,8 +35,9 @@ static BOOL create_params_tables()
 }
 
 BOOL open_hxt_service_db()
-{
-    int result = sqlite3_open_v2(DB_PATH, &g_hxt_service_db, SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_NOMUTEX, NULL);
+{   
+    sqlite3_config(SQLITE_CONFIG_SERIALIZED);
+    int result = sqlite3_open_v2(DB_PATH, &g_hxt_service_db, SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE, NULL);
     if (result != 0)
     {
         utils_print("open database %s failed, errcode=%d\n", DB_PATH, result);

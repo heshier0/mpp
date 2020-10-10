@@ -153,30 +153,10 @@ int send_recording_mp4_cmd(const char* video_file, const char* snap_file)
         return -1;
     }
 
-    // time_t now = time(0);
-	// struct tm *_tm = localtime(&now);
-	// int child_unid = hxt_get_child_unid();
     study_video_t study_video;
     bzero(&study_video, sizeof(study_video));
     strcpy(study_video.video_name, video_file);
     strcpy(study_video.snap_name, snap_file);
-	// snprintf(study_video.video_name, 128, "/user/child_%d/video/%04d%02d%02d-%02d%02d%02d.mp4",
-	// 							child_unid,
-	// 							_tm->tm_year + 1900,
-	// 							_tm->tm_mon + 1, 
-	// 							_tm->tm_mday,
-	// 							_tm->tm_hour,
-	// 							_tm->tm_min,
-	// 							_tm->tm_sec);
-
-    // snprintf(study_video.snap_name, 128, "/user/child_%d/snap/%04d%02d%02d-%02d%02d%02d.jpg",
-    //                         child_unid,
-    //                         _tm->tm_year + 1900,
-    //                         _tm->tm_mon + 1, 
-    //                         _tm->tm_mday,
-    //                         _tm->tm_hour,
-    //                         _tm->tm_min,
-    //                         _tm->tm_sec);
 
     cmd_header_t header;
     bzero(&header, sizeof(cmd_header_t));

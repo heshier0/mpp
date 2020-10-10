@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <pthread.h>
 
 
 #include <uwsc/uwsc.h>
@@ -15,6 +16,7 @@
 
 extern BOOL g_stop_capture;
 CAE_HANDLE g_cae_handle = NULL;
+pthread_mutex_t g_cae_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static BOOL wake_up = FALSE;
 
@@ -23,7 +25,8 @@ static void ivw_fn(short angle, short channel, float power, short CMScore, short
     utils_print("angle=%d, channel=%d, power=%f, CMScore=%d, beam=%d, param1=%s\n",
                     angle, channel, power, CMScore, beam, param1);
 
-	utils_send_local_voice(VOICE_WARNING_BUZZ);
+	utils_send_local_voice(VOICE_BEEP);
+	
 	wake_up = TRUE;
 }
 
@@ -72,11 +75,20 @@ int iflyos_init_cae_lib(void* data)
     CAESetShowLog(flag);
 #endif
 
+	if(g_cae_handle != NULL)
+	{
+		utils_print("iflyos cae handle is still valid\n");
+		return -1;
+	}
+
+	pthread_mutex_lock(&g_cae_mutex);
     rv = CAENew(&g_cae_handle, CONF_PATH, ivw_fn, ivw_audio_fn, recog_audio_fn, PARAM_PATH, data);
     if (rv != 0)
     {
+		pthread_mutex_unlock(&g_cae_mutex);
         return -1;
     }
+	pthread_mutex_unlock(&g_cae_mutex);
 
     char *sn = get_iflyos_sn();
     if (CAEAuth(sn))
@@ -90,10 +102,13 @@ int iflyos_init_cae_lib(void* data)
 
 void iflyos_deinit_cae_lib()
 {
+	pthread_mutex_lock(&g_cae_mutex);
     if (g_cae_handle != NULL)
     {
         CAEDestroy(g_cae_handle);
+		g_cae_handle = NULL;
     }
+	pthread_mutex_unlock(&g_cae_mutex);
 }
 
 int iflyos_write_audio(void* buffer, int buf_length)
@@ -104,12 +119,15 @@ int iflyos_write_audio(void* buffer, int buf_length)
 		return -1;
 	}
 
+	pthread_mutex_lock(&g_cae_mutex);
     rv = CAEAudioWrite(g_cae_handle, buffer, buf_length);
     if(rv != 0)
     {
         utils_print("cae write error: %d\n", rv);
+		pthread_mutex_unlock(&g_cae_mutex);
         return rv;
     }
+	pthread_mutex_unlock(&g_cae_mutex);
 
     return rv;
 }

@@ -35,6 +35,7 @@
 	free(ptr); \
 	})
 
+
 typedef enum
 {
     TRUE  = 1, 
@@ -47,7 +48,7 @@ typedef enum
     ONLINE = 1
 }WORK_MODE;
 
-#define HXT_DESK_SERVICE_VERSION        "1.0.0"
+#define HXT_DESK_SERVICE_VERSION        "1.0.3"
 #define HXT_DESK_SERVICE_VERSION_NUMBER  100000
 
 
@@ -113,7 +114,7 @@ typedef enum
 #define VOICE_SITTING_PRAISE5                   "/userdata/media/voice/V038.mp3"
 #define VOICE_QUERY_WIFI_INFO                   "/userdata/media/voice/V039.mp3"
 #define VOICE_IFLYOS_READY                      "/userdata/media/voice/V040.mp3"
-
+#define VOICE_BEEP                              "/userdata/media/voice/fengming.mp3"
 
 /* db table name */
 #define IFLYOS_DEVICE_TABLE                 "IflyosParams"

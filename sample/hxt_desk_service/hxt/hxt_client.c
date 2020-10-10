@@ -353,20 +353,15 @@ BOOL hxt_query_wifi_info(void *data)
     cJSON *checkCode_node = cJSON_GetObjectItem(root, "checkCode");
     if((NULL == ssid_node) || (NULL == pwd_node) || (NULL == checkCode_node))
     {
-        if (root != NULL)
-        {
-            cJSON_Delete(root);
-        }
+        cJSON_Delete(root);
         return FALSE;
     }
-    set_wifi_params(ssid_node->valuestring, pwd_node->valuestring, checkCode_node->valuestring);
-
-    if (root != NULL)
-    {
-        cJSON_Delete(root);
-    }
     
-    return TRUE;
+    BOOL result = set_wifi_params(ssid_node->valuestring, pwd_node->valuestring, checkCode_node->valuestring);
+
+    cJSON_Delete(root);
+
+    return result;
 }
 
 BOOL hxt_bind_desk_with_wifi_request()
@@ -556,8 +551,8 @@ BOOL hxt_get_token_request()
         }
         cJSON* token_item = cJSON_GetObjectItem(returnObject, "token");  
         cJSON* time_item = cJSON_GetObjectItem(returnObject, "tokenExpireTime");
-        utils_print("token time is %d\n", time_item->valueint/1000);
-        set_connect_params(token_item->valuestring, time_item->valueint/1000);
+        utils_print("token time is %d\n", time_item->valuedouble/1000);
+        set_connect_params(token_item->valuestring, time_item->valuedouble/1000);
 
         cJSON_Delete(token_root);
         reported = TRUE;
@@ -813,18 +808,40 @@ BOOL hxt_update_children_alarm_files(void* data)
  
     cJSON *node = (cJSON*)data;
     cJSON *node_item = cJSON_GetObjectItem(node, "childrenUnid");
+    if (node_item == NULL)
+    {   
+        utils_print("NO child !!!!\n");
+        return;
+    }
     child_unid = node_item->valueint;
+    
     node_item = cJSON_GetObjectItem(node, "studyMode");
     if (node_item == NULL)
     {
         study_mode = get_study_mode(child_unid);
+        if (study_mode == -1)
+        {
+            study_mode = 3;
+        }
     }
     else
     {
         study_mode = node_item->valueint;
     }
+
     node_item = cJSON_GetObjectItem(node, "alarmType");
-    alarm_type = node_item->valueint;
+    if (node_item == NULL)
+    {
+        alarm_type = get_alarm_type(child_unid);
+        if (alarm_type == -1)
+        {
+            alarm_type = 2;
+        }
+    }
+    else
+    {
+        alarm_type = node_item->valueint;
+    }
 
     if (get_select_child_id() == -1)
     {
@@ -945,16 +962,16 @@ int hxt_get_video_width()
     switch (video_ratio)
     {
     case 1:
-        video_width = 1280;
+        video_width = 640;
         break;
     case 2:
         video_width = 960;
         break;
     case 3:
-        video_width = 640;
+        video_width = 1280;
         break;    
     default:
-        video_width = 960;
+        video_width = 640;
         break;
     }
 
@@ -968,16 +985,16 @@ int hxt_get_video_height()
     switch (video_ratio)
     {
     case 1:
-        video_height = 720;
+        video_height = 360;
     break;
     case 2:
         video_height = 540;
     break;
     case 3:
-        video_height = 360;
+        video_height = 720;
     break;
     default:
-        video_height = 540;
+        video_height = 360;
     break;
     }
 

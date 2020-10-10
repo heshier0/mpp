@@ -1,8 +1,9 @@
+#include <sys/prctl.h>
 #include <gpiod.h>
 #include <hi_comm_aio.h>
 
 #include "utils.h"
-
+#include "posture_check.h"
 #include "server_comm.h"
 #include "board_func.h"
 
@@ -59,17 +60,18 @@ static AUDIO_DEV ao_dev = 0;
 static BOOL dec_vol_pressed = FALSE;
 static BOOL inc_vol_pressed = FALSE;
 
-// static BOOL posture_running = FALSE;
 static BOOL system_booting = TRUE;
 static BOOL net_connecting = FALSE;
 static BOOL system_reset = FALSE;
 static BOOL qrcode_scanning = FALSE;
 static BOOL ao_mute = FALSE;
+static BOOL posture_running = FALSE;
+static int scan_count = 0;
 static LED_STATUS led_status = BOOTING;
-
 
 extern BOOL g_hxt_wbsc_running;
 extern BOOL g_device_sleeping;
+
 
 static int gpio_set_value(struct gpiod_line *line, int value)
 {
@@ -114,6 +116,9 @@ static void* check_reset_event(void *param)
 {
     struct gpiod_line_event event;
     time_t start = 0, end = 0;
+    BOOL pressed = FALSE;
+
+    prctl(PR_SET_NAME, "check_reset_event");
     while(1)
     {
         gpiod_line_event_wait(btn_reset, NULL);
@@ -124,17 +129,18 @@ static void* check_reset_event(void *param)
 
         if(event.event_type == GPIOD_LINE_EVENT_RISING_EDGE)
         {
-            printf("reset btn pressed down\n");
-            end = time(0);
-        }
-        if(event.event_type == GPIOD_LINE_EVENT_FALLING_EDGE)
-        {
+            if (!pressed)
+            {
+                utils_print("reset btn not pressed\n");
+                continue;
+            }
             printf("reset btn pressed up\n");
-            start = time(0);
+            end = time(0);
             printf("inteval is %ld\n", end - start);
-            if (end - start > 5)
+            if (end - start > 3)
             {
                 board_set_led_status(RESETING);
+                sleep(3);
                 /* reset */
                 utils_system_reset();
                 utils_system_reboot();
@@ -142,12 +148,16 @@ static void* check_reset_event(void *param)
             else
             {
                 board_led_all_off();
-                sleep(2);
                 /* reboot */
                 utils_print("Btn pressed to reboot\n");
                 utils_system_reboot();
             }
-            
+        }
+        if(event.event_type == GPIOD_LINE_EVENT_FALLING_EDGE)
+        {
+            printf("reset btn pressed down\n");
+            start = time(0);
+            pressed = TRUE;
         }
     }
 
@@ -159,6 +169,9 @@ static void* check_inc_vol_event(void *param)
     struct gpiod_line_event event;
     time_t start = 0, end = 0;
     BOOL already_max = FALSE;
+
+    prctl(PR_SET_NAME, "check_inc_volume");
+
     while(1)
      {
         gpiod_line_event_wait(btn_vol_inc, NULL);
@@ -166,6 +179,7 @@ static void* check_inc_vol_event(void *param)
         {
             continue;
         }
+
         if(event.event_type == GPIOD_LINE_EVENT_FALLING_EDGE)
         {
             printf("inc vol btn pressed down\n");
@@ -213,6 +227,7 @@ static void* check_dec_vol_event(void *param)
 {
     struct gpiod_line_event event;
     time_t start = 0, end = 0;
+    prctl(PR_SET_NAME, "check_dec_volume");
     while(1)
      {
         gpiod_line_event_wait(btn_vol_dec, NULL);
@@ -224,7 +239,6 @@ static void* check_dec_vol_event(void *param)
         {
             printf("dec vol btn pressed down\n");
             start = time(0);
-
         }
 
         if(event.event_type == GPIOD_LINE_EVENT_RISING_EDGE)
@@ -260,8 +274,9 @@ static void* check_posture_event(void *param)
 {
     struct gpiod_line_event event;
     time_t start = 0, end = 0;
-    BOOL posture_running = FALSE;
-
+    time_t begin_time = 0;
+    // BOOL posture_running = FALSE;
+    prctl(PR_SET_NAME, "check_posture");
     while(1)
     {
         gpiod_line_event_wait(btn_mute, NULL);
@@ -289,16 +304,20 @@ static void* check_posture_event(void *param)
             }
             else
             {
-                
-                if (!posture_running)
+                 if (!posture_running)
                 {
-                    board_set_led_status(CHECKING);
                     start_posture_recognize();
-                    posture_running = TRUE;   
+                    posture_running = TRUE;  
+
+                    begin_time = time(NULL);
                 }
                 else
                 {
-                    board_set_led_status(NORMAL);
+                    // if (time(NULL) - begin_time < 10)
+                    // {
+                    //     utils_print("Reconizing,wait a minute....\n");
+                    //     continue;
+                    // }
                     stop_posture_recognize();   
                     posture_running = FALSE;  
                 }
@@ -310,6 +329,7 @@ static void* check_posture_event(void *param)
 
 static void* check_scan_qrcode_event(void *param)
 {
+    prctl(PR_SET_NAME, "scan_qrcode");
     while(1)
     {
         if (inc_vol_pressed && dec_vol_pressed)
@@ -320,24 +340,26 @@ static void* check_scan_qrcode_event(void *param)
 
             printf("To scan qrcode....\n");
             inc_vol_pressed = dec_vol_pressed = FALSE;
-            int scan_count = 0;
+            
             while (!board_get_qrcode_yuv_buffer())
             {
                 if (scan_count < 5)
                 {
                     utils_send_local_voice(VOICE_DEPLOYING_NET);
                     sleep(10);
+                    scan_count ++;
                     continue;
                 }         
                 else
                 {
                     utils_send_local_voice(VOICE_QUERY_WIFI_ERROR);
+                    board_set_led_status(WIFI_ERR);
                     sleep(10);
                     break;
                 }
             }
-            inc_vol_pressed = dec_vol_pressed = FALSE;
             qrcode_scanning = FALSE;
+            scan_count = 0;
         }
         sleep(3);
     }
@@ -348,6 +370,7 @@ static void* check_scan_qrcode_event(void *param)
 static void* led_blinking_thread(void* param)
 {
     BOOL changed_to_normal = FALSE;
+    prctl(PR_SET_NAME, "check_led_status");
     while(1)
     {
         time_t t = time(0);
@@ -366,6 +389,8 @@ static void* led_blinking_thread(void* param)
             gpio_set_value(led_wifi_blue, 0);
         break;
         case BINDING:
+            board_led_all_off();
+            gpio_set_value(led_wifi_blue, 1);
             gpio_set_value(led_wifi_green, 1);
             usleep(200 * 1000);
             gpio_set_value(led_wifi_green, 0);
@@ -378,20 +403,22 @@ static void* led_blinking_thread(void* param)
         break;
         case WIFI_ERR:
             gpio_set_value(led_wifi_red, 0);
+            set_camera_led_off();
         break;
         case CAMERA_ERR:
-            set_camera_led_off();
             gpio_set_value(led_camera_red, 0);
+            set_camera_led_off();
         break;
         case RESETING:
-            while( (time(0) - t) <= 2)
+            board_led_all_off();
+            while((time(0) - t) <= 2)
             {
                 gpio_set_value(led_wifi_green, 0);
                 gpio_set_value(led_camera_green, 0);
-                usleep(200 * 1000);
+                usleep(100 * 1000);
                 gpio_set_value(led_wifi_green, 1);
                 gpio_set_value(led_camera_green, 1);
-                usleep(200 * 1000);
+                usleep(100 * 1000);
             }
             board_led_all_off();
         break;
@@ -464,12 +491,13 @@ static void init_btn_events()
 {
     btn_mute = gpiod_chip_get_line(gpio10, 6);
     gpiod_line_request_both_edges_events(btn_mute, "HxtDeskService");
-    btn_reset = gpiod_chip_get_line(gpio5, 7);
-    gpiod_line_request_both_edges_events(btn_reset, "HxtDeskService");
     btn_vol_dec = gpiod_chip_get_line(gpio8, 2);
     gpiod_line_request_both_edges_events(btn_vol_dec, "HxtDeskService");
     btn_vol_inc = gpiod_chip_get_line(gpio8, 4);
     gpiod_line_request_both_edges_events(btn_vol_inc, "HxtDeskService");
+
+    btn_reset = gpiod_chip_get_line(gpio5, 7);
+    gpiod_line_request_both_edges_events(btn_reset, "HxtDeskService");
 }
 
 static void board_led_blinking()
