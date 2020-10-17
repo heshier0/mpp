@@ -23,16 +23,16 @@
 #define BUFFER_SIZE     (4*1024*1024)
 #define PCM_LENGTH      640
 
-extern BOOL g_hxt_wbsc_running;
 extern BOOL g_iflyos_wbsc_running;
 extern BOOL g_iflyos_first_login;
 
-DATABUFFER g_voice_buffer;
+DATABUFFER g_voice_buffer; 
 static BOOL g_sampling = FALSE;
-BOOL g_stop_capture = FALSE;
+volatile BOOL g_stop_capture = FALSE; 
 
 static pthread_t read_pcm_tid;
 static pthread_t send_pcm_tid;
+struct uwsc_client *wsc;
 
 static void* thread_read_pcm_cb(void *data)
 {
@@ -118,9 +118,7 @@ static void iflyos_uwsc_onopen(struct uwsc_client *cl)
     g_sampling = TRUE;
 
     pthread_create(&read_pcm_tid, NULL, thread_read_pcm_cb, NULL);
-    pthread_detach(read_pcm_tid);
     pthread_create(&send_pcm_tid, NULL, thread_send_pcm_cb, (void*)cl);
-    pthread_detach(send_pcm_tid);
 
     /* send cmd to tell service */
     send_voice_sample_start_cmd();
@@ -131,7 +129,6 @@ static void iflyos_uwsc_onopen(struct uwsc_client *cl)
         utils_send_local_voice(VOICE_IFLYOS_READY);
         g_iflyos_first_login = FALSE;
     }
-    
 }
 
 static void iflyos_uwsc_onmessage(struct uwsc_client *cl,
@@ -160,13 +157,13 @@ static void iflyos_uwsc_onmessage(struct uwsc_client *cl,
         }
         else
         {
-        utils_print("other response\n");
+            utils_print("other response\n");
         }
         
         utils_free(name);
     }
 
-    utils_print("%s: [%.*s]\n", utils_get_current_time(), (int)len, (char *)data);
+    utils_print("%s: %.*s\n", utils_get_current_time(), (int)len, (char *)data);
 }
 
 static void iflyos_uwsc_onerror(struct uwsc_client *cl, int err, const char *msg)
@@ -193,10 +190,17 @@ static void iflyos_uwsc_onclose(struct uwsc_client *cl, int code, const char *re
     ev_break(cl->loop, EVBREAK_ALL);
 }
 
+void iflyos_websocket_stop()
+{
+    utils_print("To stop iflyos websocket\n");
+    char buf[128] = "";
+    wsc->send(wsc, buf, strlen(buf + 2) + 2, UWSC_OP_CLOSE);
+}
+
 int iflyos_websocket_start()
 {
 	int ping_interval = -1;	/* second */
-    struct uwsc_client *cl;
+    // struct uwsc_client *wsc;
     struct ev_loop *loop;
 
     prctl(PR_SET_NAME, "iflyos_websocket");
@@ -204,39 +208,73 @@ int iflyos_websocket_start()
     create_buffer(&g_voice_buffer, BUFFER_SIZE);
 
     char ifly_url[255] = {0};
-    char* device_id = "HXT20200607P";//get_device_id();
-    char* token = "V1ZKr70AkzsLyqib92_Myb-DPPn8KvMfbAQcGDaNnCrDxGSwXqC7pFfkOpSVKFMx"; //get_iflyos_token();
+    /* for test */
+    // char device_id[255] = {0};
+    // char token[255] = {0};
+    // char line[255] = {0};
+    // int line_idx = 0;
+    // FILE* fp = fopen("/userdata/data/iflyos_token.txt", "r");
+    // if (fp != NULL)
+    // {
+    //     memset(line, 0, 255);
+    //     while(fgets(line, sizeof(line), fp) != NULL)
+    //     {
+    //         if (line_idx == 0)
+    //         {
+    //             strcpy(device_id, line);
+    //             device_id[strlen(device_id)-1] = '\0';
+    //             line_idx ++;
+    //         }
+    //         else
+    //         {
+    //             strcpy(token, line);
+    //             token[strlen(token)-1] = '\0';
+    //         }
+            
+    //     }
+    //     line_idx = 0;
+    // }
+    // fclose(fp);
+    /*test end*/
+
+    char* device_id = get_device_id();
+    char* token = get_iflyos_token();
     utils_print("iflyos device_id is %s and token is %s\n", device_id, token);
     sprintf(ifly_url, "wss://ivs.iflyos.cn/embedded/v1?token=%s&device_id=%s", token, device_id); 
-    // utils_free(token);
-    // utils_free(device_id);
+    utils_free(token);
+    utils_free(device_id);
 
     loop = ev_loop_new(EVFLAG_AUTO);
-    cl = uwsc_new(loop, ifly_url, ping_interval, NULL);
-    if (!cl)
+    wsc = uwsc_new(loop, ifly_url, ping_interval, NULL);
+    if (!wsc)
     {
         utils_print("iflyos websocket client init failed...\n");
         destroy_buffer(&g_voice_buffer);
         return -1;
     }
     
-    iflyos_init_cae_lib((void*)cl);
+    if (!iflyos_init_cae_lib((void*)wsc))
+    {
+        utils_print("init cae lib error\n");
+        goto IFLYOS_EXIT;
+    }
 
 	utils_print("iflyos connect...\n");
 
-    cl->onopen = iflyos_uwsc_onopen;
-    cl->onmessage = iflyos_uwsc_onmessage;
-    cl->onerror = iflyos_uwsc_onerror;
-    cl->onclose = iflyos_uwsc_onclose;
+    wsc->onopen = iflyos_uwsc_onopen;
+    wsc->onmessage = iflyos_uwsc_onmessage;
+    wsc->onerror = iflyos_uwsc_onerror;
+    wsc->onclose = iflyos_uwsc_onclose;
    
     ev_run(loop, 0);
     
-    g_iflyos_wbsc_running = FALSE;
+    // pthread_join(&read_pcm_tid, NULL);
+    // pthread_join(&send_pcm_tid, NULL);
+ IFLYOS_EXIT:   
     iflyos_deinit_cae_lib();
-    utils_free(cl);
+    utils_free(wsc);
     destroy_buffer(&g_voice_buffer);
-    
-
+    g_iflyos_wbsc_running = FALSE;
     utils_print("iflyos process exit....\n");
 
     return 0;

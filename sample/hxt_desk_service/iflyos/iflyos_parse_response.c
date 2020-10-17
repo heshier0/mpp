@@ -76,7 +76,7 @@ static char* iflyos_get_response_value(const char* json_data, const char* item_n
             int len = strlen(value->valuestring);
             name = utils_malloc(len + 1);
             memcpy(name, value->valuestring, len);
-            // name[len] = '\0';
+            name[len] = '\0';
             break;
         }
     }

@@ -27,7 +27,10 @@ typedef struct media_context
 	int file_flags;
 	char filename[128];						//视频绝对路径
 }MediaCtx;
+
 MediaCtx g_media_ctx;
+pthread_mutex_t g_media_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 
 static BOOL init_video_codec_params(int width, int height)
 {
@@ -119,6 +122,7 @@ BOOL board_create_mp4_file(const char* filename)
 	int ret = 0;
 	AVOutputFormat *output_fmt = NULL;
 
+	pthread_mutex_lock(&g_media_mutex);
 	g_count = 0;
 	memset(&g_media_ctx, 0, sizeof(g_media_ctx));
 
@@ -161,6 +165,9 @@ BOOL board_create_mp4_file(const char* filename)
 	g_media_ctx.video_idx = -1;
 	g_media_ctx.first_IDR = 0;
 
+	utils_print("TO create %s!\n", g_media_ctx.filename);
+	pthread_mutex_unlock(&g_media_mutex);
+
 	return TRUE;
 
 AVIO_OPEN_FAILED:
@@ -175,6 +182,7 @@ OUTPUT_FMT_FAILED:
 		avformat_free_context(g_media_ctx.format_ctx);
 	}
 
+	pthread_mutex_unlock(&g_media_mutex);
 	return FALSE;
 }
 
@@ -182,6 +190,7 @@ void board_close_mp4_file()
 {
 	int ret;
 
+	pthread_mutex_lock(&g_media_mutex);
 	if(g_media_ctx.format_ctx)
 	{
 		ret = av_write_trailer(g_media_ctx.format_ctx);
@@ -214,7 +223,8 @@ void board_close_mp4_file()
 
 	g_count = 0;
 
-	utils_print("SAVE MP4 Successfully!\n");
+	utils_print("SAVE MP4 %s Successfully!\n", g_media_ctx.filename);
+	pthread_mutex_unlock(&g_media_mutex);
 }
 
 BOOL board_write_mp4(void* input_stream, int width, int height)
@@ -239,6 +249,7 @@ BOOL board_write_mp4(void* input_stream, int width, int height)
 	}
 	VENC_STREAM_S* venc_stream = (VENC_STREAM_S*)input_stream;
 
+	pthread_mutex_lock(&g_media_mutex);
 	for(i = 0; i < venc_stream->u32PackCount; i++)
 	{
 		pack_virt_addr = venc_stream->pstPack[i].pu8Addr + venc_stream->pstPack[i].u32Offset;
@@ -354,11 +365,16 @@ BOOL board_write_mp4(void* input_stream, int width, int height)
 			return FALSE;
 		}						
 	}
+	pthread_mutex_unlock(&g_media_mutex);
+
 	return TRUE;
 }
 
 void board_delete_current_mp4_file()
 {
+
 	unlink(g_media_ctx.filename);
+	utils_print("delete MP4 %s\n", g_media_ctx.filename);
+	
 	return;
 }

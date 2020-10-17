@@ -35,6 +35,8 @@ void utils_system_reset();
 
 void utils_generate_mp4_file_name(char* file_name);
 
+int utils_query_file_count(char* path);
+void utils_query_file_names(const char *path, char **file_list);
 
 void utils_save_yuv_test(const char* yuv_data, const int width, const int height);
 void utils_save_pcm_test(const char* pcm_data, int length);

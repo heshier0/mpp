@@ -43,7 +43,8 @@ static BOOL g_start_record = FALSE;
 static BOOL g_recording = FALSE;
 static BOOL g_stop_record = FALSE;
 
-static char s_file_name[255] = {0};
+static char s_file_name[256] = {0};
+pthread_mutex_t g_name_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /* fifo */
 static BOOL create_fifo(const char* name)
@@ -1191,7 +1192,8 @@ void board_get_stream_from_venc_chn(int width, int height)
                     utils_free(venc_stream.pstPack);
                     venc_stream.pstPack = NULL;
                     utils_print("HI_MPI_VENC_GetStream failed with %#x!\n", ret_val);
-                    break;
+                    //break;
+                    continue;
                 }
                 
                 /* to save mp4 */
@@ -1224,7 +1226,7 @@ void board_get_stream_from_venc_chn(int width, int height)
                 g_start_record = FALSE;
                 g_recording = FALSE;
                 g_stop_record = FALSE;
-              }
+            }
         }
     }
     g_enc_stream_status = FALSE;
@@ -1334,6 +1336,7 @@ void board_get_snap_from_venc_chn(const char* jpg_file)
 
                     fflush(pFile);
                 }
+                utils_print("save %s OK!!!\n", jpg_file);
                 fclose(pFile);
                 
                 ret = HI_MPI_VENC_ReleaseStream(venc_chn, &stream);
@@ -1413,6 +1416,7 @@ void stop_sample_voice_thread()
 
 void start_video_recording(const char* filename)
 {
+    memset(s_file_name, 0, 256);
     strcpy(s_file_name, filename);
     g_start_record = TRUE;
 }
@@ -1424,6 +1428,7 @@ void stop_video_recording()
 
 void delete_video()
 {
+
     g_start_record = FALSE;
     g_recording = FALSE;
     g_stop_record = FALSE;

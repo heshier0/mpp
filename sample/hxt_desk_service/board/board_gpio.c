@@ -1,11 +1,14 @@
 #include <sys/prctl.h>
 #include <gpiod.h>
 #include <hi_comm_aio.h>
+#include <semaphore.h>
 
 #include "utils.h"
 #include "posture_check.h"
 #include "server_comm.h"
 #include "board_func.h"
+#include "db.h"
+
 
 #define FLASH_TIMES         3
 #define LED_SLEEP_TIME      (200*1000)
@@ -59,17 +62,16 @@ static struct gpiod_line *led_mute_red = NULL;
 static AUDIO_DEV ao_dev = 0;
 static BOOL dec_vol_pressed = FALSE;
 static BOOL inc_vol_pressed = FALSE;
+static int dec_vol_pressed_intv = 0;
+static int inc_vol_pressed_intv = 0;
 
-static BOOL system_booting = TRUE;
-static BOOL net_connecting = FALSE;
-static BOOL system_reset = FALSE;
-static BOOL qrcode_scanning = FALSE;
 static BOOL ao_mute = FALSE;
-static BOOL posture_running = FALSE;
 static int scan_count = 0;
 static LED_STATUS led_status = BOOTING;
 
-extern BOOL g_hxt_wbsc_running;
+extern BOOL g_deploying_net;
+extern BOOL g_posture_running;
+extern sem_t g_bind_sem;
 extern BOOL g_device_sleeping;
 
 
@@ -99,6 +101,13 @@ static void set_wifi_led_off()
     gpio_set_value(led_wifi_blue, 1);
     gpio_set_value(led_wifi_red, 1);
     gpio_set_value(led_wifi_green, 1);
+}
+
+static void clear_wifi_info()
+{
+    utils_disconnect_wifi();
+    system("rm /userdata/config/wifi.conf");
+    deinit_wifi_params();
 }
 
 static void board_led_all_off()
@@ -194,28 +203,12 @@ static void* check_inc_vol_event(void *param)
             if (end - start >= 5)
             {
                 inc_vol_pressed = TRUE;
+                inc_vol_pressed_intv = time(NULL);
             }
             else
             {
-                int current_vol = 0;
-                if(ao_mute)
-                {
-                    HI_MPI_AO_SetMute(ao_dev, HI_FALSE, NULL);
-                    ao_mute = FALSE;
-                }  
-
-                HI_MPI_AO_GetVolume(ao_dev, &current_vol);
-                utils_print("volume now is %d\n", current_vol);
-                if(current_vol == 5 && !already_max)
-                {
-                    /*already max*/
-                    utils_send_local_voice(VOICE_VOLUME_MAX);
-                    already_max = TRUE;
-                }
-                else
-                {
-                    HI_MPI_AO_SetVolume(ao_dev, current_vol+10);
-                }
+                int vol = board_inc_volume();
+                utils_print("Now volume is %d\n", vol);
             }
         }
 
@@ -249,21 +242,12 @@ static void* check_dec_vol_event(void *param)
             if (end - start >= 5)
             {
                 dec_vol_pressed = TRUE;
+                dec_vol_pressed_intv = time(NULL);
             }
             else
             {
-                int current_vol = 0;
-                HI_MPI_AO_GetVolume(ao_dev, &current_vol);
-                utils_print("volume now is %d\n", current_vol);
-                if(current_vol == -85)
-                {
-                    HI_MPI_AO_SetMute(ao_dev, HI_TRUE, NULL);
-                    ao_mute = TRUE;
-                }
-                else
-                {
-                    HI_MPI_AO_SetVolume(ao_dev, current_vol-10);
-                }
+                int vol = board_dec_volume();
+                utils_print("Now volume is %d\n", vol);
             }
         }
      }
@@ -275,7 +259,6 @@ static void* check_posture_event(void *param)
     struct gpiod_line_event event;
     time_t start = 0, end = 0;
     time_t begin_time = 0;
-    // BOOL posture_running = FALSE;
     prctl(PR_SET_NAME, "check_posture");
     while(1)
     {
@@ -297,29 +280,47 @@ static void* check_posture_event(void *param)
             end = time(NULL); 
             utils_print("inteval: %ld - %ld = %ld\n", end, start, (end-start));
 
-            if (end - start > 3)
+            if(g_deploying_net)
             {
-                /* standby */
-               board_set_led_status(SLEEPING);
+                utils_print("deploying network....\n");
+                continue;
+            }
+
+            if (end - start >= 5)
+            {
+                if (g_device_sleeping)      //device sleeping
+                {
+                    g_device_sleeping = FALSE;
+                    iflyos_websocket_start();
+                    board_set_led_status(NORMAL);
+                }
+                else
+                {
+                    g_device_sleeping = TRUE;
+                    /*stop iflyos voice*/
+                    iflyos_websocket_stop();
+                    if (g_posture_running)
+                    {
+                        stop_posture_recognize();
+                    }
+                    board_set_led_status(SLEEPING);
+                }    
             }
             else
             {
-                 if (!posture_running)
+                if (g_device_sleeping)
+                {
+                    continue;
+                }
+
+                if(!g_posture_running)
                 {
                     start_posture_recognize();
-                    posture_running = TRUE;  
-
                     begin_time = time(NULL);
                 }
                 else
                 {
-                    // if (time(NULL) - begin_time < 10)
-                    // {
-                    //     utils_print("Reconizing,wait a minute....\n");
-                    //     continue;
-                    // }
                     stop_posture_recognize();   
-                    posture_running = FALSE;  
                 }
             }
         }
@@ -334,33 +335,63 @@ static void* check_scan_qrcode_event(void *param)
     {
         if (inc_vol_pressed && dec_vol_pressed)
         {
-            qrcode_scanning = TRUE;
-
-            board_set_led_status(BINDING);
-
-            printf("To scan qrcode....\n");
-            inc_vol_pressed = dec_vol_pressed = FALSE;
-            
-            while (!board_get_qrcode_yuv_buffer())
+            if (abs(inc_vol_pressed_intv - dec_vol_pressed_intv) >= 0 && 
+                    abs(inc_vol_pressed_intv - dec_vol_pressed_intv) < 5) //check btn if pressed meantime
             {
-                if (scan_count < 5)
+
+                clear_wifi_info();
+
+                if(g_posture_running)
                 {
-                    utils_send_local_voice(VOICE_DEPLOYING_NET);
-                    sleep(10);
-                    scan_count ++;
-                    continue;
-                }         
-                else
-                {
-                    utils_send_local_voice(VOICE_QUERY_WIFI_ERROR);
-                    board_set_led_status(WIFI_ERR);
-                    sleep(10);
-                    break;
+                    stop_posture_recognize();
                 }
+                
+                g_deploying_net = TRUE;
+                board_set_led_status(BINDING);
+
+                printf("To scan qrcode....\n");
+                inc_vol_pressed = dec_vol_pressed = FALSE;
+                inc_vol_pressed_intv = dec_vol_pressed_intv = 0;
+                
+                /*qrcode recognize*/
+                while (!board_get_qrcode_yuv_buffer())
+                {
+                    if (scan_count < 5)
+                    {
+                        utils_send_local_voice(VOICE_DEPLOYING_NET);
+                        sleep(10);
+                        scan_count ++;
+                        continue;
+                    }         
+                    else
+                    {
+                        utils_send_local_voice(VOICE_QUERY_WIFI_ERROR);
+                        board_set_led_status(WIFI_ERR);
+                        sleep(10);
+                        break;
+                    }
+                }
+                char* ssid = get_wifi_ssid();
+                char* pwd = get_wifi_pwd();
+                utils_link_wifi(ssid, pwd);
+                sleep(3);
+                g_deploying_net = FALSE;
+                scan_count = 0;
+
+                if (ssid != NULL)
+                {
+                    utils_free(ssid);
+                }
+
+                if(pwd != NULL)
+                {
+                    utils_free(pwd);
+                }
+
+                sem_post(&g_bind_sem);
             }
-            qrcode_scanning = FALSE;
-            scan_count = 0;
         }
+       
         sleep(3);
     }
 
@@ -389,7 +420,7 @@ static void* led_blinking_thread(void* param)
             gpio_set_value(led_wifi_blue, 0);
         break;
         case BINDING:
-            board_led_all_off();
+            set_wifi_led_off();
             gpio_set_value(led_wifi_blue, 1);
             gpio_set_value(led_wifi_green, 1);
             usleep(200 * 1000);
@@ -513,7 +544,7 @@ void board_set_led_status(LED_STATUS status)
 
 BOOL board_get_qrcode_scan_status()
 {
-    return qrcode_scanning;
+    return g_deploying_net;
 }
 
 int board_gpio_init()

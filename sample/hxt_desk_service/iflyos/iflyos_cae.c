@@ -25,7 +25,7 @@ static void ivw_fn(short angle, short channel, float power, short CMScore, short
     utils_print("angle=%d, channel=%d, power=%f, CMScore=%d, beam=%d, param1=%s\n",
                     angle, channel, power, CMScore, beam, param1);
 
-	utils_send_local_voice(VOICE_BEEP);
+	utils_send_local_voice(VOICE_IFLYOS_ECHO);
 	
 	wake_up = TRUE;
 }
@@ -64,11 +64,11 @@ static void recog_audio_fn(const void* audio_data, unsigned int audio_len, int p
 {
 }
 
-int iflyos_init_cae_lib(void* data)
+BOOL iflyos_init_cae_lib(void* data)
 {
     int rv, i;
     char buffer[1024] = {0};
-    int flag = 1;
+    int flag = 2;
 
     utils_print("version: %s\n", CAEGetVersion());
 #ifdef DEBUG
@@ -78,7 +78,7 @@ int iflyos_init_cae_lib(void* data)
 	if(g_cae_handle != NULL)
 	{
 		utils_print("iflyos cae handle is still valid\n");
-		return -1;
+		return FALSE;
 	}
 
 	pthread_mutex_lock(&g_cae_mutex);
@@ -86,18 +86,28 @@ int iflyos_init_cae_lib(void* data)
     if (rv != 0)
     {
 		pthread_mutex_unlock(&g_cae_mutex);
-        return -1;
+		utils_print("CAENEW error\n");
+        return FALSE;
     }
 	pthread_mutex_unlock(&g_cae_mutex);
 
     char *sn = get_iflyos_sn();
-    if (CAEAuth(sn))
+	if (NULL == sn)
+	{
+		utils_print("cae sn is null\n");
+		return FALSE;
+	}
+
+    if (CAEAuth(sn) != 0)
     {
         utils_print("CAE auth error\n");
+		utils_free(sn);
+		return FALSE;
     }
 
 	utils_free(sn);
-    return 0;
+
+    return TRUE;
 }
 
 void iflyos_deinit_cae_lib()
@@ -107,6 +117,7 @@ void iflyos_deinit_cae_lib()
     {
         CAEDestroy(g_cae_handle);
 		g_cae_handle = NULL;
+		utils_print("destroy cae lib OK\n");
     }
 	pthread_mutex_unlock(&g_cae_mutex);
 }
@@ -124,11 +135,9 @@ int iflyos_write_audio(void* buffer, int buf_length)
     if(rv != 0)
     {
         utils_print("cae write error: %d\n", rv);
-		pthread_mutex_unlock(&g_cae_mutex);
-        return rv;
     }
-	pthread_mutex_unlock(&g_cae_mutex);
 
+	pthread_mutex_unlock(&g_cae_mutex);
     return rv;
 }
 

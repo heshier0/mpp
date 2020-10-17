@@ -13,5 +13,10 @@ BOOL board_get_qrcode_yuv_buffer();
 
 char* board_get_sn();
 
+void board_init_volume();
+BOOL board_set_volume(int vol);
+int board_inc_volume();
+int board_dec_volume();
+BOOL board_set_mute(BOOL mute);
 
 #endif //!__BOARD_FUNC_H__

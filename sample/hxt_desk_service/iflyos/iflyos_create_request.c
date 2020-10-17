@@ -16,14 +16,43 @@ static cJSON* iflyos_create_header()
     cJSON *location = NULL;
     cJSON *platform = NULL;
 
+    /*for test*/
+    // char device_id[255] = {0};
+    // char token[255] = {0};
+    // char line[255] = {0};
+    // int line_idx = 0;
+    // FILE* fp = fopen("/userdata/data/iflyos_token.txt", "r");
+    // if (fp != NULL)
+    // {
+    //     memset(line, 0, 255);
+    //     while(fgets(line, sizeof(line), fp) != NULL)
+    //     {
+    //         if (line_idx == 0)
+    //         {
+    //             strcpy(device_id, line);
+    //             device_id[strlen(device_id)-1] = '\0';
+    //             line_idx ++;
+    //         }
+    //         else
+    //         {
+    //             strcpy(token, line);
+    //             token[strlen(token)-1] = '\0';
+    //         }
+            
+    //     }
+    //     line_idx = 0;
+    // }
+    // fclose(fp);
+    /*test end*/
+
     /* auth */
     char auth[128] = {0};
-    char* token = "V1ZKr70AkzsLyqib92_Myb-DPPn8KvMfbAQcGDaNnCrDxGSwXqC7pFfkOpSVKFMx";//get_iflyos_token(); 
+    char* token = get_iflyos_token(); 
     strcpy(auth, "Bearer ");
     strcat(auth, token);
     utils_print("token is %s\n", auth);
     /* device id */
-    char* device_id = "HXT20200607P"; //get_device_id();
+    char* device_id = get_device_id();
     utils_print("device id is %s\n", device_id);
 
     root = cJSON_CreateObject();
@@ -36,10 +65,14 @@ static cJSON* iflyos_create_header()
     cJSON_AddItemToObject(device, "platform", platform = cJSON_CreateObject());
 
     cJSON_AddNumberToObject(location, "latitude", 0);
-    cJSON_AddNumberToObject(location, "longtitude", 0);
+    cJSON_AddNumberToObject(location, "longitude", 0);
     
     cJSON_AddStringToObject(platform, "name", PLATFORM_NAME);
     cJSON_AddStringToObject(platform, "version", PLATFORM_VER);
+
+    char* data = cJSON_PrintUnformatted(root);
+    utils_print("iflyos request header: %s\n", data);
+    utils_free(data);
 
     return root;
 }
@@ -137,6 +170,8 @@ char* iflyos_create_txt_in_request(const char* txt_buffer)
     cJSON* header_node = iflyos_create_header();
     cJSON* context_node = iflyos_create_context();
     cJSON* request_node = NULL;
+
+    
 
     root = cJSON_CreateObject();
     cJSON_AddItemToObject(root, "iflyos_header", header_node);

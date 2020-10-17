@@ -1,0 +1,13 @@
+create table if not exists DeskParams(id integer primary key asc not null,deskCode text,isBind integer,parentID integer);
+create table if not exists ServerParams(id integer primary key asc not null,serverUrl text,apiVer text,wscUrl text,uploadUrl text);
+create table if not exists ConnectParams(id integer primary key asc not null,token text, tokenExpiredTime integer);
+create table if not exists IflyosParams(id integer primary key asc not null,token text, sn text);
+create table if not exists WifiParams(id integer primary key asc not null,ssid text, pwd text, checkCode text);
+create table if not exists RunningParams(id integer primary key asc not null,judgeTime integer, videoLength integer, videoRatio integer, videoCnt integer, snapCnt integer, offlineStorage integer,attachRatio integer);
+create table if not exists UpdateParams(id integer primary key asc not null,verID integer,verNO text,packUrl text);
+create table if not exists UserParams(id integer primary key asc not null,childID integer,studyMode integer,alarmType integer,isSelect integer);
+create table if not exists ReportInfos(id integer primary key asc not null,parentID integer not null, childID integer not null,type integer not null,reportTime text,mode integer,camera integer,duration integer,videoUrl text,snapUrl text);
+create table if not exists VolumeInfos(id integer primary key asc not null,vol integer not null,isMute integer not null);
+insert into DeskParams values(1,"",0,-1);
+insert into ServerParams values(1,"https:www.horxeton.com:7002","v1","","");
+insert into VolumeInfos values(1,-20,0 );

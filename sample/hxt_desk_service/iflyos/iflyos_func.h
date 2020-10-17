@@ -6,8 +6,8 @@
 #include "iflyos_response_def.h"
 
 /* cae module */
-int iflyos_init_cae_lib(void* data);
-int iflyos_init_cae_lib(void* data);
+BOOL iflyos_init_cae_lib(void* data);
+void iflyos_deinit_cae_lib();
 int iflyos_write_audio(void* buffer, int buf_length);
 
 /* request */

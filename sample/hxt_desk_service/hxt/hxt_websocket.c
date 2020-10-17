@@ -13,6 +13,7 @@
 #include "db.h"
 #include "hxt_client.h"
 #include "posture_check.h"
+#include "board_func.h"
 
 typedef enum 
 {
@@ -24,6 +25,9 @@ typedef enum
 extern BOOL g_hxt_wbsc_running;
 extern BOOL g_hxt_first_login;
 extern DATABUFFER g_msg_buffer;
+extern int g_camera_status;
+extern BOOL g_video_upload_exceed;
+extern BOOL g_snap_upload_exceed;
 
 static BOOL g_recv_running = TRUE;
 pthread_t study_info_tid;
@@ -40,27 +44,41 @@ static BOOL init_study_info(ReportInfo *report_info, StudyInfo *study_info)
         utils_print("Study info type ERROR\n");
         return FALSE;
     }
-    report_info->camera_status = 1;//hxt_get_camera_status();
-    report_info->parent_unid = get_parent_id(); //hxt_get_parent_unid_cfg();
-    report_info->child_unid = get_select_child_id(); //hxt_get_child_unid();
+    report_info->camera_status = g_camera_status;
+    report_info->parent_unid = get_parent_id(); 
+    report_info->child_unid = get_select_child_id(); 
     report_info->report_type = study_info->info_type;
     strcpy(report_info->study_date, utils_date_to_string());
     strcpy(report_info->report_time, utils_time_to_string());
-    report_info->study_mode = get_study_mode(report_info->child_unid);//hxt_get_study_mode_cfg(report_info->child_unid);
+    report_info->study_mode = get_study_mode(report_info->child_unid);
     if (report_info->report_type == BAD_POSTURE)
     {
         report_info->duration = 10;
-        if(hxt_file_upload_request(study_info->file, report_info->study_date, report_info->video_url))
+        int status = hxt_file_upload_request(study_info->file, report_info->study_date, report_info->video_url);
+        if (status = HXT_OK)
         {
-            remove(study_info->file);
+            utils_print("Upload video %s OK\n", study_info->file);
+            
         }
-        if (hxt_file_upload_request(study_info->snap, report_info->study_date, report_info->snap_url))
+        else if (status == HXT_UPLOAD_FAIL)
         {
-            remove(study_info->snap);
+            g_video_upload_exceed = TRUE;
         }
+        // remove(study_info->file);
+
+        status = hxt_file_upload_request(study_info->snap, report_info->study_date, report_info->snap_url);
+        if (status == HXT_OK)
+        {
+            utils_print("Upload snap %s OK\n", study_info->snap);
+            
+        }
+        else if (status == HXT_UPLOAD_FAIL)
+        {
+            g_snap_upload_exceed = TRUE;
+        }
+        // remove(study_info->snap);
     }
 
-    
     return TRUE;
 }
 
@@ -84,7 +102,7 @@ static void hxt_send_desk_status(struct uwsc_client *cl, REPORT_TYPE type, int i
     cJSON_AddNumberToObject(root, "dataType", HXT_DESK_STATUS);
     cJSON_AddItemToObject(root, "data", data_item = cJSON_CreateObject());
     cJSON_AddNumberToObject(data_item, "reportType", type);
-    cJSON_AddNumberToObject(data_item, "cameraStatus", 1);
+    cJSON_AddNumberToObject(data_item, "cameraStatus", g_camera_status);
     
     char* json_data = cJSON_PrintUnformatted(root);
     if (NULL == json_data)
@@ -123,6 +141,11 @@ static void* send_study_info_cb(void *params)
         }
         bzero(&report_info, sizeof(report_info));
         init_study_info(&report_info, (StudyInfo*)ptr);
+        if (report_info.snap_url == NULL || report_info.video_url == NULL)
+        {
+            utils_print("upload failed,discard....\n");
+            goto DISCARD_EXIT;
+        }
         //post json data to server
         cJSON *root = cJSON_CreateObject();    
         if (NULL == root)
@@ -160,6 +183,7 @@ static void* send_study_info_cb(void *params)
         utils_free(json_data);
 CLEAR:
         cJSON_Delete(root);
+DISCARD_EXIT:   
         release_buffer(&g_msg_buffer, sizeof(StudyInfo));
         ptr = NULL;
     }
@@ -180,41 +204,35 @@ static void parse_server_config_data(void *data)
         return;
     }
     
-    int old_ver = 0;
-    cJSON *sub_item = NULL,  *sub_item1 = NULL, *sub_item2=NULL;
-    cJSON *item = cJSON_GetObjectItem(root, "dataType");
-    int data_type = item->valueint;
     int judge_time, video_length, video_ratio, video_count, snap_count, offline_storage, attach_ratio;
-    int version_id;
+    int old_ver = 0;
+    int version_id = 0;
     char* version_no;
     char* pack_url;
+    int child_unid = -1, alarm_type = 2;
+    
+    cJSON *sub_item = NULL,  *sub_item1 = NULL, *sub_item2=NULL;
+    cJSON *item = cJSON_GetObjectItem(root, "dataType");   
+    int data_type = item->valueint; 
     switch(data_type)
     {
      case HXT_BASIC_CFG:
         utils_print("To process basic config...\n");
         item = cJSON_GetObjectItem(root, "data");
         sub_item = cJSON_GetObjectItem(item, "postureCountDuration");   //不良坐姿时长判定值
-        // hxt_set_posture_judge_cfg(sub_item->valueint);
         judge_time = sub_item->valueint;
         sub_item = cJSON_GetObjectItem(item, "videoRecordDuration");    //视频记录时长
-        // hxt_set_video_length_cfg(sub_item->valueint);
         video_length = sub_item->valueint;
         sub_item = cJSON_GetObjectItem(item, "videoRecordRatio");       //视频分辨率
-        // hxt_set_video_ratio_cfg(sub_item->valueint);
         video_ratio = sub_item->valueint;
         sub_item = cJSON_GetObjectItem(item, "videoRecordCount");       //视频记录个数
-        // hxt_set_video_count_cfg(sub_item->valueint);
         video_count = sub_item->valueint;
         sub_item = cJSON_GetObjectItem(item, "photoRecordCount");       //照片记录张数
-        // hxt_set_photo_count_cfg(sub_item->valueint);
         snap_count = sub_item->valueint;
         sub_item = cJSON_GetObjectItem(item, "offlineStorage");         //离线存储时长
-        // hxt_set_offline_storage_cfg(sub_item->valueint);
         offline_storage = sub_item->valueint;
         sub_item = cJSON_GetObjectItem(item, "attachRatio");            //抽帧频次
         attach_ratio = sub_item->valueint;
-        // hxt_set_attach_ratio_cfg(sub_item->valueint);
-        // hxt_reload_cfg();
         set_running_params(judge_time, video_length, video_ratio, video_count, snap_count, offline_storage, attach_ratio);
     break;
     case HXT_UPDATE_REMIND:
@@ -222,9 +240,14 @@ static void parse_server_config_data(void *data)
         item = cJSON_GetObjectItem(root, "data");
         if (item != NULL)
         {
-            old_ver = get_update_version_id();//hxt_get_version_id_cfg();
-            sub_item = cJSON_GetObjectItem(item, "newVersionId");           //新版本id，大于0时有效
-            version_id = sub_item->valueint;
+            old_ver = get_update_version_id();
+            utils_print("old version is %d\n", old_ver);
+            sub_item = cJSON_GetObjectItem(item, "newVersionId");   
+            if(sub_item != NULL)
+            {
+                version_id = sub_item->valueint;
+            }        
+            utils_print("new version is %d\n", version_id);
             if (old_ver < version_id)
             {
                 sub_item1 = cJSON_GetObjectItem(item, "newVersionNo");           //新版本号
@@ -249,14 +272,25 @@ static void parse_server_config_data(void *data)
     case HXT_ALARM_VARRY:
         utils_print("To varry alarm file...\n");
         item = cJSON_GetObjectItem(root, "data");
-        hxt_update_children_alarm_files((void*)item);
+        if(item != NULL)
+        {
+            sub_item1 = cJSON_GetObjectItem(item, "childrenUnid");
+            sub_item2 = cJSON_GetObjectItem(item, "alarmType");
+            if (sub_item1 != NULL && sub_item2 != NULL)
+            {
+                update_alarm_type(sub_item1->valueint, sub_item2->valueint);
+            }
+        }   
     break;
     case HXT_STUDY_MODE_VARRRY:
         //new studyMode
         utils_print("To varray study mode...\n");
-        item = cJSON_GetObjectItem(root, "data");                           
-        sub_item = cJSON_GetObjectItem(item, "studyMode");
-        update_study_mode(get_select_child_id(), sub_item->valueint);               
+        item = cJSON_GetObjectItem(root, "data");   
+        if (item != NULL)
+        {
+            sub_item = cJSON_GetObjectItem(item, "studyMode");
+            update_study_mode(get_select_child_id(), sub_item->valueint);   
+        }                            
     break;
     case HXT_BIND_CHILD_ID:
         // child unid
@@ -313,6 +347,30 @@ static void parse_server_config_data(void *data)
         utils_print("To restart...\n");
         utils_system_reboot();
     break;
+    case HXT_UPDATE_URL:
+        utils_print("To update url ...\n");
+        item = cJSON_GetObjectItem(root, "data");
+        if (item != NULL)
+        {
+            sub_item1 = cJSON_GetObjectItem(item, "websocketUrl");
+            sub_item2 = cJSON_GetObjectItem(item, "uploadHostUrl");
+            set_server_params(sub_item1->valuestring, sub_item2->valuestring);
+        }
+    break;
+    case HXT_UPDATE_SELF_ALARM:
+        utils_print("To update selfdef alarm...\n");
+        item = cJSON_GetObjectItem(root, "data");
+        hxt_update_children_alarm_file((void*)item);
+    break;
+    case HXT_UNBIND_CHILD:
+        utils_print("To unbind child...\n");
+        item = cJSON_GetObjectItem(root, "data");
+        if (item != NULL)
+        {
+            sub_item1 = cJSON_GetObjectItem(item, "childrenUnid");   
+            hxt_unbind_child(sub_item1->valueint);
+        }
+    break;
     case 0:
     default:
         //connect OK, do nothing
@@ -334,6 +392,8 @@ static void hxt_wsc_onopen(struct uwsc_client *cl)
     utils_print("hxt onopen\n");
 
     g_hxt_wbsc_running = TRUE;
+    utils_send_local_voice(VOICE_SERVER_CONNECT_OK);//联网成功
+    board_set_led_status(NORMAL);
 
     hxt_send_desk_status(cl, POWER_ON, UWSC_OP_TEXT);
     pthread_create(&study_info_tid, NULL, send_study_info_cb, (void *)cl);

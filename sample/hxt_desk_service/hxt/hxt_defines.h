@@ -25,11 +25,13 @@
 
 /* http response result */
 #define HXT_OK                              1
+#define HXT_UPLOAD_FAIL                     2
 #define HXT_NO_REGISTER                     0
 #define HXT_BIND_FAILED                     21         
 #define HXT_AUTH_FAILED                     401
 
 #define HXT_RES_STATUS_OK                   "S0001"
+#define HXT_UPLOAD_FILE_FAIL                "S0002"
 #define HXT_RES_BIND_FAIL                   "S0301"
 #define HXT_RES_AUTH_FAIL                   "S0401"
 #define HXT_RES_NO_REG                      "S0000"
@@ -49,6 +51,9 @@
 #define HXT_DISCONNECT          15
 #define HXT_POWEROFF            16
 #define HXT_RESTART             17
+#define HXT_UPDATE_URL          18
+#define HXT_UPDATE_SELF_ALARM   19
+#define HXT_UNBIND_CHILD        20
 
 #define HXT_DESK_STATUS         11
 #define HXT_STUDY_INFO          12
@@ -60,6 +65,7 @@
 #define HXT_INIT_CFG                        ("/userdata/config/.hxt_init_config.json")
 #define HXT_CHILD_VIDEO_PATH                ("/user/child_%d/video/")
 #define HXT_CHILD_SNAP_PATH                 ("/user/child_%d/snap/")
+#define HXT_CHILD_ALARM_DOC                 ("/user/child_%d/alarm/")
 #define HXT_CHILD_ALARM_FILE                ("/user/child_%d/alarm/P00%d.mp3")
 #define HXT_CHILD_ALARM_FILE_TMP            ("/user/child_%d/alarm/P00%d.tmp")
 #define WIFI_CONFIG                         ("/userdata/config/wifi.json")

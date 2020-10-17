@@ -48,7 +48,7 @@ typedef enum
     ONLINE = 1
 }WORK_MODE;
 
-#define HXT_DESK_SERVICE_VERSION        "1.0.3"
+#define HXT_DESK_SERVICE_VERSION        "1.0.5"
 #define HXT_DESK_SERVICE_VERSION_NUMBER  100000
 
 
@@ -114,6 +114,7 @@ typedef enum
 #define VOICE_SITTING_PRAISE5                   "/userdata/media/voice/V038.mp3"
 #define VOICE_QUERY_WIFI_INFO                   "/userdata/media/voice/V039.mp3"
 #define VOICE_IFLYOS_READY                      "/userdata/media/voice/V040.mp3"
+#define VOICE_IFLYOS_ECHO                       "/userdata/media/voice/V041.mp3"
 #define VOICE_BEEP                              "/userdata/media/voice/fengming.mp3"
 
 /* db table name */
@@ -126,6 +127,7 @@ typedef enum
 #define UPDATE_PARAMS_TABLE                 "UpdateParams"
 #define USER_PARAMS_TABLE                   "UserParams"
 #define REPORT_INFOS_TABLE                  "ReportInfos"
+#define VOLUME_INFOS_TABLE                   "VolumeInfos"
 
 #pragma pack(push, 1)
 
@@ -150,6 +152,13 @@ typedef enum
     CHILD_BACK,
     BAD_POSTURE
 }STUDY_REPORT_TYPE;
+
+typedef enum
+{
+    CAMERA_ON = 1,
+    CAMERA_OFF = 2,
+    CAMERA_FAIL = 3
+}CAMERA_STATUS;
 
 typedef struct study_info_s
 {
@@ -180,7 +189,6 @@ int g_play_status;
 int g_voice_status;
 int g_video_status;
 
-int g_posture_running;
 int g_child_binding;
 
 

@@ -18,10 +18,12 @@ SUBDIRS  = $(shell ls -l | grep ^d | awk '{if($$9 != "output") print $$9}')
 
 INCS = -I$(ROOT_DIR)/. \
        $(foreach tmp,$(SUBDIRS),-I$(ROOT_DIR)/$(tmp)/.) \
-       -I/mnt/g/workspace/plugins/ffmpeg/include
+       -I/mnt/g/workspace/plugins/ffmpeg/include \
+	   -I/mnt/g/workspace/plugins/libev/include
 
 LIBS = -L/mnt/g/workspace/plugins/ffmpeg/lib -lavformat -lavcodec -lavutil -lswresample -lswscale \
-		-L/mnt/g/workspace/plugins/x264/lib -lx264 
+		-L/mnt/g/workspace/plugins/x264/lib -lx264  \
+		-L/mnt/g/workspace/plugins/libev/lib -lev
 
 LIBS +=  -L$(REL_LIB) -lsecurec
 

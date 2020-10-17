@@ -53,6 +53,7 @@ BOOL set_all_unselected()
     return TRUE;
 }
 
+
 BOOL update_select_child(int child_id)
 {
     int result;
@@ -87,6 +88,30 @@ BOOL update_study_mode(int child_id, int study_mode)
 
     /* first set unselect every child*/
     sql = sqlite3_mprintf("update %s set studyMode=%d where childID=%d", USER_PARAMS_TABLE, study_mode, child_id);
+    utils_print("%s\n", sql);
+    result = sqlite3_exec(g_hxt_service_db, sql, NULL, NULL, &err_msg);
+    if (result != SQLITE_OK)
+    {
+        utils_print("%s:%s\n", sql, err_msg);
+        sqlite3_free(err_msg);
+        sqlite3_free(sql);
+        return FALSE;    
+    }
+    sqlite3_free(sql);
+
+    return TRUE;
+}
+
+BOOL update_alarm_type(int child_id, int alarm_type)
+{
+    int result;
+    char *err_msg;
+    char *sql = NULL;
+
+    // set_all_unselected();
+
+    /* first set unselect every child*/
+    sql = sqlite3_mprintf("update %s set alarmType=%d where childID=%d", USER_PARAMS_TABLE, alarm_type, child_id);
     utils_print("%s\n", sql);
     result = sqlite3_exec(g_hxt_service_db, sql, NULL, NULL, &err_msg);
     if (result != SQLITE_OK)
@@ -203,7 +228,28 @@ int get_alarm_type(int child_unid)
     return value;
 }
 
-int deinit_user_params()
+BOOL delete_child(int child_unid)
+{
+    int result;
+    char *err_msg;
+    char *sql = NULL;
+
+    sql = sqlite3_mprintf("delete from %s where childID=%d", USER_PARAMS_TABLE, child_unid);
+    utils_print("%s\n", sql);
+    result = sqlite3_exec(g_hxt_service_db, sql, NULL, NULL, &err_msg);
+    if (result != SQLITE_OK)
+    {
+        utils_print("%s:%s\n", sql, err_msg);
+        sqlite3_free(err_msg);
+        sqlite3_free(sql);
+        return FALSE;    
+    }
+    sqlite3_free(sql);
+
+    return TRUE;
+}
+
+BOOL deinit_user_params()
 {
     return delete_table(USER_PARAMS_TABLE);
 }

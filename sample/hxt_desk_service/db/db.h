@@ -74,10 +74,20 @@ BOOL deinit_running_params();
 BOOL set_user_params(int child_id, int study_mode, int alarm_type, int selected);
 BOOL update_select_child(int child_id);
 BOOL update_study_mode(int child_id, int sudy_mode);
+BOOL update_alarm_type(int child_id, int study_mode);
 BOOL set_all_unselected();
 int get_select_child_id();
-int get_study_mode(int child_id);
-int get_alarm_type(int child_id);
-int deinit_user_params();
+int get_study_mode(int child_unid);
+int get_alarm_type(int child_unid);
+BOOL delete_child(int child_unid);
+BOOL deinit_user_params();
+
+/*volume info*/
+int check_mute();
+BOOL set_mute(BOOL mute);
+int get_volume();
+BOOL set_volume(int vol);
+
+
 
 #endif //!__DB_H__

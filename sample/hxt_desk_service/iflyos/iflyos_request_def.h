@@ -2,8 +2,8 @@
 #define __IFLYOS_REQUEST_DEF_H__
 
 
-#define PLATFORM_NAME       "Linux"
-#define PLATFORM_VER        "1.0.0"
+#define PLATFORM_NAME       "linux"
+#define PLATFORM_VER        "4.9.37"
 
 #define SYSTEM_VER          "1.3"
 

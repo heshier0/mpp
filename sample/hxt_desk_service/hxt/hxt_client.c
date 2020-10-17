@@ -110,7 +110,7 @@ static char* hxt_get_upload_url(const char* api)
 static int hxt_get_reponse_status_code(void* data)
 {
     int status_code = 0;
-    if(NULL == data)
+    if(NULL == data || strlen(data) == 0)
     {
         return NULL;
     }
@@ -133,6 +133,10 @@ static int hxt_get_reponse_status_code(void* data)
     else if (strcmp(item->valuestring, HXT_RES_BIND_FAIL) == 0)
     {
         status_code = HXT_BIND_FAILED;
+    }
+    else if (strcmp(item->valuestring, HXT_UPLOAD_FILE_FAIL) == 0)
+    {
+        status_code = HXT_UPLOAD_FAIL;
     }
 
     if(root != NULL)
@@ -265,6 +269,23 @@ static void hxt_create_private_doc(int child_unid)
     return;
 }
 
+static void hxt_remove_private_doc(int child_unid)
+{
+    /* posture video */
+    char rm_dir_cmd[256] = {0};
+    sprintf(rm_dir_cmd, "rm -r /user/child_%d/video", child_unid);
+    system(rm_dir_cmd);
+    /* posture snap */
+    memset(rm_dir_cmd, 0, 256);
+    sprintf(rm_dir_cmd, "rm -r /user/child_%d/snap", child_unid);
+    system(rm_dir_cmd);
+
+    /* self define voice */
+    memset(rm_dir_cmd, 0, 256);
+    sprintf(rm_dir_cmd, "rm -r /user/child_%d/alarm", child_unid);
+    system(rm_dir_cmd);
+}
+
 static void hxt_init_cfg(void* data)
 {
     cJSON* item = NULL; 
@@ -348,16 +369,37 @@ BOOL hxt_query_wifi_info(void *data)
         return FALSE;
     }
     
+    BOOL old_code = FALSE;
+    char *ssid = NULL, *pwd = NULL, *code = NULL;
+
     cJSON *ssid_node = cJSON_GetObjectItem(root, "ssid");
-    cJSON *pwd_node = cJSON_GetObjectItem(root, "pwd");
-    cJSON *checkCode_node = cJSON_GetObjectItem(root, "checkCode");
-    if((NULL == ssid_node) || (NULL == pwd_node) || (NULL == checkCode_node))
+    if (ssid_node != NULL)
     {
-        cJSON_Delete(root);
-        return FALSE;
+        ssid = ssid_node->valuestring;
     }
-    
-    BOOL result = set_wifi_params(ssid_node->valuestring, pwd_node->valuestring, checkCode_node->valuestring);
+    cJSON *pwd_node = cJSON_GetObjectItem(root, "pwd");
+    if (pwd_node != NULL)
+    {
+        pwd = pwd_node->valuestring;
+    }
+    cJSON *checkCode_node = cJSON_GetObjectItem(root, "checkCode");
+    if (checkCode_node != NULL)
+    {
+        code = checkCode_node->valuestring;
+    }
+
+    if (code == NULL)
+    {
+        code = get_wifi_check_code();
+        old_code = TRUE;
+    }
+
+    BOOL result = set_wifi_params(ssid, pwd, code);
+
+    if (old_code && code != NORMAL)
+    {
+        utils_free(code);
+    }
 
     cJSON_Delete(root);
 
@@ -402,8 +444,8 @@ BOOL hxt_bind_desk_with_wifi_request()
     }
     utils_print("%s\n", json_data);
     //save response data
-    char* out = (char*)utils_malloc(1024);
-    if(!utils_post_json_data(api_url, "", json_data, out, 1024))
+    char* out = (char*)utils_malloc(2048);
+    if(!utils_post_json_data(api_url, "", json_data, out, 2048))
     {
         utils_print("post data send failed\n");
         goto CLEANUP1;
@@ -427,6 +469,13 @@ BOOL hxt_bind_desk_with_wifi_request()
     {
         utils_print("device is already binded\n");
         reported = FALSE;
+    }
+    else if (status_code == HXT_NO_REGISTER)
+    {
+        /* deinit */
+        utils_system_reset();
+        sleep(3);
+        utils_system_reboot();
     }
 
 CLEANUP1:  
@@ -469,8 +518,8 @@ BOOL hxt_confirm_desk_bind_request()
     }
     utils_print("%s\n", json_data);
     //save response data
-    char* out = (char*)utils_malloc(1024);
-    if(!utils_post_json_data(api_url, "", json_data, out, 1024))
+    char* out = (char*)utils_malloc(2048);
+    if(!utils_post_json_data(api_url, "", json_data, out, 2048))
     {
         utils_print("post data send failed\n");
         goto CLEANUP1;
@@ -525,8 +574,8 @@ BOOL hxt_get_token_request()
     }
 
     //save response data
-    char *out = (char*)utils_malloc(1024);
-    if(!utils_post_json_data(api_url, NULL, json_data, out, 1024))
+    char *out = (char*)utils_malloc(2048);
+    if(!utils_post_json_data(api_url, NULL, json_data, out, 2048))
     {
         utils_print("post data send failed\n");
         goto CLEANUP1;
@@ -536,7 +585,6 @@ BOOL hxt_get_token_request()
     if (status_code == HXT_OK)
     {
         /* write token into cfg */   
-        // hxt_init_token(out);
         cJSON* token_root = cJSON_Parse(out);
         if(NULL == token_root)
         {
@@ -551,7 +599,7 @@ BOOL hxt_get_token_request()
         }
         cJSON* token_item = cJSON_GetObjectItem(returnObject, "token");  
         cJSON* time_item = cJSON_GetObjectItem(returnObject, "tokenExpireTime");
-        utils_print("token time is %d\n", time_item->valuedouble/1000);
+        utils_print("token time is %lld\n", time_item->valuedouble);
         set_connect_params(token_item->valuestring, time_item->valuedouble/1000);
 
         cJSON_Delete(token_root);
@@ -559,9 +607,10 @@ BOOL hxt_get_token_request()
     }
     else if(status_code == HXT_NO_REGISTER)
     {
-        //clear wifi info, to prevent user connect to server
-        deinit_wifi_params();
-        //
+        utils_print("No register device...\n");
+        utils_system_reset();
+        sleep(3);
+        utils_system_reboot();
     } 
 
 CLEANUP1:    
@@ -666,13 +715,14 @@ BOOL hxt_get_new_version_request(const char* update_url)
     return TRUE;
 }
 
-BOOL hxt_file_upload_request(const char* filename, const char* study_date, char* server_file_path)
+int hxt_file_upload_request(const char* filename, const char* study_date, char* server_file_path)
 {
     BOOL uploaded = FALSE;
     int retry_count = 0;
     char* upload_url = NULL;
     char* header = NULL;
     char* out = NULL;
+    int status_code = 0;
 
     if(NULL == filename || 0 == strlen(filename) || NULL == server_file_path || NULL == study_date)
     {
@@ -680,12 +730,10 @@ BOOL hxt_file_upload_request(const char* filename, const char* study_date, char*
     }
     
     /* create json data*/
-    // int child_unid = hxt_get_child_unid();
     int child_unid = get_select_child_id();
 
     char url[256] = {0};
     sprintf(url, HXT_UPLOAD_FILE, child_unid, study_date);
-    // utils_print("url is %s\n",url);
     
     while((!uploaded) && (retry_count < 3))
     {
@@ -694,7 +742,6 @@ BOOL hxt_file_upload_request(const char* filename, const char* study_date, char*
         {
             return FALSE;
         }
-        // utils_print("upload url is %s\n", upload_url);
         header = hxt_get_header_with_token();
 
         if (out != NULL)
@@ -702,16 +749,15 @@ BOOL hxt_file_upload_request(const char* filename, const char* study_date, char*
             utils_free(out);
             out = NULL;
         }
-        out = (char*)utils_malloc(1024);
-        utils_upload_file(upload_url, header, filename, out, 1024);
-        // utils_print("[%s]\n", out);
+        out = (char*)utils_malloc(2048);
+        utils_upload_file(upload_url, header, filename, out, 2048);
         if (strlen(out) == 0)
         {
             retry_count ++;
+            utils_print("retry count is %d\n", retry_count);
             continue;
         }
-
-        int status_code = hxt_get_reponse_status_code((void*)out);
+        status_code = hxt_get_reponse_status_code((void*)out);
         if (status_code == HXT_OK)
         {
             char* file_path = hxt_get_response_description((void*)out);
@@ -721,6 +767,10 @@ BOOL hxt_file_upload_request(const char* filename, const char* study_date, char*
                 uploaded = TRUE;
                 utils_free(file_path);
             }
+        }
+        else if (status_code == HXT_UPLOAD_FAIL)
+        {
+            break;
         }
         else if (status_code == HXT_AUTH_FAILED)
         {
@@ -738,7 +788,7 @@ BOOL hxt_file_upload_request(const char* filename, const char* study_date, char*
     utils_free(header);
     utils_free(upload_url);
     
-    return uploaded;
+    return status_code;
 }
 
 BOOL hxt_sample_snap_upload_request(const char* filename, const char* study_date, char* server_file_path)
@@ -773,8 +823,8 @@ BOOL hxt_sample_snap_upload_request(const char* filename, const char* study_date
         header = hxt_get_header_with_token();
         utils_print("[%s]\n", header);
 
-        out = (char*)utils_malloc(1024);
-        utils_upload_file(upload_url, header, filename, out, 1024);
+        out = (char*)utils_malloc(2048);
+        utils_upload_file(upload_url, header, filename, out, 2048);
         utils_print("[%s]\n", out);
 
         int status_code = hxt_get_reponse_status_code((void*)out);
@@ -857,36 +907,129 @@ BOOL hxt_update_children_alarm_files(void* data)
     hxt_create_private_doc(child_unid);
 
     /* self defines alarm voice */
-    if (alarm_type == PERSONAL)
-    {
-        char alarm_file[128] = {0};
-        char old_alarm_file[128] = {0};
-        char replace_cmd[512] = {0};
+    char alarm_file[128] = {0};
+    char old_alarm_file[128] = {0};
+    char replace_cmd[512] = {0};
+    char del_cmd[256] = {0};
 
-        cJSON *alarm_file_node = cJSON_GetObjectItem(node, "filePaths");
+    cJSON *alarm_file_node = cJSON_GetObjectItem(node, "filePaths");
+    if (alarm_file_node != NULL)
+    {
         int alarm_file_count = cJSON_GetArraySize(alarm_file_node);
-        for (int count = 0; count < PERSONAL_ALARM_VOICE_COUNT; count ++)
+        for (int count = 0; count < alarm_file_count; count++)
         {
             cJSON *file_item = cJSON_GetArrayItem(alarm_file_node, count);
             if (!file_item)
             {
                 continue;
             }
+            node_item = cJSON_GetObjectItem(file_item, "operation");
+            int operate = node_item->valueint; //1:replace 2:delete
             node_item = cJSON_GetObjectItem(file_item, "priority");
             int idx = node_item->valueint;
-            bzero(alarm_file, 128);
-            sprintf(alarm_file, HXT_CHILD_ALARM_FILE_TMP, child_unid, idx);
-            node_item = cJSON_GetObjectItem(file_item, "filePath");
-            utils_download_file(node_item->valuestring, alarm_file);
-            
-            /*replace old file*/
-            bzero(old_alarm_file, 128);
-            sprintf(old_alarm_file, HXT_CHILD_ALARM_FILE, child_unid, idx);
-            sprintf(replace_cmd, "mv %s %s", alarm_file, old_alarm_file);
-            system(replace_cmd);    
+
+            if (operate == 1)   //replace
+            {
+                bzero(alarm_file, 128);
+                sprintf(alarm_file, HXT_CHILD_ALARM_FILE_TMP, child_unid, idx);
+                node_item = cJSON_GetObjectItem(file_item, "filePath");
+                utils_download_file(node_item->valuestring, alarm_file);
+                
+                /*replace old file*/
+                bzero(old_alarm_file, 128);
+                sprintf(old_alarm_file, HXT_CHILD_ALARM_FILE, child_unid, idx);
+                sprintf(replace_cmd, "mv %s %s", alarm_file, old_alarm_file);
+                system(replace_cmd);  
+            } 
+            else if (operate == 2) //delete 
+            {
+                bzero(old_alarm_file, 128);
+                sprintf(old_alarm_file, HXT_CHILD_ALARM_FILE, child_unid, idx);
+                sprintf(del_cmd, "rm %s", old_alarm_file);
+                system(del_cmd);
+            }
         }
-    }   
-   
+    }
+
+    return TRUE;
+}
+
+BOOL hxt_update_children_alarm_file(void* data)
+{
+    if (NULL == data)
+    {
+        return FALSE;
+    }
+
+    /* self defines alarm voice */
+    int child_unid = -1; 
+    char alarm_file[128] = {0};
+    char old_alarm_file[128] = {0};
+    char replace_cmd[512] = {0};
+    char del_cmd[256] = {0};
+    cJSON *node_item = NULL;
+
+    cJSON *node = (cJSON*)data;
+    if (node != NULL)
+    {
+        int alarm_file_count = 0;
+        BOOL is_array = cJSON_IsArray(node);
+        if (is_array)
+        {
+            alarm_file_count = cJSON_GetArraySize(node);
+        }
+        else
+        {
+            alarm_file_count = 1;
+        }
+        
+        for (int count = 0; count < alarm_file_count; count++)
+        {
+            cJSON *data_item = NULL;
+            if (is_array)
+            {
+                data_item = cJSON_GetArrayItem(node, count);
+            }
+            else
+            {
+                data_item = node;
+            }
+            if (!data_item)
+            {
+                continue;
+            }
+            node_item = cJSON_GetObjectItem(data_item, "childrenUnid");
+            child_unid = node_item->valueint;
+            node_item = cJSON_GetObjectItem(data_item, "operation");
+            int operate = node_item->valueint; //1:replace 2:delete
+            node_item = cJSON_GetObjectItem(data_item, "priority");
+            int idx = node_item->valueint;
+            
+            if (operate == 1)   //replace
+            {
+                bzero(alarm_file, 128);
+                sprintf(alarm_file, HXT_CHILD_ALARM_FILE_TMP, child_unid, idx);
+                node_item = cJSON_GetObjectItem(data_item, "filePath");
+                utils_download_file(node_item->valuestring, alarm_file);
+                
+                /*replace old file*/
+                bzero(old_alarm_file, 128);
+                sprintf(old_alarm_file, HXT_CHILD_ALARM_FILE, child_unid, idx);
+                sprintf(replace_cmd, "mv %s %s", alarm_file, old_alarm_file);
+                utils_print("%s\n", replace_cmd);
+                system(replace_cmd);  
+            } 
+            else if (operate == 2) //delete 
+            {
+                bzero(old_alarm_file, 128);
+                sprintf(old_alarm_file, HXT_CHILD_ALARM_FILE, child_unid, idx);
+                sprintf(del_cmd, "rm %s", old_alarm_file);
+                utils_print("%s\n", del_cmd);
+                system(del_cmd);
+            }
+        }
+    }
+
     return TRUE;
 }
 
@@ -900,6 +1043,10 @@ BOOL hxt_parse_user_data(void* data)
     cJSON* returnObject = (cJSON*)data;
 
     cJSON* item = cJSON_GetObjectItem(returnObject, "parentUnid");
+    if (item == NULL)
+    {
+        return FALSE;
+    }
     set_parent_id(item->valueint);
 
     item = cJSON_GetObjectItem(returnObject, "childrenData");
@@ -925,6 +1072,19 @@ BOOL hxt_parse_user_data(void* data)
     }
     
     return result;
+}
+
+BOOL hxt_unbind_child(int child_unid)
+{
+    if (child_unid == -1)
+    {
+        return FALSE;
+    }
+    /*rm private files*/
+    hxt_remove_private_doc(child_unid);
+
+    return delete_child(child_unid);
+
 }
 
 char* hxt_get_posture_detect_model_path(int study_mode)

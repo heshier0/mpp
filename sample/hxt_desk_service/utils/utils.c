@@ -11,6 +11,8 @@
 #include <sys/ioctl.h>
 #include <sys/ipc.h>
 #include <sys/msg.h>
+#include <dirent.h>
+#include <unistd.h>
 
 #include <cJSON.h>
 
@@ -212,11 +214,6 @@ BOOL utils_download_file(const char *url, const char* save_file_path)
         return FALSE;
     }
 
-    // char * filename = separate_filename(url);
-    // if(filename == NULL)
-    // {
-    //     return FALSE;
-    // }
     char CMD_DOWNLOAD_FILE[512] = {0};
 #ifdef DEBUG
     sprintf(CMD_DOWNLOAD_FILE, "curl --insecure -o %s %s", save_file_path, url);
@@ -586,6 +583,69 @@ void utils_generate_mp4_file_name(char* file_name)
 	
     return;
 }
+
+int utils_query_file_count(char* path)
+{
+    int file_count = 0;
+
+    char CMD_COUNT_IN_PATH[256] = {0};
+    sprintf(CMD_COUNT_IN_PATH, "ls %s|wc -l", path);
+    
+    char line[64] = {0};
+    FILE *fp = NULL;
+    fp = popen(CMD_COUNT_IN_PATH, "r");
+    if(NULL != fp)
+    {
+        if(fgets(line, sizeof(line), fp) == NULL)
+        {
+            pclose(fp);
+            return 0;
+        }
+        file_count = atoi(line);
+    }
+    pclose(fp);
+
+    return file_count;
+}
+
+void utils_query_file_names(const char *path, char **file_list)
+{
+    DIR *dir;
+    struct dirent *ptr;
+    int idx = 0;
+
+    if (NULL == file_list)
+    {
+        return;
+    }
+
+    if ((dir=opendir(path)) == NULL)
+    {
+        utils_print("Open %s error...\n", path);
+        return;
+    }
+
+    while ((ptr=readdir(dir)) != NULL)
+    {
+        if(strcmp(ptr->d_name,".")==0 || strcmp(ptr->d_name,"..")==0)
+        {
+            continue;
+        }
+        else if(ptr->d_type == 8)    ///file
+        {
+	        strcpy(file_list[idx], path);
+            strcat(file_list[idx++], ptr->d_name);
+	    }
+        else 
+        {
+	        continue;
+        }
+    }
+    closedir(dir);
+
+    return 0;
+}
+
 
 void utils_save_yuv_test(const char* yuv_data, const int width, const int height)
 {

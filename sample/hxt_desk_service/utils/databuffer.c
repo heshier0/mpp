@@ -81,6 +81,11 @@ int clear_buffer(DATABUFFER* buf)
 
 char* get_free_buffer(DATABUFFER* buf, int get_size)
 {
+	if(NULL == buf)
+	{
+		return NULL;
+	}
+
 	pthread_mutex_lock(&buf->buf_mutex);
 	if( (buf->buffer_size - buf->data_size) < get_size)
 	{
@@ -105,6 +110,11 @@ char* get_free_buffer(DATABUFFER* buf, int get_size)
 
 int use_free_buffer(DATABUFFER* buf, int used_size)
 {
+	if(NULL == buf)
+	{
+		return -1;
+	}
+
 	pthread_mutex_lock(&buf->buf_mutex);
 	buf->data_size += used_size;
 	if(buf->reserve_type == RESERVED_FREE)
@@ -120,6 +130,11 @@ int use_free_buffer(DATABUFFER* buf, int used_size)
 
 char *get_buffer(DATABUFFER* buf, int get_size)
 {
+	if(NULL == buf)
+	{
+		return NULL;
+	}
+
 	pthread_mutex_lock(&buf->buf_mutex);
 	if(buf->data_size < get_size)
 	{
@@ -142,6 +157,10 @@ char *get_buffer(DATABUFFER* buf, int get_size)
 
 int release_buffer(DATABUFFER* buf, int used_size)
 {
+	if(NULL == buf)
+	{
+		return -1;
+	}
 	pthread_mutex_lock(&buf->buf_mutex);
 	memset(buf->data_buf + buf->start_idx, 0x0, used_size);
 	buf->start_idx += used_size;

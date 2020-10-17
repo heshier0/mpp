@@ -172,13 +172,19 @@ int send_recording_mp4_cmd(const char* video_file, const char* snap_file)
     return write_count;
 }
 
-int send_delete_mp4_cmd()
+int send_delete_mp4_cmd(const char* video_file, const char* snap_file)
 {
     int write_count = -1;
     if(g_service_sock == -1)
     {
         return -1;
     }
+
+    study_video_t study_video;
+    bzero(&study_video, sizeof(study_video));
+    strcpy(study_video.video_name, video_file);
+    strcpy(study_video.snap_name, snap_file);
+
     cmd_header_t header;
     bzero(&header, sizeof(cmd_header_t));
     header.flag = CMD_FLAG;
@@ -188,17 +194,24 @@ int send_delete_mp4_cmd()
     header.reserve = 0;
 
     write_count = send(g_service_sock, (void*)&header, sizeof(cmd_header_t), 0);
+    write_count += send(g_service_sock, (void*)&study_video, sizeof(study_video_t), 0);
 
     return write_count;
 }
 
-int send_stop_record_mp4_cmd()
+int send_stop_record_mp4_cmd(const char* video_file, const char* snap_file)
 {
     int write_count = -1;
     if(g_service_sock == -1)
     {
         return -1;
     }
+
+    study_video_t study_video;
+    bzero(&study_video, sizeof(study_video));
+    strcpy(study_video.video_name, video_file);
+    strcpy(study_video.snap_name, snap_file);
+
     cmd_header_t header;
     bzero(&header, sizeof(cmd_header_t));
     header.flag = CMD_FLAG;
@@ -208,6 +221,7 @@ int send_stop_record_mp4_cmd()
     header.reserve = 0;
 
     write_count = send(g_service_sock, (void*)&header, sizeof(cmd_header_t), 0);
-
+    write_count += send(g_service_sock, (void*)&study_video, sizeof(study_video_t), 0);
+    
     return write_count;    
 }

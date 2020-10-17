@@ -18,7 +18,7 @@
 
 #define HXT_MPP_SERVICE_VERSION ("1.0.0")
 #define MPP_SERVICE_PORT        (10086)
-#define BUFFER_SIZE             (5*1024)
+#define BUFFER_SIZE             (5*1024*1024)
 
 int g_last_sock = -1;
 DATABUFFER g_client_data;
@@ -86,8 +86,6 @@ static void* receive_client_data_thread(void *args)
                 continue;
             }
             memcpy(ptr, buf, read_count);
-            memset(buf, 0, 256);
-
             use_free_buffer(&g_client_data, read_count);          
         }
         else
@@ -96,6 +94,8 @@ static void* receive_client_data_thread(void *args)
             break;
         }
     }
+
+    utils_print("read client thread exit....\n");
 
     return NULL;
 }
@@ -106,8 +106,7 @@ static void* process_desk_business_thread(void *args)
     int len = sizeof(cmd_header_t);
     video_ratio_t video_ratio;
     study_video_t study_video;
-    BOOL video_started = FALSE;
-
+    BOOL saving_video = FALSE;
     prctl(PR_SET_NAME, "process_cmd");
 
     while(1)
@@ -181,28 +180,44 @@ static void* process_desk_business_thread(void *args)
             }
         break;      
         case CMD_START_VIDEO_RECORD:
-            if (!video_started)
             {
+                while(saving_video)
+                {
+                    sleep(100);
+                }
                 bzero(&study_video, sizeof(study_video_t));
                 ptr = get_buffer(&g_client_data, sizeof(study_video_t));
                 memcpy(&study_video, ptr, sizeof(study_video_t));
                 release_buffer(&g_client_data, sizeof(study_video_t));
                 utils_print("video is %s, snap is %s\n", study_video.video_name, study_video.snap_name);
+
                 start_video_recording(study_video.video_name);
-                video_started = TRUE;
             }
         break;
         case CMD_STOP_VIDEO_RECORD:
-            if (video_started)
             {
+                saving_video = TRUE;
+                bzero(&study_video, sizeof(study_video_t));
+                ptr = get_buffer(&g_client_data, sizeof(study_video_t));
+                memcpy(&study_video, ptr, sizeof(study_video_t));
+                release_buffer(&g_client_data, sizeof(study_video_t));
                 stop_video_recording();
                 board_get_snap_from_venc_chn(study_video.snap_name);
-                video_started = FALSE;
+                saving_video = FALSE;
+                utils_print("stop video....\n");
             }
         break;
         case CMD_DEL_VIDEO_FILE:
+        {
+            bzero(&study_video, sizeof(study_video_t));
+            ptr = get_buffer(&g_client_data, sizeof(study_video_t));
+            memcpy(&study_video, ptr, sizeof(study_video_t));
+            release_buffer(&g_client_data, sizeof(study_video_t));
             delete_video();
             unlink(study_video.snap_name);
+            utils_print("delete snap %s\n", study_video.snap_name);
+        }
+
         break;    
         default:
         break;

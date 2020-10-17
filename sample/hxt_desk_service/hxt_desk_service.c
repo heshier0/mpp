@@ -7,6 +7,7 @@
 #include <sys/stat.h>
 #include <signal.h>
 #include <sys/prctl.h>
+#include <semaphore.h>
 
 #include <sitting_posture.h>
 
@@ -21,10 +22,13 @@
 
 volatile BOOL g_hxt_wbsc_running = FALSE;
 volatile BOOL g_iflyos_wbsc_running = FALSE;
-volatile BOOL g_device_sleeping = FALSE;
+volatile BOOL g_deploying_net = FALSE;
 volatile BOOL g_iflyos_first_login = TRUE;
 volatile BOOL g_hxt_first_login = TRUE;
-
+volatile BOOL g_device_sleeping = FALSE;
+volatile BOOL g_snap_upload_exceed = FALSE;
+volatile BOOL g_video_upload_exceed = FALSE;
+sem_t g_bind_sem;
 
 DATABUFFER g_msg_buffer;
 static pid_t iflyos_pid = -1, hxt_pid = -1;
@@ -74,6 +78,7 @@ static void start_iflyos_websocket_thread()
     return;
 }
 
+
 static void check_websocket_running()
 {
     time_t begin, end;
@@ -81,19 +86,20 @@ static void check_websocket_running()
     while(g_processing)
     {
         end = time(NULL);
-        if (end - begin >= 20)
+        if (end - begin >= 30)
         {
             if(!g_hxt_wbsc_running)
             {
                 start_hxt_websocket_thread();
             }
 
-            if(!g_iflyos_wbsc_running)
+            if(!g_iflyos_wbsc_running && !g_device_sleeping)
             {
                 start_iflyos_websocket_thread();
             }
+
+            begin = time(NULL);
         }
-        sleep(30);
     }
 }
 
@@ -107,11 +113,16 @@ static void handle_signal(int signo)
 
 static void  hxt_bind_user()
 {
-    BOOL first_notice = TRUE;
+    BOOL first = TRUE;
 
     /* check if wifi info in cfg */
     while (g_processing)
     {
+        if (g_deploying_net)
+        {
+            continue;
+        }
+
         char* ssid = get_wifi_ssid();
         char* pwd = get_wifi_pwd();
         if(ssid == NULL || pwd == NULL)
@@ -141,9 +152,8 @@ static void  hxt_bind_user()
                 break;
             }
             
-            while(1)
+            while(!g_deploying_net)
             {
-                utils_send_local_voice(VOICE_SERVER_CONNECT_OK);//联网成功，正在绑定
                 if(!board_get_qrcode_scan_status())
                 {
                     if (hxt_bind_desk_with_wifi_request())
@@ -151,20 +161,30 @@ static void  hxt_bind_user()
                         if (hxt_confirm_desk_bind_request())
                         {
                             set_desk_bind_status(1);
+                            first = FALSE;
                             break;
                         }
                     }
                     sleep(5);
                 }
             }
-            break;
+
+            if (first)
+            {
+                sem_wait(&g_bind_sem);
+                first = FALSE;
+            }
+            else
+            {
+                break;    
+            }
         }
         else
         {
             utils_disconnect_wifi();
         }
     }
-    board_set_led_status(NORMAL);
+    // board_set_led_status(NORMAL);
     return;
 }
 
@@ -180,11 +200,13 @@ int main(int argc, char **argv)
 #endif
     open_hxt_service_db();
 #if 1
+    sem_init(&g_bind_sem, 0, 0);
+
     create_buffer(&g_msg_buffer, 16*1024);
     /* init gpio */
     board_gpio_init();
 
-    HI_MPI_AO_SetVolume(0, -35);
+    board_init_volume();
     sleep(1);
     utils_send_local_voice(VOICE_DEVICE_OPEN);
     board_set_led_status(NO_BIND);
@@ -213,10 +235,11 @@ int main(int argc, char **argv)
 
     if(server_started)
     {
-        start_hxt_websocket_thread();
-        start_iflyos_websocket_thread();
-
         init_posture_model();
+
+        start_hxt_websocket_thread();
+        sleep(5);
+        start_iflyos_websocket_thread();
 
         check_websocket_running();
     }  

@@ -2,13 +2,12 @@
  * databuffer.c
  *
  *  Created on: Nov 17, 2016
- *  Author: huajia
+ *      Author: huajia
  */
 
 #include <pthread.h>
 
 #include "databuffer.h"
-#include "defines.h"
 
 #define RESERVED_BUF_SIZE 	(8*1024*1024)
 
@@ -35,7 +34,7 @@ int create_buffer(DATABUFFER* buf, int buf_size)
 		return -1;
 	}
 
-	buf->data_buf = (char*)utils_malloc(buf_size+RESERVED_BUF_SIZE);
+	buf->data_buf = (char*)malloc(buf_size+RESERVED_BUF_SIZE);
 	memset(buf->data_buf, 0x0, buf_size);
 
 	buf->buffer_size = buf_size;
@@ -57,7 +56,7 @@ int destroy_buffer(DATABUFFER* buf)
 
 	if (buf->data_buf != NULL)
 	{
-		utils_free(buf->data_buf);
+		free(buf->data_buf);
 		buf->data_buf = NULL;
 	}
 
@@ -82,6 +81,11 @@ int clear_buffer(DATABUFFER* buf)
 
 char* get_free_buffer(DATABUFFER* buf, int get_size)
 {
+	if(NULL == buf)
+	{
+		return NULL;
+	}
+
 	pthread_mutex_lock(&buf->buf_mutex);
 	if( (buf->buffer_size - buf->data_size) < get_size)
 	{
@@ -106,6 +110,11 @@ char* get_free_buffer(DATABUFFER* buf, int get_size)
 
 int use_free_buffer(DATABUFFER* buf, int used_size)
 {
+	if(NULL == buf)
+	{
+		return -1;
+	}
+
 	pthread_mutex_lock(&buf->buf_mutex);
 	buf->data_size += used_size;
 	if(buf->reserve_type == RESERVED_FREE)
@@ -121,6 +130,11 @@ int use_free_buffer(DATABUFFER* buf, int used_size)
 
 char *get_buffer(DATABUFFER* buf, int get_size)
 {
+	if(NULL == buf)
+	{
+		return NULL;
+	}
+
 	pthread_mutex_lock(&buf->buf_mutex);
 	if(buf->data_size < get_size)
 	{
@@ -143,6 +157,10 @@ char *get_buffer(DATABUFFER* buf, int get_size)
 
 int release_buffer(DATABUFFER* buf, int used_size)
 {
+	if(NULL == buf)
+	{
+		return -1;
+	}
 	pthread_mutex_lock(&buf->buf_mutex);
 	memset(buf->data_buf + buf->start_idx, 0x0, used_size);
 	buf->start_idx += used_size;

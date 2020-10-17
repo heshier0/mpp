@@ -135,7 +135,7 @@ BOOL board_get_qrcode_yuv_buffer()
 
     if (hxt_query_wifi_info((void*)qrcode_info))
     {
-        board_set_led_status(NORMAL);
+        //board_set_led_status(NORMAL);
     }
     
     return TRUE;

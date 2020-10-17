@@ -10,10 +10,13 @@ BOOL hxt_get_token_request();
 BOOL hxt_refresh_token_request();
 BOOL hxt_get_desk_cfg_request();
 BOOL hxt_get_new_version_request(const char* update_url);
-BOOL hxt_file_upload_request(const char* filename, const char* study_date, char* server_file_path);
+int hxt_file_upload_request(const char* filename, const char* study_date, char* server_file_path);
 BOOL hxt_sample_snap_upload_request(const char* filename, const char* study_date, char* server_file_path);
 BOOL hxt_update_children_alarm_files(void* data);
+BOOL hxt_update_children_alarm_file(void* data);
 BOOL hxt_parse_user_data(void* data);
+BOOL hxt_unbind_child(int child_unid);
+
 char* hxt_get_posture_detect_model_path(int study_mode);
 char* hxt_get_posture_class_model_path(int study_mode);
 

@@ -15,7 +15,7 @@ BOOL add_report_info(void* data)
         return FALSE;
     }
     ReportInfo *info = (ReportInfo *)data;
-    sql = sqlite3_mprintf("INSERT INTO %s VALUES(NULL, %d, %d, %d, '%s', %d, %d, %d, '%s', '%s'",
+    sql = sqlite3_mprintf("INSERT INTO %s VALUES(NULL, %d, %d, %d, '%s', %d, %d, %d, '%s', '%s')",
                                             REPORT_INFOS_TABLE,
                                             info->parent_unid, 
                                             info->child_unid,
