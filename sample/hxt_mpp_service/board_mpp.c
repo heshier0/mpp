@@ -44,7 +44,6 @@ static BOOL g_recording = FALSE;
 static BOOL g_stop_record = FALSE;
 
 static char s_file_name[256] = {0};
-pthread_mutex_t g_name_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /* fifo */
 static BOOL create_fifo(const char* name)
@@ -809,6 +808,10 @@ static void* sample_pcm_cb(void *data)
     AI_CHN      AiChn = 0;
     AI_CHN_PARAM_S stAiChnPara;
 
+
+    prctl(PR_SET_NAME, "mpp_sample_voice");
+    pthread_detach(pthread_self());
+
     /* open fifo */
     int fd = open_pcm_fifo();
     if (-1 == fd)
@@ -843,8 +846,6 @@ static void* sample_pcm_cb(void *data)
     struct timeval TimeoutVal;
     AEC_FRAME_S   stAecFrm;
     AUDIO_FRAME_S stFrame;
-
-    prctl(PR_SET_NAME, "mpp_sample_voice");
 
     while(g_sample_pcm_status)
     {
@@ -921,14 +922,15 @@ static void* play_mp3_cb(void* data)
     HI_S32 s32AdecChn = 0;
     HI_U8* pu8AudioStream = NULL;
 
+    prctl(PR_SET_NAME, "mpp_play_mp3");
+    pthread_detach(pthread_self());
+  
     pu8AudioStream = (HI_U8*)utils_malloc(sizeof(HI_U8) * MAX_AUDIO_STREAM_LEN);
     if (NULL == pu8AudioStream)
     {
         utils_print("malloc failed!\n");
         return NULL;
     }
-
-    prctl(PR_SET_NAME, "mpp_play_mp3");
 
     while (g_play_mp3_status)
     {
@@ -973,7 +975,8 @@ static void* sample_video_cb(void* data)
     {
         return NULL;
     }
-
+    prctl(PR_SET_NAME, "sample_video_thread");
+    pthread_detach(pthread_self());
     board_get_stream_from_venc_chn(ptmp->width, ptmp->height);
     return NULL;
 }
@@ -1372,8 +1375,7 @@ void start_sample_video_thread(void* data)
     pthread_t video_tid;
 
     pthread_create(&video_tid, NULL, sample_video_cb, data);
-    pthread_detach(video_tid);
-
+   
     return;
 }
 
@@ -1388,8 +1390,7 @@ void start_play_mp3_thread()
 
     g_play_mp3_status =  TRUE;
     pthread_create(&play_id, NULL, play_mp3_cb, NULL);
-    pthread_detach(play_id);
-
+   
     return;
 }
 
@@ -1404,7 +1405,6 @@ void start_sample_voice_thread(void* data)
 
     g_sample_pcm_status = TRUE;
     pthread_create(&voice_tid, NULL, sample_pcm_cb, NULL);
-    pthread_detach(voice_tid);
 
     return;
 }

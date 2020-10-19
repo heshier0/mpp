@@ -5,6 +5,8 @@
 #include "iflyos_request_def.h"
 #include "iflyos_response_def.h"
 
+void start_iflyos_websocket_thread();
+
 /* cae module */
 BOOL iflyos_init_cae_lib(void* data);
 void iflyos_deinit_cae_lib();

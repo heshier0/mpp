@@ -66,11 +66,12 @@ BOOL g_posture_running = FALSE;
 
 
 static void* g_recog_handle = NULL;
-static BOOL g_keep_processing = FALSE;
+static BOOL s_keep_processing = FALSE;
 static BOOL g_is_recording = FALSE;
 static BOOL g_is_inited = FALSE;
 static BOOL g_first_alarm = TRUE;
 static BOOL g_first_away = TRUE;
+static BOOL s_last_warn = FALSE;
 static char g_mp4_file[128] = {0};
 static char g_snap_file[128] = {0};
 // static int g_msg_qid;
@@ -135,6 +136,7 @@ static void play_random_warn_voice()
             utils_send_local_voice(voice[idx]);
         break;
     }
+    s_last_warn = TRUE;
 }
 
 static void play_random_praise_voice()
@@ -142,7 +144,11 @@ static void play_random_praise_voice()
     char* voice[5] = {VOICE_SITTING_PRAISE1, VOICE_SITTING_PRAISE2, VOICE_SITTING_PRAISE3, VOICE_SITTING_PRAISE4, VOICE_SITTING_PRAISE5};
     int idx = rand() % 5;
     
-    utils_send_local_voice(voice[idx]);
+    if (s_last_warn)
+    {
+        utils_send_local_voice(voice[idx]);
+        s_last_warn = FALSE;
+    }
 }
 
 static void take_rest(int time_ms)
@@ -443,10 +449,9 @@ static BOOL check_posture_alarm(struct check_status_t *check_status, int check_r
             {
                 if (interval >= LAST_DEPART_ALARM_TIMEVAL)
                 {
-                    utils_send_local_voice(VOICE_CAMERA_SLEEP);
                     utils_print("AWAY ALARM22222 !!!\n");
                     /* exit recog thread */
-                    g_keep_processing = FALSE;
+                    s_keep_processing = FALSE;
 
                     /* send message to hxt server */
                     StudyInfo info;
@@ -480,7 +485,7 @@ static void* thread_proc_yuv_data_cb(void *param)
     }
 
     prctl(PR_SET_NAME, "proc_yuv_data");
-
+    pthread_detach(pthread_self());
 
     int alarm_interval = 0, video_duration = 0, study_mode = 0, width = 0, height = 0;
 
@@ -490,7 +495,7 @@ static void* thread_proc_yuv_data_cb(void *param)
     study_mode = params->study_mode;
     width = params->height;
     height = params->width;
-
+    utils_print("study mode now is %d\n", study_mode);
     if (alarm_interval == 0)
     {
         alarm_interval = 10;
@@ -501,24 +506,27 @@ static void* thread_proc_yuv_data_cb(void *param)
     }
     if (study_mode == 0)
     {
-        study_mode = 3;
+        study_mode = STRICT;
     }
     utils_free(params);    
 
     struct check_status_t check_status;
     memset(&check_status, 0, sizeof(struct check_status_t));
 
+    g_camera_status = CAMERA_ON;
+
     StudyInfo info;
     memset(&info, 0, sizeof(StudyInfo));
     info.info_type = STUDY_BEGIN;
     send_study_report_type(&info);
-
-    unsigned char *yuv_buf = NULL;
-    utils_print("To process yuv data from vpss ....\n");
-    g_camera_status = CAMERA_ON;
+       
     board_set_led_status(CHECKING);
     utils_send_local_voice(VOICE_NORMAL_STATUS);
-    while (g_keep_processing)
+
+    utils_print("To process yuv data from vpss ....\n");
+    unsigned char *yuv_buf = NULL;
+
+    while (s_keep_processing)
     {
         /* get yuv data from vpss */
         board_get_yuv_from_vpss_chn(&yuv_buf);
@@ -532,7 +540,7 @@ static void* thread_proc_yuv_data_cb(void *param)
         /* 0 : Normal */
         /* 1 : bad posture */
         /* 2 : away */
-        one_check_result = run_sit_posture(g_recog_handle, yuv_buf, width, height, 5);
+        one_check_result = run_sit_posture(g_recog_handle, yuv_buf, width, height, study_mode);
         utils_print("%s -----> %d\n", utils_get_current_time(), one_check_result);
 
         if (init_check_status(&check_status, one_check_result))
@@ -557,15 +565,17 @@ static void* thread_proc_yuv_data_cb(void *param)
 
         take_rest(200);
     }
+
     g_is_inited = FALSE;
     g_posture_running = FALSE;
+
     /* prevent some fragmentary video*/
     delete_recorded();
 
     g_camera_status = CAMERA_OFF;
 
     /* send cmd to mpp service */
-     send_posture_stop_cmd();
+    send_posture_stop_cmd();
 
    /* play voice and change led status */
     utils_send_local_voice(VOICE_CAMERA_SLEEP);
@@ -596,23 +606,13 @@ void start_posture_recognize()
         return;
     }
 
-    if (g_keep_processing)
+    if (s_keep_processing)
     {
         utils_print("wait to last process exit....\n");
         return;
     }
-    g_keep_processing = TRUE;
+    s_keep_processing = TRUE;
 
-    /* get config */
-    if (g_hxt_wbsc_running)
-    {
-        if (!hxt_get_desk_cfg_request())
-        {
-            utils_print("Get config from server failed\n");
-            return;
-        }
-    }
-    
     PostureParams *params = utils_malloc(sizeof(PostureParams));
     params->video_duration = get_video_length(); 
     params->alarm_interval = get_judge_time(); 
@@ -621,22 +621,21 @@ void start_posture_recognize()
     params->snap_freq = get_attach_ratio();
     params->study_mode = get_study_mode(get_select_child_id()); 
     //for test
-    params->study_mode = 3;
+    params->study_mode = 2;
 
     send_posture_start_cmd(params->height, params->width);
     
     utils_print("To start recognize....\n");
     pthread_create(&proc_yuv_tid, NULL, thread_proc_yuv_data_cb, (void*)params);
-
     return;
 }
 
 void stop_posture_recognize()
 {
-    if (g_keep_processing)
+    if (s_keep_processing)
     {
         /* to tell mpp service stop video system */
-        g_keep_processing = FALSE;
+        s_keep_processing = FALSE;
         // pthread_join(proc_yuv_tid, NULL);
         utils_print("To stop recognize....\n");
     }
@@ -647,7 +646,7 @@ BOOL init_posture_model()
     int study_mode = get_study_mode(get_select_child_id());
     if (study_mode == -1)
     {
-        study_mode = 3;
+        study_mode = STRICT;
     }
 
     char *model_path1 = hxt_get_posture_detect_model_path(study_mode);

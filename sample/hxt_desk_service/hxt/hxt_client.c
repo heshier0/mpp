@@ -9,14 +9,6 @@
 #include "db.h"
 #include "hxt_client.h"
 #include "board_func.h"
-// typedef enum report_type
-// {
-//     START = 1,
-//     END,
-//     LEAVE,
-//     BACK,
-//     BAD
-// }ReportType;
 
 #define PERSONAL_ALARM_VOICE_COUNT      (5)
 
@@ -27,13 +19,6 @@ typedef enum
     ORIGNAL = 2,
     PERSONAL = 3
  };
-
-typedef enum
-{
-    LOW = 1, 
-    MEDIUM = 2,
-    STRICT = 3
-};
 
 static char* hxt_get_api_url(const char* api)
 {
@@ -1089,16 +1074,7 @@ BOOL hxt_unbind_child(int child_unid)
 
 char* hxt_get_posture_detect_model_path(int study_mode)
 {
-    switch (study_mode)
-    {
-    case LOW:
-        return LOW_CLASS_DETECT_FILE;
-    case MEDIUM:
-        return MEDIUM_CLASS_DETECT_FILE;
-    case STRICT:
-    default:
-        return HIGH_CLASS_DETECT_FILE;
-    }
+    return DETECT_PATTERN;
 }
 
 char* hxt_get_posture_class_model_path(int study_mode)

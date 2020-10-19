@@ -48,7 +48,7 @@ typedef enum
     ONLINE = 1
 }WORK_MODE;
 
-#define HXT_DESK_SERVICE_VERSION        "1.0.5"
+#define HXT_DESK_SERVICE_VERSION        "1.0.6"
 #define HXT_DESK_SERVICE_VERSION_NUMBER  100000
 
 
@@ -66,13 +66,10 @@ typedef enum
 #define WIFI_CFG                ("/userdata/config/wifi.conf")
 
 //posture pattern file
-#define LOW_CLASS_DETECT_FILE   ("/userdata/pattern/low_class/detect.wk")
-#define MEDIUM_CLASS_DETECT_FILE   ("/userdata/pattern/medium_class/detect.wk")
-#define HIGH_CLASS_DETECT_FILE   ("/userdata/pattern/high_class/detect.wk")
-#define LOW_CLASS_SAMPLE_FILE   ("/userdata/pattern/low_class/class.wk")
-#define MEDIUM_CLASS_SAMPLE_FILE   ("/userdata/pattern/medium_class/class.wk")
-#define HIGH_CLASS_SAMPLE_FILE   ("/userdata/pattern/high_class/class.wk")
-
+#define DETECT_PATTERN              ("/userdata/pattern/detect.wk")
+#define HIGH_CLASS_SAMPLE_FILE      ("/userdata/pattern/model1.wk")
+#define MEDIUM_CLASS_SAMPLE_FILE    ("/userdata/pattern/model2.wk")
+#define LOW_CLASS_SAMPLE_FILE       ("/userdata/pattern/model3.wk")
 //local voice
 #define VOICE_DEVICE_OPEN                       "/userdata/media/voice/V001.mp3"
 #define VOICE_CONNECT_ERROR                     "/userdata/media/voice/V002.mp3"  
@@ -130,6 +127,13 @@ typedef enum
 #define VOLUME_INFOS_TABLE                   "VolumeInfos"
 
 #pragma pack(push, 1)
+
+typedef enum
+{
+    LOW = 3, 
+    MEDIUM = 2,
+    STRICT = 1
+};
 
 typedef enum
 {

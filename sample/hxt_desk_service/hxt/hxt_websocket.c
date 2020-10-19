@@ -29,6 +29,7 @@ extern int g_camera_status;
 extern BOOL g_video_upload_exceed;
 extern BOOL g_snap_upload_exceed;
 
+struct uwsc_client *hxt_wsc;
 static BOOL g_recv_running = TRUE;
 pthread_t study_info_tid;
 
@@ -54,29 +55,43 @@ static BOOL init_study_info(ReportInfo *report_info, StudyInfo *study_info)
     if (report_info->report_type == BAD_POSTURE)
     {
         report_info->duration = 10;
-        int status = hxt_file_upload_request(study_info->file, report_info->study_date, report_info->video_url);
-        if (status = HXT_OK)
-        {
-            utils_print("Upload video %s OK\n", study_info->file);
-            
-        }
-        else if (status == HXT_UPLOAD_FAIL)
+        if (utils_get_file_size(study_info->file) < 1024)
         {
             g_video_upload_exceed = TRUE;
         }
-        // remove(study_info->file);
-
-        status = hxt_file_upload_request(study_info->snap, report_info->study_date, report_info->snap_url);
-        if (status == HXT_OK)
+        else
         {
-            utils_print("Upload snap %s OK\n", study_info->snap);
-            
+            int status = hxt_file_upload_request(study_info->file, report_info->study_date, report_info->video_url);
+            if (status = HXT_OK)
+            {
+                utils_print("Upload video %s OK\n", study_info->file);
+                
+            }
+            else if (status == HXT_UPLOAD_FAIL)
+            {
+                g_video_upload_exceed = TRUE;
+            }
         }
-        else if (status == HXT_UPLOAD_FAIL)
+        remove(study_info->file);
+
+        if (utils_get_file_size(study_info->file) < 1024)
         {
             g_snap_upload_exceed = TRUE;
         }
-        // remove(study_info->snap);
+        else
+        {
+            int status = hxt_file_upload_request(study_info->snap, report_info->study_date, report_info->snap_url);
+            if (status == HXT_OK)
+            {
+                utils_print("Upload snap %s OK\n", study_info->snap);
+                
+            }
+            else if (status == HXT_UPLOAD_FAIL)
+            {
+                g_snap_upload_exceed = TRUE;
+            }
+        }
+        remove(study_info->snap);
     }
 
     return TRUE;
@@ -128,6 +143,7 @@ static void* send_study_info_cb(void *params)
     }    
 
     prctl(PR_SET_NAME, "hxt_send_study_info");
+    pthread_detach(pthread_self());
 
     struct uwsc_client *cl = (struct uwsc_client *)params;
 
@@ -430,13 +446,21 @@ static void hxt_wsc_ping(struct uwsc_client *cl)
     hxt_send_desk_status(cl, HEARTBEAT, UWSC_OP_PING);
 }
 
+void hxt_websocket_stop()
+{
+    utils_print("To stop HXT websocket\n");
+    char buf[128] = "";
+    hxt_wsc->send(hxt_wsc, buf, strlen(buf + 2) + 2, UWSC_OP_CLOSE);
+}
+
 int hxt_websocket_start()
 {
 	int ping_interval = 120;	        /* second */
-    struct uwsc_client *cl;
+    // struct uwsc_client *cl;
     struct ev_loop *loop;
 
     prctl(PR_SET_NAME, "hxt_websocket");
+    pthread_detach(pthread_self());
 
     char* hxt_url = get_websocket_url();
     char* token = get_server_token();
@@ -448,8 +472,8 @@ int hxt_websocket_start()
 
     loop = ev_loop_new(EVFLAG_AUTO);
 
-    cl = uwsc_new(loop, hxt_url, ping_interval, extra_header);
-    if (!cl)
+    hxt_wsc = uwsc_new(loop, hxt_url, ping_interval, extra_header);
+    if (!hxt_wsc)
     {
         utils_print("hxt init failed\n");
         return -1;
@@ -459,15 +483,15 @@ int hxt_websocket_start()
     utils_free(hxt_url);     
 	utils_print("%s -- Hxt websocket start ...\n", utils_get_current_time());
 
-    cl->onopen = hxt_wsc_onopen;
-    cl->onmessage = hxt_wsc_onmessage;
-    cl->onerror = hxt_wsc_onerror;
-    cl->onclose = hxt_wsc_onclose;
-    cl->ping = hxt_wsc_ping;
+    hxt_wsc->onopen = hxt_wsc_onopen;
+    hxt_wsc->onmessage = hxt_wsc_onmessage;
+    hxt_wsc->onerror = hxt_wsc_onerror;
+    hxt_wsc->onclose = hxt_wsc_onclose;
+    hxt_wsc->ping = hxt_wsc_ping;
 
     ev_run(loop, 0);
 
-    free(cl);
+    free(hxt_wsc);
     
     g_hxt_wbsc_running = FALSE;
     utils_print("Hxt websocket exit...\n");   
@@ -475,3 +499,19 @@ int hxt_websocket_start()
     return 0;  
 }
 
+static void* hxt_websocket_cb(void* data)
+{
+    hxt_websocket_start();
+    return NULL;
+}
+
+void start_hxt_websocket_thread()
+{
+    pthread_t hxt_tid;
+    if (hxt_get_desk_cfg_request())
+    {
+        pthread_create(&hxt_tid, NULL, hxt_websocket_cb, NULL);
+    }
+    
+    return;
+}

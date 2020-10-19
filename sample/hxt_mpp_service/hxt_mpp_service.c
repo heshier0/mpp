@@ -71,6 +71,7 @@ static void* receive_client_data_thread(void *args)
     char buf[256] = {0};
 
     prctl(PR_SET_NAME, "read_client_data");
+    pthread_detach(pthread_self());
 
     while(1)
     {   
@@ -108,7 +109,7 @@ static void* process_desk_business_thread(void *args)
     study_video_t study_video;
     BOOL saving_video = FALSE;
     prctl(PR_SET_NAME, "process_cmd");
-
+    pthread_detach(pthread_self());
     while(1)
     {
         bzero(&header, len);
@@ -231,21 +232,19 @@ static void start_receive_client_data(int sock_fd)
 {
     pthread_t tid;
     pthread_create(&tid, NULL, receive_client_data_thread, (void*)sock_fd);
-    pthread_detach(tid);
 }
 
 static void start_process_desk_business()
 {
     pthread_t tid; 
     pthread_create(&tid, NULL, process_desk_business_thread, NULL);
-    pthread_detach(tid);
 }
 
 static void handle_signal(int signo)
 {
     if (posturing)
     {
-        // stop_sample_video_thread();
+        stop_sample_video_thread();
         posturing = FALSE;
         //???
         stop_video_recording();
@@ -256,6 +255,12 @@ static void handle_signal(int signo)
     {
         sampling = FALSE;
         stop_sample_voice_thread();
+    }
+
+    if (g_last_sock != -1)
+    {
+        close(g_last_sock);
+        g_last_sock = -1;
     }
 }
 

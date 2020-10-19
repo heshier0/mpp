@@ -8,6 +8,7 @@
 #include "server_comm.h"
 #include "board_func.h"
 #include "db.h"
+#include "iflyos_func.h"
 
 
 #define FLASH_TIMES         3
@@ -59,13 +60,11 @@ static struct gpiod_line *led_mute_green = NULL;
 static struct gpiod_line *led_mute_blue = NULL;
 static struct gpiod_line *led_mute_red = NULL;
 
-static AUDIO_DEV ao_dev = 0;
 static BOOL dec_vol_pressed = FALSE;
 static BOOL inc_vol_pressed = FALSE;
 static int dec_vol_pressed_intv = 0;
 static int inc_vol_pressed_intv = 0;
 
-static BOOL ao_mute = FALSE;
 static int scan_count = 0;
 static LED_STATUS led_status = BOOTING;
 
@@ -73,6 +72,8 @@ extern BOOL g_deploying_net;
 extern BOOL g_posture_running;
 extern sem_t g_bind_sem;
 extern BOOL g_device_sleeping;
+volatile BOOL g_hxt_wbsc_running;
+volatile BOOL g_iflyos_wbsc_running;
 
 
 static int gpio_set_value(struct gpiod_line *line, int value)
@@ -105,6 +106,7 @@ static void set_wifi_led_off()
 
 static void clear_wifi_info()
 {
+    // system("ifconfig wlan0 down");
     utils_disconnect_wifi();
     system("rm /userdata/config/wifi.conf");
     deinit_wifi_params();
@@ -128,6 +130,7 @@ static void* check_reset_event(void *param)
     BOOL pressed = FALSE;
 
     prctl(PR_SET_NAME, "check_reset_event");
+    pthread_detach(pthread_self());
     while(1)
     {
         gpiod_line_event_wait(btn_reset, NULL);
@@ -180,7 +183,7 @@ static void* check_inc_vol_event(void *param)
     BOOL already_max = FALSE;
 
     prctl(PR_SET_NAME, "check_inc_volume");
-
+    pthread_detach(pthread_self());
     while(1)
      {
         gpiod_line_event_wait(btn_vol_inc, NULL);
@@ -221,6 +224,7 @@ static void* check_dec_vol_event(void *param)
     struct gpiod_line_event event;
     time_t start = 0, end = 0;
     prctl(PR_SET_NAME, "check_dec_volume");
+    pthread_detach(pthread_self());
     while(1)
      {
         gpiod_line_event_wait(btn_vol_dec, NULL);
@@ -260,6 +264,7 @@ static void* check_posture_event(void *param)
     time_t start = 0, end = 0;
     time_t begin_time = 0;
     prctl(PR_SET_NAME, "check_posture");
+    pthread_detach(pthread_self());
     while(1)
     {
         gpiod_line_event_wait(btn_mute, NULL);
@@ -290,26 +295,30 @@ static void* check_posture_event(void *param)
             {
                 if (g_device_sleeping)      //device sleeping
                 {
+                    utils_print("To wake....\n");
                     g_device_sleeping = FALSE;
-                    iflyos_websocket_start();
+                    start_iflyos_websocket_thread();
                     board_set_led_status(NORMAL);
+                    utils_print("OK!!\n");
                 }
                 else
                 {
+                    utils_print("To sleeping...\n");
                     g_device_sleeping = TRUE;
-                    /*stop iflyos voice*/
                     iflyos_websocket_stop();
                     if (g_posture_running)
                     {
                         stop_posture_recognize();
                     }
                     board_set_led_status(SLEEPING);
+                    utils_print("ZZZZZZZZ\n");
                 }    
             }
             else
             {
                 if (g_device_sleeping)
                 {
+                    utils_print("Still sleeping...\n");
                     continue;
                 }
 
@@ -317,6 +326,7 @@ static void* check_posture_event(void *param)
                 {
                     start_posture_recognize();
                     begin_time = time(NULL);
+                    
                 }
                 else
                 {
@@ -331,6 +341,8 @@ static void* check_posture_event(void *param)
 static void* check_scan_qrcode_event(void *param)
 {
     prctl(PR_SET_NAME, "scan_qrcode");
+    pthread_detach(pthread_self());
+    
     while(1)
     {
         if (inc_vol_pressed && dec_vol_pressed)
@@ -345,11 +357,21 @@ static void* check_scan_qrcode_event(void *param)
                 {
                     stop_posture_recognize();
                 }
+
+                if (g_hxt_wbsc_running)
+                {
+                    hxt_websocket_stop();
+                }
+
+                if(g_iflyos_wbsc_running)
+                {
+                    iflyos_websocket_stop();
+                }
                 
                 g_deploying_net = TRUE;
                 board_set_led_status(BINDING);
 
-                printf("To scan qrcode....\n");
+                utils_print("To scan qrcode....\n");
                 inc_vol_pressed = dec_vol_pressed = FALSE;
                 inc_vol_pressed_intv = dec_vol_pressed_intv = 0;
                 
@@ -371,24 +393,8 @@ static void* check_scan_qrcode_event(void *param)
                         break;
                     }
                 }
-                char* ssid = get_wifi_ssid();
-                char* pwd = get_wifi_pwd();
-                utils_link_wifi(ssid, pwd);
-                sleep(3);
                 g_deploying_net = FALSE;
                 scan_count = 0;
-
-                if (ssid != NULL)
-                {
-                    utils_free(ssid);
-                }
-
-                if(pwd != NULL)
-                {
-                    utils_free(pwd);
-                }
-
-                sem_post(&g_bind_sem);
             }
         }
        
@@ -402,6 +408,7 @@ static void* led_blinking_thread(void* param)
 {
     BOOL changed_to_normal = FALSE;
     prctl(PR_SET_NAME, "check_led_status");
+    pthread_detach(pthread_self());
     while(1)
     {
         time_t t = time(0);

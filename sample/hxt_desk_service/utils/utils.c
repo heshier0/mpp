@@ -495,8 +495,10 @@ void utils_link_wifi(const char* ssid, const char* pwd)
     {
         return;
     }
-    utils_disconnect_wifi();
-    sleep(1);
+    // utils_disconnect_wifi();
+    system("ifconfig wlan0 up");
+
+    sleep(3);
 
     char CMD_SAVE_WIFI_INFO[256] = {0};
     sprintf(CMD_SAVE_WIFI_INFO, "wpa_passphrase %s %s > %s", ssid, pwd, WIFI_CFG);
@@ -515,6 +517,7 @@ void utils_link_wifi(const char* ssid, const char* pwd)
 
 void utils_disconnect_wifi()
 {
+    system("ifconfig wlan0 down");
     system("kill -9 $(pidof udhcpc)");
     system("kill -9 $(pidof wpa_supplicant)");
 }
@@ -525,7 +528,7 @@ BOOL utils_check_wifi_state()
     FILE *fp = NULL;
     int link_mode = 0;
     
-    fp = popen("cat /sys/class/net/wlan0/link_mode", "r");
+    fp = popen("cat /sys/class/net/wlan0/operstate", "r");
     if(NULL != fp)
     {
         if(fgets(line, sizeof(line), fp) == NULL)
@@ -533,11 +536,10 @@ BOOL utils_check_wifi_state()
             pclose(fp);
             return FALSE;
         }
-        link_mode = atoi(line);
+        line[2] = '\0';
     }
     pclose(fp);
-
-    if(link_mode == 1)
+    if (strcmp("up", line) == 0)
     {
         return TRUE;
     }
@@ -645,7 +647,6 @@ void utils_query_file_names(const char *path, char **file_list)
 
     return 0;
 }
-
 
 void utils_save_yuv_test(const char* yuv_data, const int width, const int height)
 {
