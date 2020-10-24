@@ -110,6 +110,7 @@ static cJSON* iflyos_create_context()
     cJSON_AddNumberToObject(speaker, "volume", SPEAKER_VOL);
     cJSON_AddStringToObject(speaker, "type", SPEAKER_TYPE);
 
+
     return root;
 }
 

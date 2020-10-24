@@ -10,6 +10,8 @@
 #include "db.h"
 #include "iflyos_func.h"
 
+#include "multi_button.h"
+
 
 #define FLASH_TIMES         3
 #define LED_SLEEP_TIME      (200*1000)
@@ -62,16 +64,28 @@ static struct gpiod_line *led_mute_red = NULL;
 
 static BOOL dec_vol_pressed = FALSE;
 static BOOL inc_vol_pressed = FALSE;
-static int dec_vol_pressed_intv = 0;
-static int inc_vol_pressed_intv = 0;
+
+static BOOL btn_mute_long_pressed = TRUE;
+
+static time_t mute_pressed_start = 0;
+static time_t mute_pressed_end = 0;
+
+static time_t inc_pressed_start = 0;
+static time_t inc_pressed_end  = 0;
+
+static time_t dec_pressed_start = 0;
+static time_t dec_pressed_end = 0;
+
+static time_t reset_pressed_start = 0;
+static time_t reset_pressed_end = 0;
 
 static int scan_count = 0;
 static LED_STATUS led_status = BOOTING;
 
 extern BOOL g_deploying_net;
 extern BOOL g_posture_running;
-extern sem_t g_bind_sem;
 extern BOOL g_device_sleeping;
+extern int g_connect_count;
 volatile BOOL g_hxt_wbsc_running;
 volatile BOOL g_iflyos_wbsc_running;
 
@@ -123,8 +137,254 @@ static void board_led_all_off()
     gpio_set_value(led_mute_red, 1);
 }
 
+/*camera*/
+uint8_t read_button_mute_gpio()
+{
+    return gpio_get_value(btn_mute);
+}
+
+void button_mute_callback(void *btn)
+{
+    uint32_t btn_event_val;
+
+    if(g_deploying_net)
+    {
+        utils_print("deploying network....\n");
+        return;
+    }
+
+    btn_event_val = get_button_event((struct Button *)btn);
+    switch (btn_event_val)
+    {
+    case PRESS_DOWN:
+    break;
+    case PRESS_UP:
+        btn_mute_long_pressed = TRUE;
+    break;
+    case PRESS_REPEAT:
+    break;
+    case SINGLE_CLICK:
+        if (g_device_sleeping)
+        {
+            utils_print("Still sleeping...\n");
+            break;
+        }
+        if(!g_posture_running)
+        {
+            board_set_led_status(CHECKING);
+            start_posture_recognize();
+        }
+        else
+        {
+            board_set_led_status(CHECKING_EXIT);
+            stop_posture_recognize();   
+        }
+    break;
+    case DOUBLE_CLICK:
+    break;
+    case LONG_PRESS_START:
+        mute_pressed_start = time(NULL);
+    break;
+    case LONG_PRESS_HOLD:
+        mute_pressed_end = time(NULL);
+        if ((mute_pressed_end - mute_pressed_start) >= 3)
+        {
+            if (btn_mute_long_pressed)
+            {
+                if (g_device_sleeping)      //device sleeping
+                {
+                    utils_print("To wake....\n");
+                    g_device_sleeping = FALSE;
+                    start_iflyos_websocket_thread();
+                    board_set_led_status(NORMAL);
+                    utils_print("OK!!\n");
+                }
+                else
+                {
+                    utils_print("To sleeping...\n");
+                    g_device_sleeping = TRUE;
+                    if (g_posture_running)
+                    {
+                        stop_posture_recognize();
+                    }
+                    iflyos_websocket_stop();
+                    hxt_websocket_stop();
+                    board_set_led_status(SLEEPING);
+                    utils_disconnect_wifi();
+                    utils_print("ZZZZZZZZ\n");
+                }   
+                btn_mute_long_pressed = FALSE;
+            }
+        }
+    break;    
+    default:
+    break;
+    }
+
+    return;
+}
+
+/*inc volume*/
+uint8_t read_button_vol_inc_gpio()
+{
+    return gpio_get_value(btn_vol_inc);
+}
+
+void button_vol_inc_callback(void *btn)
+{
+    int vol = -20;
+    uint32_t btn_event_val;
+
+    if (g_device_sleeping)
+    {
+        utils_print("Still sleeping...\n");
+        return;
+    }
+
+    btn_event_val = get_button_event((struct Button *)btn);
+    switch (btn_event_val)
+    {
+    case PRESS_DOWN:
+        break;
+    case PRESS_UP:
+        inc_vol_pressed = FALSE;
+        break;
+    case PRESS_REPEAT:
+    case SINGLE_CLICK:
+        vol = board_inc_volume();
+        utils_print("Now volume is %d\n", vol);
+        break;
+    case DOUBLE_CLICK:
+        break;
+    case LONG_PRESS_START:
+        inc_pressed_start = time(NULL);
+        break;
+    case LONG_PRESS_HOLD:
+        inc_pressed_end = time(NULL);
+        if ((inc_pressed_end - inc_pressed_start) >= 3)
+        {
+            inc_vol_pressed = TRUE;
+        }
+        break;    
+    default:
+        break;
+    }
+}
+
+/*dec volume*/
+uint8_t read_button_vol_dec_gpio()
+{
+    return gpio_get_value(btn_vol_dec);
+}
+
+void button_vol_dec_callback(void *btn)
+{
+    int vol = -20;
+    uint32_t btn_event_val;
+
+    if (g_device_sleeping)
+    {
+        utils_print("Still sleeping...\n");
+        return;
+    }
+
+    btn_event_val = get_button_event((struct Button *)btn);
+    switch (btn_event_val)
+    {
+    case PRESS_DOWN:
+        break;
+    case PRESS_UP:
+        dec_vol_pressed = FALSE;
+    break;
+    case PRESS_REPEAT:
+    case SINGLE_CLICK:
+        vol = board_dec_volume();
+    break;
+    case DOUBLE_CLICK:
+        break;
+    case LONG_PRESS_START:
+        dec_pressed_start = time(NULL);
+        break;
+    case LONG_PRESS_HOLD:
+        dec_pressed_end = time(NULL);
+        if ((dec_pressed_end - dec_pressed_start) >= 3)
+        {
+            dec_vol_pressed = TRUE;
+        }
+    break;    
+    default:
+        break;
+    }
+}
+
+/*reset*/
+uint8_t read_button_reset_gpio()
+{
+    return gpio_get_value(btn_reset);
+}
+
+void button_reset_callback(void *btn)
+{
+    uint32_t btn_event_val;
+    btn_event_val = get_button_event((struct Button *)btn);
+    switch (btn_event_val)
+    {
+    case PRESS_DOWN:
+        break;
+    case PRESS_UP:
+        break;
+    case PRESS_REPEAT:
+        break;
+    case SINGLE_CLICK:
+        board_led_all_off();
+        /* reboot */
+        utils_print("Btn pressed to reboot\n");
+        utils_system_reboot();
+        break;
+    case DOUBLE_CLICK:
+        break;
+    case LONG_PRESS_START:
+        reset_pressed_start = time(NULL);
+        break;
+    case LONG_PRESS_HOLD:
+        reset_pressed_end = time(NULL);
+        if ((reset_pressed_end - reset_pressed_start) >= 3)
+        {
+            board_set_led_status(RESETING);
+            sleep(3);
+            /* reset */
+            utils_system_reset();
+            utils_system_reboot();
+        }
+        break;    
+    default:
+        break;
+    }
+}
+
 static void* check_reset_event(void *param)
 {
+    struct Button button_reset;
+    button_init(&button_reset, read_button_reset_gpio, 0);
+    button_attach(&button_reset, PRESS_DOWN, button_reset_callback);
+    button_attach(&button_reset, PRESS_UP, button_reset_callback);
+    button_attach(&button_reset, PRESS_REPEAT, button_reset_callback);
+    button_attach(&button_reset, SINGLE_CLICK, button_reset_callback);
+    button_attach(&button_reset, DOUBLE_CLICK, button_reset_callback);
+    button_attach(&button_reset, LONG_PRESS_START, button_reset_callback);
+    button_attach(&button_reset, LONG_PRESS_HOLD, button_reset_callback);
+    button_start(&button_reset);
+
+    prctl(PR_SET_NAME, "check_reset_event");
+    pthread_detach(pthread_self());
+
+    while (1)
+    {
+        button_ticks();
+        usleep(2000);
+    }
+
+    #if 0
     struct gpiod_line_event event;
     time_t start = 0, end = 0;
     BOOL pressed = FALSE;
@@ -172,12 +432,34 @@ static void* check_reset_event(void *param)
             pressed = TRUE;
         }
     }
-
+    #endif
     return;
 }
 
 static void* check_inc_vol_event(void *param)
 {
+    struct Button button_vol_inc;
+    button_init(&button_vol_inc, read_button_vol_inc_gpio, 0);
+    button_attach(&button_vol_inc, PRESS_DOWN, button_vol_inc_callback);
+    button_attach(&button_vol_inc, PRESS_UP, button_vol_inc_callback);
+    button_attach(&button_vol_inc, PRESS_REPEAT, button_vol_inc_callback);
+    button_attach(&button_vol_inc, SINGLE_CLICK, button_vol_inc_callback);
+    button_attach(&button_vol_inc, DOUBLE_CLICK, button_vol_inc_callback);
+    button_attach(&button_vol_inc, LONG_PRESS_START, button_vol_inc_callback);
+    button_attach(&button_vol_inc, LONG_PRESS_HOLD, button_vol_inc_callback);
+    button_start(&button_vol_inc);
+
+    prctl(PR_SET_NAME, "check_inc_volume");
+    pthread_detach(pthread_self());
+
+    while (1)
+    {
+        button_ticks();
+        usleep(2000);
+    }
+    
+
+    #if 0
     struct gpiod_line_event event;
     time_t start = 0, end = 0;
     BOOL already_max = FALSE;
@@ -186,6 +468,13 @@ static void* check_inc_vol_event(void *param)
     pthread_detach(pthread_self());
     while(1)
      {
+         if (g_device_sleeping)
+         {
+             utils_print("not inc device sleeping...\n");
+             sleep(5);
+             continue;
+         }
+
         gpiod_line_event_wait(btn_vol_inc, NULL);
         if (gpiod_line_event_read(btn_vol_inc, &event) != 0)
         {
@@ -216,17 +505,46 @@ static void* check_inc_vol_event(void *param)
         }
 
      }
+     #endif
     return NULL;
 }
 
 static void* check_dec_vol_event(void *param)
 {
+    struct Button button_vol_dec;
+    button_init(&button_vol_dec, read_button_vol_dec_gpio, 0);
+    button_attach(&button_vol_dec, PRESS_DOWN, button_vol_dec_callback);
+    button_attach(&button_vol_dec, PRESS_UP, button_vol_dec_callback);
+    button_attach(&button_vol_dec, PRESS_REPEAT, button_vol_dec_callback);
+    button_attach(&button_vol_dec, SINGLE_CLICK, button_vol_dec_callback);
+    button_attach(&button_vol_dec, DOUBLE_CLICK, button_vol_dec_callback);
+    button_attach(&button_vol_dec, LONG_PRESS_START, button_vol_dec_callback);
+    button_attach(&button_vol_dec, LONG_PRESS_HOLD, button_vol_dec_callback);
+    button_start(&button_vol_dec);
+
+    prctl(PR_SET_NAME, "check_dec_volume");
+    pthread_detach(pthread_self());
+
+    while (1)
+    {
+        button_ticks();
+        usleep(2000);
+    }
+    
+    #if 0
     struct gpiod_line_event event;
     time_t start = 0, end = 0;
     prctl(PR_SET_NAME, "check_dec_volume");
     pthread_detach(pthread_self());
     while(1)
      {
+         if (g_device_sleeping)
+         {
+             utils_print("not dec device sleeping...\n");
+             sleep(5);
+             continue;
+         }
+
         gpiod_line_event_wait(btn_vol_dec, NULL);
         if (gpiod_line_event_read(btn_vol_dec, &event) != 0)
         {
@@ -255,11 +573,34 @@ static void* check_dec_vol_event(void *param)
             }
         }
      }
+    #endif
+
     return NULL;
 }
 
 static void* check_posture_event(void *param)
 {
+    struct Button button_mute;
+    button_init(&button_mute, read_button_mute_gpio, 0);
+    button_attach(&button_mute, PRESS_DOWN, button_mute_callback);
+    button_attach(&button_mute, PRESS_UP, button_mute_callback);
+    button_attach(&button_mute, PRESS_REPEAT, button_mute_callback);
+    button_attach(&button_mute, SINGLE_CLICK, button_mute_callback);
+    button_attach(&button_mute, DOUBLE_CLICK, button_mute_callback);
+    button_attach(&button_mute, LONG_PRESS_START, button_mute_callback);
+    button_attach(&button_mute, LONG_PRESS_HOLD, button_mute_callback);
+    button_start(&button_mute);
+
+    prctl(PR_SET_NAME, "check_posture");
+    pthread_detach(pthread_self());
+
+    while (1)
+    {
+        button_ticks();
+        usleep(2000);
+    }
+
+    #if 0
     struct gpiod_line_event event;
     time_t start = 0, end = 0;
     time_t begin_time = 0;
@@ -324,17 +665,19 @@ static void* check_posture_event(void *param)
 
                 if(!g_posture_running)
                 {
+                    board_set_led_status(CHECKING);
                     start_posture_recognize();
                     begin_time = time(NULL);
-                    
                 }
                 else
                 {
+                    board_set_led_status(NORMAL);
                     stop_posture_recognize();   
                 }
             }
         }
     }
+    #endif
     return NULL;
 }
 
@@ -345,57 +688,63 @@ static void* check_scan_qrcode_event(void *param)
     
     while(1)
     {
+        if (g_device_sleeping)
+        {
+            sleep(5);
+            continue;
+        }
+
         if (inc_vol_pressed && dec_vol_pressed)
         {
-            if (abs(inc_vol_pressed_intv - dec_vol_pressed_intv) >= 0 && 
-                    abs(inc_vol_pressed_intv - dec_vol_pressed_intv) < 5) //check btn if pressed meantime
+            if (g_deploying_net )
             {
-
-                clear_wifi_info();
-
-                if(g_posture_running)
-                {
-                    stop_posture_recognize();
-                }
-
-                if (g_hxt_wbsc_running)
-                {
-                    hxt_websocket_stop();
-                }
-
-                if(g_iflyos_wbsc_running)
-                {
-                    iflyos_websocket_stop();
-                }
-                
-                g_deploying_net = TRUE;
-                board_set_led_status(BINDING);
-
-                utils_print("To scan qrcode....\n");
-                inc_vol_pressed = dec_vol_pressed = FALSE;
-                inc_vol_pressed_intv = dec_vol_pressed_intv = 0;
-                
-                /*qrcode recognize*/
-                while (!board_get_qrcode_yuv_buffer())
-                {
-                    if (scan_count < 5)
-                    {
-                        utils_send_local_voice(VOICE_DEPLOYING_NET);
-                        sleep(10);
-                        scan_count ++;
-                        continue;
-                    }         
-                    else
-                    {
-                        utils_send_local_voice(VOICE_QUERY_WIFI_ERROR);
-                        board_set_led_status(WIFI_ERR);
-                        sleep(10);
-                        break;
-                    }
-                }
-                g_deploying_net = FALSE;
-                scan_count = 0;
+                utils_print("Now still deploying...\n");
+                continue;
             }
+            g_deploying_net = TRUE;
+
+            clear_wifi_info();
+
+            if(g_posture_running)
+            {
+                stop_posture_recognize();
+            }
+
+            if (g_hxt_wbsc_running)
+            {
+                hxt_websocket_stop();
+            }
+
+            if(g_iflyos_wbsc_running)
+            {
+                iflyos_websocket_stop();
+            }
+            
+            board_set_led_status(BINDING);
+
+            utils_print("To scan qrcode....\n");
+            
+            /*qrcode recognize*/
+            while (!board_get_qrcode_yuv_buffer())
+            {
+                if (scan_count < 5)
+                {
+                    utils_send_local_voice(VOICE_DEPLOYING_NET);
+                    sleep(10);
+                    scan_count ++;
+                    continue;
+                }         
+                else
+                {
+                    utils_send_local_voice(VOICE_QUERY_WIFI_ERROR);
+                    board_set_led_status(WIFI_ERR);
+                    sleep(10);
+                    break;
+                }
+            }
+            scan_count = 0;
+            g_deploying_net = FALSE;
+            g_connect_count = 0;
         }
        
         sleep(3);
@@ -437,15 +786,21 @@ static void* led_blinking_thread(void* param)
         break;
         case CHECKING:
             gpio_set_value(led_camera_green, 0);
-            gpio_set_value(led_wifi_green, 0);
+        break;
+        case CHECKING_EXIT:
+            gpio_set_value(led_camera_green, 1);
         break;
         case WIFI_ERR:
             gpio_set_value(led_wifi_red, 0);
-            set_camera_led_off();
+            if (!g_posture_running)
+            {
+                set_camera_led_off();
+            }
+            changed_to_normal = FALSE;
         break;
         case CAMERA_ERR:
-            gpio_set_value(led_camera_red, 0);
             set_camera_led_off();
+            gpio_set_value(led_camera_red, 0);
         break;
         case RESETING:
             board_led_all_off();
@@ -464,8 +819,11 @@ static void* led_blinking_thread(void* param)
             board_led_all_off();
         break;
         case NORMAL:
-        default:    
-            set_camera_led_off();
+        default:   
+            if (!g_posture_running)
+            {
+                set_camera_led_off();
+            } 
             if (!changed_to_normal)
             {
                 set_wifi_led_off();
@@ -479,14 +837,73 @@ static void* led_blinking_thread(void* param)
     return NULL;
 }
 
+static void * check_btn_event(void *param)
+{
+    struct Button button_mute;
+    button_init(&button_mute, read_button_mute_gpio, 0);
+    button_attach(&button_mute, PRESS_DOWN, button_mute_callback);
+    button_attach(&button_mute, PRESS_UP, button_mute_callback);
+    button_attach(&button_mute, PRESS_REPEAT, button_mute_callback);
+    button_attach(&button_mute, SINGLE_CLICK, button_mute_callback);
+    button_attach(&button_mute, DOUBLE_CLICK, button_mute_callback);
+    button_attach(&button_mute, LONG_PRESS_START, button_mute_callback);
+    button_attach(&button_mute, LONG_PRESS_HOLD, button_mute_callback);
+    button_start(&button_mute);
+
+    struct Button button_vol_dec;
+    button_init(&button_vol_dec, read_button_vol_dec_gpio, 0);
+    button_attach(&button_vol_dec, PRESS_DOWN, button_vol_dec_callback);
+    button_attach(&button_vol_dec, PRESS_UP, button_vol_dec_callback);
+    button_attach(&button_vol_dec, PRESS_REPEAT, button_vol_dec_callback);
+    button_attach(&button_vol_dec, SINGLE_CLICK, button_vol_dec_callback);
+    button_attach(&button_vol_dec, DOUBLE_CLICK, button_vol_dec_callback);
+    button_attach(&button_vol_dec, LONG_PRESS_START, button_vol_dec_callback);
+    button_attach(&button_vol_dec, LONG_PRESS_HOLD, button_vol_dec_callback);
+    button_start(&button_vol_dec);
+
+    struct Button button_vol_inc;
+    button_init(&button_vol_inc, read_button_vol_inc_gpio, 0);
+    button_attach(&button_vol_inc, PRESS_DOWN, button_vol_inc_callback);
+    button_attach(&button_vol_inc, PRESS_UP, button_vol_inc_callback);
+    button_attach(&button_vol_inc, PRESS_REPEAT, button_vol_inc_callback);
+    button_attach(&button_vol_inc, SINGLE_CLICK, button_vol_inc_callback);
+    button_attach(&button_vol_inc, DOUBLE_CLICK, button_vol_inc_callback);
+    button_attach(&button_vol_inc, LONG_PRESS_START, button_vol_inc_callback);
+    button_attach(&button_vol_inc, LONG_PRESS_HOLD, button_vol_inc_callback);
+    button_start(&button_vol_inc);
+
+    struct Button button_reset;
+    button_init(&button_reset, read_button_reset_gpio, 0);
+    button_attach(&button_reset, PRESS_DOWN, button_reset_callback);
+    button_attach(&button_reset, PRESS_UP, button_reset_callback);
+    button_attach(&button_reset, PRESS_REPEAT, button_reset_callback);
+    button_attach(&button_reset, SINGLE_CLICK, button_reset_callback);
+    button_attach(&button_reset, DOUBLE_CLICK, button_reset_callback);
+    button_attach(&button_reset, LONG_PRESS_START, button_reset_callback);
+    button_attach(&button_reset, LONG_PRESS_HOLD, button_reset_callback);
+    button_start(&button_reset);
+
+    prctl(PR_SET_NAME, "btn_event_check");
+    pthread_detach(pthread_self());
+
+    while (1)
+    {
+        button_ticks();
+        usleep(2000);
+    }
+
+    return NULL;
+}
+
 static void board_listen_button_event()
 {
     pthread_t t1, t2, t3, t4, t5;
-    pthread_create(&t1, NULL, check_inc_vol_event, NULL);
-    pthread_create(&t2, NULL, check_dec_vol_event, NULL);
+    // pthread_create(&t1, NULL, check_inc_vol_event, NULL);
+    // pthread_create(&t2, NULL, check_dec_vol_event, NULL);
+    // pthread_create(&t4, NULL, check_posture_event, NULL);
+    // pthread_create(&t5, NULL, check_reset_event, NULL);
     pthread_create(&t3, NULL, check_scan_qrcode_event, NULL);
-    pthread_create(&t4, NULL, check_posture_event, NULL);
-    pthread_create(&t5, NULL, check_reset_event, NULL);
+    pthread_create(&t1, NULL, check_btn_event, NULL);
 }
 
 static void init_wifi_led()
@@ -528,14 +945,17 @@ static void init_mute_led()
 static void init_btn_events()
 {
     btn_mute = gpiod_chip_get_line(gpio10, 6);
-    gpiod_line_request_both_edges_events(btn_mute, "HxtDeskService");
+    gpiod_line_request_input(btn_mute, "HxtDeskService");
+    //gpiod_line_request_both_edges_events(btn_mute, "HxtDeskService");
     btn_vol_dec = gpiod_chip_get_line(gpio8, 2);
-    gpiod_line_request_both_edges_events(btn_vol_dec, "HxtDeskService");
+    gpiod_line_request_input(btn_vol_dec, "HxtDeskService");
+    // gpiod_line_request_both_edges_events(btn_vol_dec, "HxtDeskService");
     btn_vol_inc = gpiod_chip_get_line(gpio8, 4);
-    gpiod_line_request_both_edges_events(btn_vol_inc, "HxtDeskService");
-
+    gpiod_line_request_input(btn_vol_inc, "HxtDeskService");
+    // gpiod_line_request_both_edges_events(btn_vol_inc, "HxtDeskService");
     btn_reset = gpiod_chip_get_line(gpio5, 7);
-    gpiod_line_request_both_edges_events(btn_reset, "HxtDeskService");
+    gpiod_line_request_input(btn_reset, "HxtDeskService");
+    // gpiod_line_request_both_edges_events(btn_reset, "HxtDeskService");
 }
 
 static void board_led_blinking()
@@ -543,6 +963,7 @@ static void board_led_blinking()
     pthread_t tid; 
     pthread_create(&tid, NULL, led_blinking_thread, NULL);
 }
+
 
 void board_set_led_status(LED_STATUS status)
 {
@@ -553,6 +974,8 @@ BOOL board_get_qrcode_scan_status()
 {
     return g_deploying_net;
 }
+
+
 
 int board_gpio_init()
 {

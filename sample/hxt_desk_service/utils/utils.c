@@ -216,9 +216,9 @@ BOOL utils_download_file(const char *url, const char* save_file_path)
 
     char CMD_DOWNLOAD_FILE[512] = {0};
 #ifdef DEBUG
-    sprintf(CMD_DOWNLOAD_FILE, "curl --insecure -o %s %s", save_file_path, url);
+    sprintf(CMD_DOWNLOAD_FILE, "curl --insecure -o %s \"%s\"", save_file_path, url);
 #else
-    sprintf(CMD_DOWNLOAD_FILE, "curl --insecure -s -o %s %s", filename, url);
+    sprintf(CMD_DOWNLOAD_FILE, "curl --insecure -s -o %s \"%s\"", filename, url);
 #endif    
     utils_print("%s\n", CMD_DOWNLOAD_FILE);
 
@@ -252,6 +252,7 @@ BOOL utils_upload_file(const char* url, const char* header, const char* local_fi
     char CMD_UPLOAD_FILE[1024] = {0};
 #ifdef DEBUG
     sprintf(CMD_UPLOAD_FILE, "curl --insecure --retry 3 -H \"%s\" -F \"file=@%s\" %s", header, local_file_path, url);
+    // sprintf(CMD_UPLOAD_FILE, "curl --insecure -S -X POST -H \"%s\" -T %s %s", header, local_file_path, url);
 #else
     sprintf(CMD_UPLOAD_FILE, "curl --insecure -s -X POST -H \"%s\" -T %s %s", header, local_file_path, url);
     //sprintf(CMD_UPLOAD_FILE, "curl --insecure -s -H \"%s\" -F \"file=@%s\" %s", header, local_file_path, url);

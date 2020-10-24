@@ -808,33 +808,29 @@ static void* sample_pcm_cb(void *data)
     AI_CHN      AiChn = 0;
     AI_CHN_PARAM_S stAiChnPara;
 
-
     prctl(PR_SET_NAME, "mpp_sample_voice");
     pthread_detach(pthread_self());
 
     /* open fifo */
-    int fd = open_pcm_fifo();
-    if (-1 == fd)
+    // int fd = open_pcm_fifo();
+    // if (-1 == fd)
+    // {
+    //     utils_print("open pcm fifo error\n");
+    //     return NULL;
+    // }
+    
+    /*create udp client to send voice data*/
+    int sockfd = -1;
+    struct sockaddr_in addr;
+    if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
     {
-        utils_print("open pcm fifo error\n");
+        utils_print("create pcm udp client failed\n");
         return NULL;
     }
-
-    /* 2020-08-29 added */
-    // s32Ret = HI_MPI_AI_GetChnParam(AiDev, AiChn, &stAiChnPara);
-    // if (HI_SUCCESS != s32Ret)
-    // {
-    //     utils_print("%s: Get ai chn param failed\n");
-    //     goto ERROR_EXIT;
-    // }
-    // stAiChnPara.u32UsrFrmDepth = 30;
-    // s32Ret = HI_MPI_AI_SetChnParam(AiDev, AiChn, &stAiChnPara);
-    // if (HI_SUCCESS != s32Ret)
-    // {
-    //     utils_print("%s: set ai chn param failed\n");
-    //     goto ERROR_EXIT;
-    // }
-    /*end added*/
+    bzero(&addr, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(PCM_DATA_PORT);
+    addr.sin_addr.s_addr = inet_addr("127.0.0.1");
 
     /* get frame after AEC */
     fd_set read_fds;
@@ -899,12 +895,14 @@ static void* sample_pcm_cb(void *data)
                 continue;
             }  
         }
-        int write_count = write(fd, out_buff, size);
+        // int write_count = write(fd, out_buff, size);
+        int write_count = sendto(sockfd, out_buff, size, 0, (struct sockaddr*)&addr, sizeof(addr));
         utils_free(out_buff);
+        usleep(50*1000);
     }
 
 ERROR_EXIT:    
-    close(fd);
+    close(sockfd);
    
     utils_print("voice sample thread exit...\n");
     return NULL;
@@ -939,7 +937,6 @@ static void* play_mp3_cb(void* data)
         ssize_t read_count = read(fd, stAudioStream.pStream, u32Len);
         if (read_count > 0)
         {
-            // utils_print("read %d bytes from my_mp3_fifo\n", (HI_U32)read_count);
             stAudioStream.u32Len = (HI_U32)read_count;
             s32Ret = HI_MPI_ADEC_SendStream(s32AdecChn, &stAudioStream, HI_TRUE);
             if (HI_SUCCESS != s32Ret)
@@ -976,7 +973,7 @@ static void* sample_video_cb(void* data)
         return NULL;
     }
     prctl(PR_SET_NAME, "sample_video_thread");
-    pthread_detach(pthread_self());
+    
     board_get_stream_from_venc_chn(ptmp->width, ptmp->height);
     return NULL;
 }
@@ -1101,6 +1098,7 @@ void board_get_stream_from_venc_chn(int width, int height)
     struct timeval timout_val; 
 
     prctl(PR_SET_NAME, "board_get_stream_from_venc_chn");
+    pthread_detach(pthread_self());
 
     g_enc_stream_status = TRUE;
     ret_val = HI_MPI_VENC_GetChnAttr(venc_chn, &venc_chn_attrs);

@@ -16,7 +16,6 @@
 
 extern BOOL g_stop_capture;
 CAE_HANDLE g_cae_handle = NULL;
-pthread_mutex_t g_cae_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static BOOL wake_up = FALSE;
 
@@ -75,21 +74,18 @@ BOOL iflyos_init_cae_lib(void* data)
     CAESetShowLog(flag);
 #endif
 
-	if(g_cae_handle != NULL)
-	{
-		utils_print("iflyos cae handle is still valid\n");
-		return FALSE;
-	}
+	// if(g_cae_handle != NULL)
+	// {
+	// 	utils_print("iflyos cae handle is still valid\n");
+	// 	return FALSE;
+	// }
 
-	pthread_mutex_lock(&g_cae_mutex);
     rv = CAENew(&g_cae_handle, CONF_PATH, ivw_fn, ivw_audio_fn, recog_audio_fn, PARAM_PATH, data);
     if (rv != 0)
     {
-		pthread_mutex_unlock(&g_cae_mutex);
 		utils_print("CAENEW error\n");
         return FALSE;
     }
-	pthread_mutex_unlock(&g_cae_mutex);
 
     char *sn = get_iflyos_sn();
 	if (NULL == sn)
@@ -112,32 +108,32 @@ BOOL iflyos_init_cae_lib(void* data)
 
 void iflyos_deinit_cae_lib()
 {
-	pthread_mutex_lock(&g_cae_mutex);
     if (g_cae_handle != NULL)
     {
         CAEDestroy(g_cae_handle);
 		g_cae_handle = NULL;
 		utils_print("destroy cae lib OK\n");
     }
-	pthread_mutex_unlock(&g_cae_mutex);
 }
 
 int iflyos_write_audio(void* buffer, int buf_length)
 {
-    int rv;
+    int rv = -1;
 	if (NULL == buffer)
 	{
 		return -1;
 	}
 
-	pthread_mutex_lock(&g_cae_mutex);
-    rv = CAEAudioWrite(g_cae_handle, buffer, buf_length);
+	if (g_cae_handle)
+	{
+		rv = CAEAudioWrite(g_cae_handle, buffer, buf_length);
+	}
+    
     if(rv != 0)
     {
         utils_print("cae write error: %d\n", rv);
     }
 
-	pthread_mutex_unlock(&g_cae_mutex);
     return rv;
 }
 

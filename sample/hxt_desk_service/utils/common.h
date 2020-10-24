@@ -48,15 +48,14 @@ typedef enum
     ONLINE = 1
 }WORK_MODE;
 
-#define HXT_DESK_SERVICE_VERSION        "1.0.6"
+#define HXT_DESK_SERVICE_VERSION        "1.0.8"
 #define HXT_DESK_SERVICE_VERSION_NUMBER  100000
 
 
 #define MP3_FIFO                "/tmp/mp3_fifo"
 #define PCM_FIFO                "/tmp/pcm_fifo"
-#define VIDEO_FIFO              "/tmp/video_fifo"
-#define PCM_RECV_PORT           10099
-// #define STUDY_INFO_MQ_KEY       (232323L)
+
+#define PCM_RECV_PORT           10098
 
 /* db */
 #define DB_PATH     ("/userdata/data/desk.db")
@@ -145,7 +144,8 @@ typedef enum
     WIFI_ERR = 5,
     CAMERA_ERR = 6,
     RESETING = 7,
-    SLEEPING = 8
+    SLEEPING = 8,
+    CHECKING_EXIT = 9
 }LED_STATUS;
 
 typedef enum

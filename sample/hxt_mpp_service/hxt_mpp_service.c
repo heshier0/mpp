@@ -16,7 +16,7 @@
 #include "board_mpp.h"
 #include "command.h"
 
-#define HXT_MPP_SERVICE_VERSION ("1.0.0")
+#define HXT_MPP_SERVICE_VERSION ("1.0.1")
 #define MPP_SERVICE_PORT        (10086)
 #define BUFFER_SIZE             (5*1024*1024)
 
@@ -25,6 +25,7 @@ DATABUFFER g_client_data;
 
 static BOOL posturing = FALSE;
 static BOOL sampling = FALSE;
+static BOOL client_running = FALSE;
 
 static int create_local_tcp_server()
 {
@@ -67,13 +68,17 @@ static void* receive_client_data_thread(void *args)
         return NULL;
     }
 
+    char buf[512] = {0};
     int new_sock = (int)args;
-    char buf[256] = {0};
-
+    if (-1 == new_sock)
+    {
+        return NULL;
+    }
+    
     prctl(PR_SET_NAME, "read_client_data");
     pthread_detach(pthread_self());
 
-    while(1)
+    while(client_running)
     {   
         memset(buf, 0, 256);
         int read_count = read(new_sock, buf, sizeof(buf)-1);
@@ -91,12 +96,28 @@ static void* receive_client_data_thread(void *args)
         }
         else
         {
-            close(new_sock);
+            if (posturing)
+            {
+                stop_sample_video_thread();
+                posturing = FALSE;
+                //???
+                stop_video_recording();
+                delete_video();
+            }
+
+            if (sampling)
+            {
+                sampling = FALSE;
+                stop_sample_voice_thread();
+            }
+            client_running = FALSE;
+            
             break;
         }
     }
+    close(new_sock);
 
-    utils_print("read client thread exit....\n");
+    utils_print("read_client_data thread exit....\n");
 
     return NULL;
 }
@@ -110,7 +131,8 @@ static void* process_desk_business_thread(void *args)
     BOOL saving_video = FALSE;
     prctl(PR_SET_NAME, "process_cmd");
     pthread_detach(pthread_self());
-    while(1)
+
+    while(client_running)
     {
         bzero(&header, len);
         char* ptr = get_buffer(&g_client_data, len);
@@ -191,7 +213,6 @@ static void* process_desk_business_thread(void *args)
                 memcpy(&study_video, ptr, sizeof(study_video_t));
                 release_buffer(&g_client_data, sizeof(study_video_t));
                 utils_print("video is %s, snap is %s\n", study_video.video_name, study_video.snap_name);
-
                 start_video_recording(study_video.video_name);
             }
         break;
@@ -218,13 +239,12 @@ static void* process_desk_business_thread(void *args)
             unlink(study_video.snap_name);
             utils_print("delete snap %s\n", study_video.snap_name);
         }
-
         break;    
         default:
         break;
         }
     }
-
+    utils_print("process_cmd thread exit....\n");
     return NULL;
 }
 
@@ -242,6 +262,8 @@ static void start_process_desk_business()
 
 static void handle_signal(int signo)
 {
+    utils_print("MPP SIGPIPE break!!!!\n");
+    client_running = FALSE;
     if (posturing)
     {
         stop_sample_video_thread();
@@ -255,12 +277,6 @@ static void handle_signal(int signo)
     {
         sampling = FALSE;
         stop_sample_voice_thread();
-    }
-
-    if (g_last_sock != -1)
-    {
-        close(g_last_sock);
-        g_last_sock = -1;
     }
 }
 
@@ -327,7 +343,7 @@ int main(int argc, char **argv)
             close(g_last_sock);
         }
         g_last_sock = client_fd;
-
+        client_running = TRUE;
         start_receive_client_data(client_fd);
         start_process_desk_business();
     }

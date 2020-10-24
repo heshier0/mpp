@@ -61,6 +61,7 @@ typedef struct check_status_t
 
 extern DATABUFFER g_msg_buffer;
 extern BOOL g_hxt_wbsc_running;
+extern BOOL g_device_sleeping;
 int g_camera_status = CAMERA_OFF;    //close
 BOOL g_posture_running = FALSE;
 
@@ -167,6 +168,8 @@ static BOOL begin_recording()
     int child_unid = get_select_child_id();//hxt_get_child_unid();
     if (child_unid == -1)
     {
+        bzero(g_mp4_file, 128);
+        bzero(g_snap_file, 128);
         return FALSE;
     }
 
@@ -473,11 +476,6 @@ static BOOL check_posture_alarm(struct check_status_t *check_status, int check_r
 static void* thread_proc_yuv_data_cb(void *param)
 {
     int one_check_result = 0;
-    BOOL inited_status = FALSE;
-    BOOL change_to_correct = FALSE;
-    BOOL first_away_alarm = TRUE;
-    BOOL first_bad_alarm = TRUE;
-    BOOL recording = FALSE;
 
     if(NULL == param)
     {
@@ -520,7 +518,7 @@ static void* thread_proc_yuv_data_cb(void *param)
     info.info_type = STUDY_BEGIN;
     send_study_report_type(&info);
        
-    board_set_led_status(CHECKING);
+    // board_set_led_status(CHECKING);
     utils_send_local_voice(VOICE_NORMAL_STATUS);
 
     utils_print("To process yuv data from vpss ....\n");
@@ -579,8 +577,11 @@ static void* thread_proc_yuv_data_cb(void *param)
 
    /* play voice and change led status */
     utils_send_local_voice(VOICE_CAMERA_SLEEP);
-    board_set_led_status(NORMAL);
-
+    // if (!g_device_sleeping)
+    // {
+    //     board_set_led_status(NORMAL);
+    // }
+    
     /* send msg to notify ending */
     memset(&info, 0, sizeof(StudyInfo));
     info.info_type = STUDY_END;

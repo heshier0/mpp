@@ -63,7 +63,7 @@ BOOL update_select_child(int child_id)
     set_all_unselected();
 
     /* first set unselect every child*/
-    sql = sqlite3_mprintf("update %s set isSelect=0 where childID=%d", USER_PARAMS_TABLE, child_id);
+    sql = sqlite3_mprintf("update %s set isSelect=1 where childID=%d", USER_PARAMS_TABLE, child_id);
     utils_print("%s\n", sql);
     result = sqlite3_exec(g_hxt_service_db, sql, NULL, NULL, &err_msg);
     if (result != SQLITE_OK)

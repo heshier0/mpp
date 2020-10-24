@@ -24,17 +24,23 @@
 #define HXT_UPLOAD_SAMPLE_SNAP              "/Upload/UploadPicsAsync?childunid=%d"
 
 /* http response result */
-#define HXT_OK                              1
-#define HXT_UPLOAD_FAIL                     2
-#define HXT_NO_REGISTER                     0
+#define HXT_NO_REGISTER                     0       
+#define HXT_OK                              1       
+#define HXT_UPLOAD_FAIL                     2       
 #define HXT_BIND_FAILED                     21         
 #define HXT_AUTH_FAILED                     401
 
-#define HXT_RES_STATUS_OK                   "S0001"
-#define HXT_UPLOAD_FILE_FAIL                "S0002"
-#define HXT_RES_BIND_FAIL                   "S0301"
-#define HXT_RES_AUTH_FAIL                   "S0401"
-#define HXT_RES_NO_REG                      "S0000"
+#define HXT_RES_STATUS_OK                   "S0001"     //成功
+#define HXT_UPLOAD_FILE_FAIL                "S0002"     //绑定保存失败
+#define HXT_ALREADY_BIND                    "S0003"     //已被绑定
+#define HXT_DEVICE_NOT_EXIST                "S0004"     //设备不存在
+#define HXT_REQ_TOO_MANY                    "S0006"     //请求频繁
+#define HXT_RES_BIND_FAIL                   "S0301"     //参数有误
+#define HXT_RES_AUTH_FAIL                   "S0401"     //无权限
+#define HXT_INVALID_OP                      "S0402"     //非法操作
+#define HXT_NO_IFLYOS_ID                    "S0404"     //设备ID已分配完
+#define HXT_INTERNAL_ERR                    "S0500"     //服务器内部错误
+#define HXT_RES_NO_REG                      "S0000"     //设备未注册
 
 /* hxt websocket result defines */
 #define HXT_CONNECT_OK          0

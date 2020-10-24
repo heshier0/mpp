@@ -44,7 +44,7 @@ static char* hxt_get_api_url(const char* api)
     // strcat(request_url, HXT_API_VER);
     strcat(request_url, api);
 
-    char* ret_value = (char*)utils_calloc(strlen(request_url) + 1);
+    char* ret_value = (char*)utils_malloc(strlen(request_url) + 1);
     if(NULL == ret_value)
     {
         return NULL;
@@ -94,7 +94,7 @@ static char* hxt_get_upload_url(const char* api)
 
 static int hxt_get_reponse_status_code(void* data)
 {
-    int status_code = 0;
+    int status_code = -1;
     if(NULL == data || strlen(data) == 0)
     {
         return NULL;
@@ -103,6 +103,10 @@ static int hxt_get_reponse_status_code(void* data)
 
     cJSON* root = cJSON_Parse(data);
     cJSON *item = cJSON_GetObjectItem(root, "statusCode");
+    if (item != NULL)
+    {
+        goto ITEM_NOT_EXIST;
+    }
     if (strcmp(item->valuestring, HXT_RES_STATUS_OK) == 0)
     {
         status_code = HXT_OK;
@@ -123,7 +127,9 @@ static int hxt_get_reponse_status_code(void* data)
     {
         status_code = HXT_UPLOAD_FAIL;
     }
+    else if (strcmp(item->valuestring, HXT))
 
+ITEM_NOT_EXIST:
     if(root != NULL)
     {
         cJSON_Delete(root);
@@ -467,7 +473,10 @@ CLEANUP1:
     utils_free(out);
 CLEANUP2:   
     utils_free(check_code);
-    utils_free(desk_uunid_tmp);
+    if (desk_uunid_tmp != NULL)
+    {
+        utils_free(desk_uunid_tmp);
+    }
     utils_free(json_data);
 CLEANUP3:
     cJSON_Delete(root);
@@ -627,7 +636,11 @@ BOOL hxt_refresh_token_request()
         token_required = hxt_get_token_request();
     }
 
-    utils_free(server_token);
+    if (server_token != NULL)
+    {
+        utils_free(server_token);
+    }
+    
     return token_required;
 }
 
@@ -659,7 +672,7 @@ BOOL hxt_get_desk_cfg_request()
         utils_free(api_url);
         return FALSE;
     } 
-    // utils_print("response is [%s]\n", out);
+    //utils_print("response is [%s]\n", out);
 
     int status_code = hxt_get_reponse_status_code((void *)out);
     if (status_code == HXT_OK)
@@ -667,7 +680,14 @@ BOOL hxt_get_desk_cfg_request()
         /* init hxt config */
         hxt_init_cfg((void*)out);
         reported = TRUE;
-    }
+    } 
+    else if(status_code == HXT_NO_REGISTER)
+    {
+        utils_print("No register device...\n");
+        utils_system_reset();
+        sleep(3);
+        utils_system_reboot();
+    } 
     else
     {
         hxt_refresh_token_request();

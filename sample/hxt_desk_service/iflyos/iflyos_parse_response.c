@@ -18,19 +18,6 @@
 #define IFLYOS_MP3_URL              ("url")
 
 
-static void iflyos_free(void* ptr)
-{
-    if(ptr == NULL)
-    {
-        return;
-    }
-    
-    utils_free(ptr);
-    ptr = NULL;
-
-    return;
-}
-
 static char* iflyos_get_response_value(const char* json_data, const char* item_name, const char* sub_name, const char* last_node)
 {
     char* name = NULL;
@@ -120,7 +107,7 @@ void iflyos_play_response_audio(void *data)
     
     utils_send_mp3_voice(url);
     
-    iflyos_free(url);
+    utils_free(url);
 
     return;
 }

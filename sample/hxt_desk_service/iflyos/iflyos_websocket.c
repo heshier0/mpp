@@ -13,6 +13,9 @@
 
 #include <uwsc/uwsc.h>
 
+#include <hi_common.h>
+#include <sample_comm.h>
+
 #include "common.h"
 #include "utils.h"
 #include "databuffer.h"
@@ -21,93 +24,86 @@
 #include "iflyos_func.h"
 
 #define BUFFER_SIZE     (4*1024*1024)
-#define PCM_LENGTH      640
+#define PCM_LENGTH      640*4
 
 extern BOOL g_hxt_wbsc_running;
 extern BOOL g_iflyos_wbsc_running;
-// extern BOOL g_iflyos_first_login;
+extern BOOL g_iflyos_first_login;
 
-DATABUFFER g_voice_buffer; 
 static BOOL g_sampling = FALSE;
 volatile BOOL g_stop_capture = FALSE; 
 
-static pthread_t read_pcm_tid;
-static pthread_t send_pcm_tid;
-struct uwsc_client *iflyos_wsc;
+static struct uwsc_client *iflyos_wsc = NULL;
+static struct ev_loop *g_iflyos_loop = NULL; 
 
 static void* thread_read_pcm_cb(void *data)
 {
     char pcm_buf[PCM_LENGTH] = {0};
-    memset(pcm_buf, 0, PCM_LENGTH);
-        
+           
     prctl(PR_SET_NAME, "read_pcm_cb");
-    pthread_detach(pthread_self());
-
-    int fd = open(PCM_FIFO, O_RDONLY);
-    if (-1 == fd)
-    {
-        utils_print("open PCM_FIFO error\n");
-        return NULL;
-    }   
-
-    while(g_sampling)
-    {
-        int read_count = read(fd, pcm_buf, PCM_LENGTH);
-        if( read_count <= 0)
-        {
-            continue;
-        }
-        char *ptr = get_free_buffer(&g_voice_buffer, read_count);
-        if(NULL == ptr)
-        {
-            memset(pcm_buf, 0, PCM_LENGTH);
-            continue;
-        }
-        memcpy(ptr, pcm_buf, read_count);
-        memset(pcm_buf, 0, PCM_LENGTH);
-        use_free_buffer(&g_voice_buffer, read_count);
-    }
-
-    close(fd);
-    utils_print("read pcm thread exit...\n");
-
-    return NULL;
-}
-
-static void* thread_send_pcm_cb(void *data)
-{
-    if (NULL == data)
-    {
-        return NULL;
-    }    
-
-    prctl(PR_SET_NAME, "send_pcm_cb");
     pthread_detach(pthread_self());
 
     BOOL requested = FALSE;
     struct uwsc_client *cl = (struct uwsc_client *)data;
 
+    /*create udp server to recv data*/
+    int sockfd = -1;
+    struct sockaddr_in local_addr, remote_addr;
+    bzero(&local_addr, sizeof(local_addr));
+    bzero(&remote_addr, sizeof(remote_addr));
+    int addr_len = sizeof(struct sockaddr_in);
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockfd < 0)
+    {
+        utils_print("craete pcm recv server failed\n");
+        return NULL;
+    }
+
+    int reuse = 1;
+    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0)     
+    {    
+        utils_print("reuse addr PCM_RECV_PORT failed\n");
+        return NULL;  
+    }
+
+    bzero(&local_addr, sizeof(local_addr));
+    local_addr.sin_family = AF_INET;
+    local_addr.sin_port = htons(PCM_RECV_PORT);
+    local_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    if ((bind(sockfd, (struct sockaddr *)&local_addr, sizeof(local_addr))) < 0)
+    {
+        utils_print("bind error\n");
+        return NULL;
+    }
+
     while(g_sampling)
     {
         if (g_stop_capture)
         {
-            utils_print("To send END flag !!!!!\n");
-            cl->send(cl, "__END__", strlen("__END__"), UWSC_OP_BINARY);
+            utils_print("To send END flag...\n");
+            if (cl != NULL)
+            {
+                cl->send(cl, "__END__", strlen("__END__"), UWSC_OP_BINARY);
+            }
+            utils_print("OK!!!\n");
             g_stop_capture = FALSE;
             requested = FALSE;
         }
 
-        char* ptr = get_buffer(&g_voice_buffer, PCM_LENGTH);
-        if(NULL == ptr)
+        memset(pcm_buf, 0, PCM_LENGTH);
+        int read_count = recvfrom(sockfd, pcm_buf, PCM_LENGTH, 0, (struct sockaddr*)&remote_addr, &addr_len);
+        if (read_count <= 0)
         {
+            usleep(500 * 1000);
             continue;
         }
-        // send data
-        iflyos_write_audio(ptr, PCM_LENGTH);
-        release_buffer(&g_voice_buffer, PCM_LENGTH);
+
+        iflyos_write_audio(pcm_buf, PCM_LENGTH);
     }
-    utils_print("send pcm thread exit...\n");
-    
+
+    close(sockfd);
+    utils_print("read pcm thread exit...\n");
+
     return NULL;
 }
 
@@ -115,28 +111,30 @@ static void iflyos_uwsc_onopen(struct uwsc_client *cl)
 {
     utils_print("iflyos onopen\n");
 
-    g_iflyos_wbsc_running = TRUE;
+    // g_iflyos_wbsc_running = TRUE;
 
     /* sample voice to iflyos */
     g_sampling = TRUE;
 
-    pthread_create(&read_pcm_tid, NULL, thread_read_pcm_cb, NULL);
-    pthread_create(&send_pcm_tid, NULL, thread_send_pcm_cb, (void*)cl);
-
     /* send cmd to tell service */
     send_voice_sample_start_cmd();
 
+    pthread_t read_pcm_tid;
+    pthread_create(&read_pcm_tid, NULL, thread_read_pcm_cb, (void*)cl);
+
     /* */
-    // if (g_iflyos_first_login)
-    // {
+    if (g_iflyos_first_login)
+    {
         utils_send_local_voice(VOICE_IFLYOS_READY);
-    //     g_iflyos_first_login = FALSE;
-    // }
+        g_iflyos_first_login = FALSE;
+    }
 }
 
 static void iflyos_uwsc_onmessage(struct uwsc_client *cl,
 	void *data, size_t len, bool binary)
 {
+    utils_print("iflyos recv:\n");
+    utils_print("%s: %.*s\n", utils_get_current_time(), (int)len, (char *)data);
     if (binary) {
         //文件
     } 
@@ -165,18 +163,13 @@ static void iflyos_uwsc_onmessage(struct uwsc_client *cl,
         
         utils_free(name);
     }
-
-    utils_print("%s: %.*s\n", utils_get_current_time(), (int)len, (char *)data);
 }
 
 static void iflyos_uwsc_onerror(struct uwsc_client *cl, int err, const char *msg)
 {
     utils_print("iflyos onerror:%d: %s\n", err, msg);
-    if (g_sampling)
-    {
-        g_sampling = FALSE;
-        send_voice_sample_stop_cmd();
-    }
+    send_voice_sample_stop_cmd();
+    g_sampling = FALSE;
 
     ev_break(cl->loop, EVBREAK_ALL);
 }
@@ -184,32 +177,51 @@ static void iflyos_uwsc_onerror(struct uwsc_client *cl, int err, const char *msg
 static void iflyos_uwsc_onclose(struct uwsc_client *cl, int code, const char *reason)
 {
     utils_print("iflyos onclose:%d: %s\n", code, reason);
-    if (g_sampling)
-    {
-        g_sampling = FALSE;
-        send_voice_sample_stop_cmd();
-    }
+    send_voice_sample_stop_cmd();
+    g_sampling = FALSE;
 
     ev_break(cl->loop, EVBREAK_ALL);
 }
 
 void iflyos_websocket_stop()
 {
-    utils_print("To stop iflyos websocket\n");
-    char buf[128] = "";
-    iflyos_wsc->send(iflyos_wsc, buf, strlen(buf + 2) + 2, UWSC_OP_CLOSE);
+    if (!g_iflyos_wbsc_running)
+    {
+        return;
+        
+    }
+    send_voice_sample_stop_cmd();
+    g_sampling = FALSE; 
+    
+    // char buf[128] = "";
+    // iflyos_wsc->send(iflyos_wsc, buf, strlen(buf + 2) + 2, UWSC_OP_CLOSE);   
+    if (g_iflyos_loop)
+    {
+        utils_print("iflyos weboscket break\n");
+        ev_break(g_iflyos_loop, EVBREAK_ALL);
+    }
+
+    return; 
+}
+
+static void handle_signal(int signo)
+{
+    if (SIGPIPE == signo)
+    {
+        utils_print("PCM_FIFO break\n");
+    }
 }
 
 int iflyos_websocket_start()
 {
 	int ping_interval = -1;	/* second */
     // struct uwsc_client *wsc;
-    struct ev_loop *loop;
+    // struct ev_loop *loop;
+
+    signal(SIGPIPE, handle_signal);
 
     prctl(PR_SET_NAME, "iflyos_websocket");
     pthread_detach(pthread_self());
-
-    create_buffer(&g_voice_buffer, BUFFER_SIZE);
 
     char ifly_url[255] = {0};
 
@@ -220,12 +232,11 @@ int iflyos_websocket_start()
     utils_free(token);
     utils_free(device_id);
 
-    loop = ev_loop_new(EVFLAG_AUTO);
-    iflyos_wsc = uwsc_new(loop, ifly_url, ping_interval, NULL);
+    g_iflyos_loop = ev_loop_new(EVFLAG_AUTO);
+    iflyos_wsc = uwsc_new(g_iflyos_loop, ifly_url, ping_interval, NULL);
     if (!iflyos_wsc)
     {
         utils_print("iflyos websocket client init failed...\n");
-        destroy_buffer(&g_voice_buffer);
         return -1;
     }
     
@@ -242,20 +253,16 @@ int iflyos_websocket_start()
     iflyos_wsc->onerror = iflyos_uwsc_onerror;
     iflyos_wsc->onclose = iflyos_uwsc_onclose;
    
-    ev_run(loop, 0);
-    
-    // pthread_join(&read_pcm_tid, NULL);
-    // pthread_join(&send_pcm_tid, NULL);
+    ev_run(g_iflyos_loop, 0);
+
  IFLYOS_EXIT:   
     iflyos_deinit_cae_lib();
     utils_free(iflyos_wsc);
-    destroy_buffer(&g_voice_buffer);
     g_iflyos_wbsc_running = FALSE;
     utils_print("iflyos process exit....\n");
 
     return 0;
 }
-
 
 static void* iflyos_websocket_cb(void* data)
 {
@@ -265,18 +272,20 @@ static void* iflyos_websocket_cb(void* data)
 
 void start_iflyos_websocket_thread()
 {
-    if (!g_hxt_wbsc_running)
+    pthread_t iflyos_tid;
+    
+    if (g_iflyos_wbsc_running)
     {
         return;
     }
 
-    pthread_t iflyos_tid;
+    g_iflyos_wbsc_running = TRUE;
+
     char *token = get_iflyos_token();
     char *sn = get_iflyos_sn();
     if (token != NULL && sn != NULL)
     {
         pthread_create(&iflyos_tid, NULL, iflyos_websocket_cb, NULL);
-
         utils_free(token);
         utils_free(sn);
     }

@@ -28,10 +28,13 @@ extern DATABUFFER g_msg_buffer;
 extern int g_camera_status;
 extern BOOL g_video_upload_exceed;
 extern BOOL g_snap_upload_exceed;
+extern BOOL g_deploying_net;
+extern BOOL g_device_sleeping;
 
-struct uwsc_client *hxt_wsc;
+
+static struct uwsc_client *hxt_wsc = NULL;
+static struct ev_loop *g_hxt_loop = NULL;
 static BOOL g_recv_running = TRUE;
-pthread_t study_info_tid;
 
 static BOOL init_study_info(ReportInfo *report_info, StudyInfo *study_info)
 {
@@ -72,10 +75,11 @@ static BOOL init_study_info(ReportInfo *report_info, StudyInfo *study_info)
                 g_video_upload_exceed = TRUE;
             }
         }
-        remove(study_info->file);
+        //remove(study_info->file);
 
         if (utils_get_file_size(study_info->file) < 1024)
         {
+            utils_print("file size is error\n");
             g_snap_upload_exceed = TRUE;
         }
         else
@@ -91,13 +95,13 @@ static BOOL init_study_info(ReportInfo *report_info, StudyInfo *study_info)
                 g_snap_upload_exceed = TRUE;
             }
         }
-        remove(study_info->snap);
+        //remove(study_info->snap);
     }
 
     return TRUE;
 }
 
-static void hxt_send_desk_status(struct uwsc_client *cl, REPORT_TYPE type, int info_type)
+static int hxt_send_desk_status(struct uwsc_client *cl, REPORT_TYPE type, int info_type)
 {
     if(NULL == cl)
     {
@@ -125,12 +129,13 @@ static void hxt_send_desk_status(struct uwsc_client *cl, REPORT_TYPE type, int i
         goto END;
     }
     utils_print("HXT_DESK_STATUS: %s\n", json_data);
-    cl->send(cl, json_data, strlen(json_data), info_type);
+    int send_count = cl->send(cl, json_data, strlen(json_data), info_type);
 
     utils_free(json_data);
 END:
     cJSON_Delete(root);
-    return;
+
+    return send_count;
 }
 
 static void* send_study_info_cb(void *params)
@@ -253,26 +258,29 @@ static void parse_server_config_data(void *data)
     break;
     case HXT_UPDATE_REMIND:
         utils_print("To process update...\n");
-        item = cJSON_GetObjectItem(root, "data");
-        if (item != NULL)
+        if (!g_device_sleeping && !g_deploying_net)
         {
-            old_ver = get_update_version_id();
-            utils_print("old version is %d\n", old_ver);
-            sub_item = cJSON_GetObjectItem(item, "newVersionId");   
-            if(sub_item != NULL)
+            item = cJSON_GetObjectItem(root, "data");
+            if (item != NULL)
             {
-                version_id = sub_item->valueint;
-            }        
-            utils_print("new version is %d\n", version_id);
-            if (old_ver < version_id)
-            {
-                sub_item1 = cJSON_GetObjectItem(item, "newVersionNo");           //新版本号
-                version_no = sub_item1->valuestring;
-                sub_item2 = cJSON_GetObjectItem(item, "upgradepackUrl");         //新版本文件地址
-                pack_url = sub_item2->valuestring;
-                set_update_params(version_id, version_no, pack_url);
-                //to upgrade
-                hxt_get_new_version_request(pack_url);
+                old_ver = get_update_version_id();
+                utils_print("old version is %d\n", old_ver);
+                sub_item = cJSON_GetObjectItem(item, "newVersionId");   
+                if(sub_item != NULL)
+                {
+                    version_id = sub_item->valueint;
+                }        
+                utils_print("new version is %d\n", version_id);
+                if (old_ver < version_id)
+                {
+                    sub_item1 = cJSON_GetObjectItem(item, "newVersionNo");           //新版本号
+                    version_no = sub_item1->valuestring;
+                    sub_item2 = cJSON_GetObjectItem(item, "upgradepackUrl");         //新版本文件地址
+                    pack_url = sub_item2->valuestring;
+                    set_update_params(version_id, version_no, pack_url);
+                    //to upgrade
+                    hxt_get_new_version_request(pack_url);
+                }
             }
         }
     break;    
@@ -320,7 +328,13 @@ static void parse_server_config_data(void *data)
         item = cJSON_GetObjectItem(root, "data");
         sub_item = cJSON_GetObjectItem(item, "childrenUnid");               //设置/变更上报数据的孩子ID
         // stop_posture_recognize();
-        update_select_child(sub_item->valueint);
+        if (sub_item != NULL)
+        {
+            if (sub_item->valueint > 0)
+            {
+                update_select_child(sub_item->valueint);
+            }
+        }
         sleep(1);
         // start_posture_recognize();
     break;
@@ -408,10 +422,17 @@ static void hxt_wsc_onopen(struct uwsc_client *cl)
     utils_print("hxt onopen\n");
 
     g_hxt_wbsc_running = TRUE;
-    utils_send_local_voice(VOICE_SERVER_CONNECT_OK);//联网成功
     board_set_led_status(NORMAL);
-
+    if (g_hxt_first_login)
+    {
+        utils_send_local_voice(VOICE_SERVER_CONNECT_OK);//联网成功
+        g_hxt_first_login = FALSE;
+    }
+    
     hxt_send_desk_status(cl, POWER_ON, UWSC_OP_TEXT);
+
+    g_recv_running = TRUE;
+    pthread_t study_info_tid;
     pthread_create(&study_info_tid, NULL, send_study_info_cb, (void *)cl);
 }
 
@@ -448,16 +469,18 @@ static void hxt_wsc_ping(struct uwsc_client *cl)
 
 void hxt_websocket_stop()
 {
-    utils_print("To stop HXT websocket\n");
-    char buf[128] = "";
-    hxt_wsc->send(hxt_wsc, buf, strlen(buf + 2) + 2, UWSC_OP_CLOSE);
+    g_recv_running = FALSE;
+    if (g_hxt_loop)
+    {
+        utils_print("To stop HXT websocket\n");
+        ev_break(g_hxt_loop, EVBREAK_ALL);
+    }
 }
 
 int hxt_websocket_start()
 {
 	int ping_interval = 120;	        /* second */
-    // struct uwsc_client *cl;
-    struct ev_loop *loop;
+    // struct ev_loop *loop;
 
     prctl(PR_SET_NAME, "hxt_websocket");
     pthread_detach(pthread_self());
@@ -470,9 +493,9 @@ int hxt_websocket_start()
     strcat(extra_header, token);
     strcat(extra_header, "\r\n");
 
-    loop = ev_loop_new(EVFLAG_AUTO);
+    g_hxt_loop = ev_loop_new(EVFLAG_AUTO);
 
-    hxt_wsc = uwsc_new(loop, hxt_url, ping_interval, extra_header);
+    hxt_wsc = uwsc_new(g_hxt_loop, hxt_url, ping_interval, extra_header);
     if (!hxt_wsc)
     {
         utils_print("hxt init failed\n");
@@ -489,7 +512,7 @@ int hxt_websocket_start()
     hxt_wsc->onclose = hxt_wsc_onclose;
     hxt_wsc->ping = hxt_wsc_ping;
 
-    ev_run(loop, 0);
+    ev_run(g_hxt_loop, 0);
 
     free(hxt_wsc);
     
