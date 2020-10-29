@@ -35,12 +35,16 @@
 	free(ptr); \
 	})
 
+// typedef enum
+// {
+//     TRUE  = 1, 
+//     FALSE  = 0
+// }BOOL;
 
-typedef enum
-{
-    TRUE  = 1, 
-    FALSE  = 0
-}BOOL;
+#define BOOL int
+#define TRUE 1
+#define FALSE 0
+
 
 typedef enum 
 {
@@ -186,13 +190,24 @@ typedef struct report_info_s
     int camera_status;
 }ReportInfo;
 
+typedef struct alioss_options_t
+{
+    char* endpoint;
+    char* access_key_id;
+    char* access_key_secret;
+    char* sts_token;
+    char* bucket_name;
+    char* path;
+    int expired_time;
+}AliossOptions;
+
+
 #pragma pack(pop)
 
 
 int g_play_status;
 int g_voice_status;
 int g_video_status;
-
 int g_child_binding;
 
 

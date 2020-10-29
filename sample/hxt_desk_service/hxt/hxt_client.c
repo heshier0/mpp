@@ -103,10 +103,11 @@ static int hxt_get_reponse_status_code(void* data)
 
     cJSON* root = cJSON_Parse(data);
     cJSON *item = cJSON_GetObjectItem(root, "statusCode");
-    if (item != NULL)
+    if (item == NULL)
     {
-        goto ITEM_NOT_EXIST;
+        goto ITEM_NOT_EXSIT;
     }
+
     if (strcmp(item->valuestring, HXT_RES_STATUS_OK) == 0)
     {
         status_code = HXT_OK;
@@ -127,9 +128,8 @@ static int hxt_get_reponse_status_code(void* data)
     {
         status_code = HXT_UPLOAD_FAIL;
     }
-    else if (strcmp(item->valuestring, HXT))
 
-ITEM_NOT_EXIST:
+ITEM_NOT_EXSIT:
     if(root != NULL)
     {
         cJSON_Delete(root);
@@ -1090,6 +1090,69 @@ BOOL hxt_unbind_child(int child_unid)
 
     return delete_child(child_unid);
 
+}
+
+BOOL hxt_get_aliyun_config(void **opts)
+{
+    int retry_count = 0;
+    BOOL reported = FALSE;
+    char* api_url = hxt_get_api_url(HXT_GET_ALIYUN_CFG);
+    if(NULL == api_url)
+    {
+        return FALSE;
+    }
+
+    char* header = hxt_get_header_with_token();
+    if(NULL == header)
+    {
+        utils_free(api_url);
+        return FALSE;
+    }
+
+    //save response data
+    char *out = (char*)utils_malloc(1024*2);
+ RETRY_GET:   
+    if(!utils_send_get_request(api_url, header, out, 1024*2))
+    {
+        utils_print("post data send failed\n");
+        utils_free(out);
+        utils_free(header);
+        utils_free(api_url);
+        return FALSE;
+    } 
+    //utils_print("response is [%s]\n", out);
+
+    int status_code = hxt_get_reponse_status_code((void *)out);
+    if (status_code == HXT_OK)
+    {
+        utils_print("Aliyun: %s\n", out);
+        init_upload_options((AliossOptions**)opts, (void*)out);
+       
+    } 
+    else if(status_code == HXT_NO_REGISTER)
+    {
+        utils_print("No register device...\n");
+        utils_system_reset();
+        sleep(3);
+        utils_system_reboot();
+    } 
+    else
+    {
+        hxt_refresh_token_request();
+        if (retry_count < 3)
+        {
+            retry_count ++;
+            bzero((void*)out, 1024*2);
+            goto RETRY_GET;
+        }
+    }
+    
+
+    utils_free(out);
+    utils_free(header);
+    utils_free(api_url);
+    
+    return reported;
 }
 
 char* hxt_get_posture_detect_model_path(int study_mode)

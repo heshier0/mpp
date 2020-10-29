@@ -28,8 +28,6 @@ volatile BOOL g_iflyos_first_login = TRUE;
 volatile BOOL g_linking_wifi = TRUE;
 volatile BOOL g_hxt_first_login = TRUE;
 volatile BOOL g_device_sleeping = FALSE;
-volatile BOOL g_snap_upload_exceed = FALSE;
-volatile BOOL g_video_upload_exceed = FALSE;
 volatile int g_connect_count = 0;
 
 DATABUFFER g_msg_buffer;
@@ -44,10 +42,10 @@ static void* hxt_websocket_cb(void* data)
 static void start_hxt_websocket_thread()
 {
     pthread_t hxt_tid;
-    if (hxt_get_desk_cfg_request())
-    {
+    // if (hxt_get_desk_cfg_request())
+    // {
         pthread_create(&hxt_tid, NULL, hxt_websocket_cb, NULL);
-    }
+    // }
     
     return;
 }

@@ -8,7 +8,7 @@
 
 /* http request url */
 #define HXT_SERVER_URL                      "https://www.horxeton.com:7002/api/v1"
-
+/* POST */
 #define HXT_GET_TOKEN                       "/Authorize/GetDeskToken"
 #define HXT_GET_DESK_CONFIG                 "/Device/GetDeskConfig"
 #define HXT_STATUS_REPORT                   "/Device/DeskStatusReport"
@@ -22,6 +22,8 @@
 #define HXT_BIND_DESK_WIFI                  "/Device/BindDeskByWifi"
 #define HXT_CONFIRM_DESK_BIND               "/Device/BindDeskConfirm"
 #define HXT_UPLOAD_SAMPLE_SNAP              "/Upload/UploadPicsAsync?childunid=%d"
+/* GET */
+#define HXT_GET_ALIYUN_CFG                  "/system/UploadConfig?clientType=1"
 
 /* http response result */
 #define HXT_NO_REGISTER                     0       

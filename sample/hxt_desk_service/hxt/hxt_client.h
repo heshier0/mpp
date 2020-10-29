@@ -17,6 +17,13 @@ BOOL hxt_update_children_alarm_file(void* data);
 BOOL hxt_parse_user_data(void* data);
 BOOL hxt_unbind_child(int child_unid);
 
+BOOL hxt_get_aliyun_config(void **opt);
+void init_upload_options(void **opts, void *data);
+void deinit_upload_options(void *opts);
+BOOL hxt_upload_file(const char* path, void *opts);
+BOOL hxt_init_aliyun_env();
+void hxt_deinit_aliyun_env();
+
 char* hxt_get_posture_detect_model_path(int study_mode);
 char* hxt_get_posture_class_model_path(int study_mode);
 

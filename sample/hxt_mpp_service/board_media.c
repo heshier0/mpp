@@ -125,7 +125,7 @@ BOOL board_create_mp4_file(const char* filename)
 	// pthread_mutex_lock(&g_media_mutex);
 	g_count = 0;
 	memset(&g_media_ctx, 0, sizeof(g_media_ctx));
-
+	
 	if (NULL == filename)
 	{
 		return FALSE;

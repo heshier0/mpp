@@ -40,10 +40,6 @@ static BOOL g_play_mp3_status = TRUE;   //get mp3 data from fifo
 static BOOL g_enc_stream_status = TRUE;  //get stream from venc
 
 static BOOL g_start_record = FALSE;
-static BOOL g_recording = FALSE;
-static BOOL g_stop_record = FALSE;
-
-static char s_file_name[256] = {0};
 
 /* fifo */
 static BOOL create_fifo(const char* name)
@@ -1142,12 +1138,6 @@ void board_get_stream_from_venc_chn(int width, int height)
         }
         else
         {
-            if (g_start_record && !g_recording)
-            {   
-                board_create_mp4_file(s_file_name);
-                g_recording = TRUE;
-            }
-
             if (FD_ISSET(venc_fd, &read_fds))
             {
                 /*******************************************************
@@ -1198,10 +1188,9 @@ void board_get_stream_from_venc_chn(int width, int height)
                 }
                 
                 /* to save mp4 */
-                if(g_recording)
+                if (g_start_record)
                 {   
                     board_write_mp4(&venc_stream, width, height);  
-                    g_start_record = FALSE;
                 }                          
                 /*******************************************************
                  step 2.6 : release stream
@@ -1220,14 +1209,6 @@ void board_get_stream_from_venc_chn(int width, int height)
                 utils_free(venc_stream.pstPack);
                 venc_stream.pstPack = NULL;
             }    
-
-            if (g_stop_record)
-            {
-                board_close_mp4_file();
-                g_start_record = FALSE;
-                g_recording = FALSE;
-                g_stop_record = FALSE;
-            }
         }
     }
     g_enc_stream_status = FALSE;
@@ -1414,22 +1395,24 @@ void stop_sample_voice_thread()
 
 void start_video_recording(const char* filename)
 {
-    memset(s_file_name, 0, 256);
-    strcpy(s_file_name, filename);
+    if (NULL == filename)
+    {
+        return;
+    }
     g_start_record = TRUE;
+    board_create_mp4_file(filename);
 }
 
 void stop_video_recording()
 {
-    g_stop_record = TRUE;
+    board_close_mp4_file();
+    g_start_record = FALSE;
 }
 
 void delete_video()
 {
-
     g_start_record = FALSE;
-    g_recording = FALSE;
-    g_stop_record = FALSE;
+    sleep(1);
     board_delete_current_mp4_file();
 }
 

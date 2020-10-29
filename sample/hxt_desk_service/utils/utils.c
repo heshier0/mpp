@@ -197,11 +197,8 @@ BOOL utils_send_local_voice(const char *path)
 BOOL utils_send_mp3_voice(const char *url)
 {
     char cmd[256] = {0};
-#ifdef DEBUG    
     sprintf(cmd, "curl --insecure -o %s %s", MP3_FIFO, url);
-#else
-    sprintf(cmd, "curl --insecure -s -o %s %s", MP3_FIFO, url);
-#endif   
+
     pid_t status = system(cmd);
     
     return check_system_cmd_result(status);
@@ -215,11 +212,8 @@ BOOL utils_download_file(const char *url, const char* save_file_path)
     }
 
     char CMD_DOWNLOAD_FILE[512] = {0};
-#ifdef DEBUG
     sprintf(CMD_DOWNLOAD_FILE, "curl --insecure -o %s \"%s\"", save_file_path, url);
-#else
-    sprintf(CMD_DOWNLOAD_FILE, "curl --insecure -s -o %s \"%s\"", filename, url);
-#endif    
+ 
     utils_print("%s\n", CMD_DOWNLOAD_FILE);
 
     char out_buffer[1024] = {0};
@@ -250,13 +244,8 @@ BOOL utils_upload_file(const char* url, const char* header, const char* local_fi
     }
 
     char CMD_UPLOAD_FILE[1024] = {0};
-#ifdef DEBUG
+
     sprintf(CMD_UPLOAD_FILE, "curl --insecure --retry 3 -H \"%s\" -F \"file=@%s\" %s", header, local_file_path, url);
-    // sprintf(CMD_UPLOAD_FILE, "curl --insecure -S -X POST -H \"%s\" -T %s %s", header, local_file_path, url);
-#else
-    sprintf(CMD_UPLOAD_FILE, "curl --insecure -s -X POST -H \"%s\" -T %s %s", header, local_file_path, url);
-    //sprintf(CMD_UPLOAD_FILE, "curl --insecure -s -H \"%s\" -F \"file=@%s\" %s", header, local_file_path, url);
-#endif // DEBUG
     utils_print("upload cmd: [%s]\n", CMD_UPLOAD_FILE);
 
     FILE *fp = NULL;
@@ -295,17 +284,44 @@ BOOL utils_post_json_data(const char *url, const char* header_content, const cha
     {
         data = "";
     }
-#ifdef DEBUG
+
     sprintf(CMD_POST_JSON, "curl --insecure -X POST -H \"Content-Type:application/json;charset=UTF-8\" -H \"%s\" -d \'%s\' %s", 
                                 extra_header, data, url);
-#else 
-    sprintf(CMD_POST_JSON, "curl --insecure -s -X POST -H \"Content-Type:application/json;charset=UTF-8\" -H \"%s\" -d \'%s\' %s", 
-                                header_content, json_data, url);
-#endif // DEBUG
-    // utils_print("%s\n", CMD_POST_JSON);
 
     FILE *fp = NULL;
     fp = popen(CMD_POST_JSON, "r");
+    if(NULL != fp)
+    {
+        if(fgets(out, out_length, fp) == NULL)
+        {
+            pclose(fp);
+            return FALSE;
+        }
+    }
+    pclose(fp);
+
+    return TRUE;
+}
+
+BOOL utils_send_get_request(const char* url, const char* header_content, char* out, int out_length)
+{
+    if (NULL == url || NULL == out)
+    {
+        return FALSE;
+    }
+
+    char* extra_header = (char *)header_content;
+    if( NULL == extra_header)
+    {
+        extra_header = "";
+    }
+
+    char CMD_GET_REQ[1024] = {0};
+    sprintf(CMD_GET_REQ, "curl --insecure -H \"Content-Type:application/json;charset=UTF-8\" -H \"%s\" %s", extra_header, url);
+    utils_print("GET request: [%s]\n", CMD_GET_REQ);                            
+
+    FILE *fp = NULL;
+    fp = popen(CMD_GET_REQ, "r");
     if(NULL != fp)
     {
         if(fgets(out, out_length, fp) == NULL)

@@ -179,4 +179,39 @@ void trans_yuv2jpg(char* src_uri, char* dst_uri, int width, int height)
     destroy_context(ctx);
 }
 
+static void usage(void)
+{
+    printf("\tVersion:1.0.0  \n");
+    printf("\n\n/Usage:./yuv2jpg src dst width height\n");
+}
 
+
+#if 0
+int main(int argc, char **argv)
+{
+    int retValue = -1;
+
+    if (argc != 5)
+    {
+        usage();
+        return -1;
+    }
+
+    retValue = strcmp(argv[1], "-h");
+    if (0 == retValue)
+    {
+        usage();
+        return retValue;
+    }
+
+    char* src = argv[1];
+    char* dst = argv[2];
+    int w = atoi(argv[3]);
+    int h = atoi(argv[4]);
+
+    trans_yuv2jpg(src, dst, w, h);
+
+    return 0;
+}
+
+#endif

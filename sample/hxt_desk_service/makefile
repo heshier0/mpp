@@ -30,7 +30,12 @@ INCS = -I$(ROOT_DIR)/. \
        -I/mnt/g/workspace/plugins/opencv4/include/opencv4 \
        -I/mnt/g/workspace/plugins/libsitposture/include \
        -I/mnt/g/workspace/plugins/iflyos/include \
-       -I/mnt/g/workspace/plugins/sqlite3/include
+       -I/mnt/g/workspace/plugins/sqlite3/include \
+       -I/mnt/g/workspace/plugins/mxml/include \
+       -I/mnt/g/workspace/plugins/libcurl/include \
+       -I/mnt/g/workspace/plugins/apr-utils/include/apr-1 \
+       -I/mnt/g/workspace/plugins/apr/include/apr-1 \
+       -I/mnt/g/workspace/plugins/alioss/include 
  
 LIBS = -L/mnt/g/workspace/plugins/libev/lib -lev \
        -L/mnt/g/workspace/plugins/cjson/lib -lcjson \
@@ -46,7 +51,15 @@ LIBS = -L/mnt/g/workspace/plugins/libev/lib -lev \
        -L/mnt/g/workspace/plugins/libsitposture/lib -lsitposture \
        -L/mnt/g/workspace/plugins/libsitPostrecog/lib -lsitPostrecog \
        -L/mnt/g/workspace/plugins/iflyos/lib -lhlw \
-       -L/mnt/g/workspace/plugins/sqlite3/lib -lsqlite3
+       -L/mnt/g/workspace/plugins/sqlite3/lib -lsqlite3 \
+       -L/mnt/g/workspace/plugins/alioss/lib -loss_c_sdk_static \
+       -L/mnt/g/workspace/plugins/mxml/lib -lmxml \
+       -L/mnt/g/workspace/plugins/apr/lib -lapr-1 \
+       -L/mnt/g/workspace/plugins/apr-utils/lib -laprutil-1 \
+       -L/mnt/g/workspace/plugins/libcurl/lib -lcurl \
+       -L/mnt/g/workspace/plugins/libexpat/lib -lexpat \
+       -L/mnt/g/workspace/plugins/openssl/lib -lssl \
+       -L/mnt/g/workspace/plugins/openssl/lib -lcrypto
 
 LIBS +=  -L$(REL_LIB) -lsecurec -lnnie
 LIBS += -L/mnt/g/workspace/plugins/opencv4/lib -lopencv_core -lopencv_calib3d -lopencv_dnn -lopencv_features2d -lopencv_flann -lopencv_highgui -lopencv_imgcodecs -lopencv_imgproc -lopencv_ml -lopencv_objdetect

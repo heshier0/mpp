@@ -26,11 +26,8 @@ extern BOOL g_hxt_wbsc_running;
 extern BOOL g_hxt_first_login;
 extern DATABUFFER g_msg_buffer;
 extern int g_camera_status;
-extern BOOL g_video_upload_exceed;
-extern BOOL g_snap_upload_exceed;
 extern BOOL g_deploying_net;
 extern BOOL g_device_sleeping;
-
 
 static struct uwsc_client *hxt_wsc = NULL;
 static struct ev_loop *g_hxt_loop = NULL;
@@ -58,9 +55,10 @@ static BOOL init_study_info(ReportInfo *report_info, StudyInfo *study_info)
     if (report_info->report_type == BAD_POSTURE)
     {
         report_info->duration = 10;
+
         if (utils_get_file_size(study_info->file) < 1024)
         {
-            g_video_upload_exceed = TRUE;
+            utils_print("video size is error\n");
         }
         else
         {
@@ -68,19 +66,17 @@ static BOOL init_study_info(ReportInfo *report_info, StudyInfo *study_info)
             if (status = HXT_OK)
             {
                 utils_print("Upload video %s OK\n", study_info->file);
-                
             }
             else if (status == HXT_UPLOAD_FAIL)
             {
-                g_video_upload_exceed = TRUE;
+                utils_print("Upload video %s Failed\n", study_info->file);
             }
         }
         //remove(study_info->file);
 
-        if (utils_get_file_size(study_info->file) < 1024)
+        if (utils_get_file_size(study_info->snap) < 1024)
         {
-            utils_print("file size is error\n");
-            g_snap_upload_exceed = TRUE;
+            utils_print("snap size is error\n");
         }
         else
         {
@@ -88,11 +84,10 @@ static BOOL init_study_info(ReportInfo *report_info, StudyInfo *study_info)
             if (status == HXT_OK)
             {
                 utils_print("Upload snap %s OK\n", study_info->snap);
-                
             }
             else if (status == HXT_UPLOAD_FAIL)
             {
-                g_snap_upload_exceed = TRUE;
+                utils_print("Upload snap %s Failed\n", study_info->snap);
             }
         }
         //remove(study_info->snap);
@@ -485,6 +480,9 @@ int hxt_websocket_start()
     prctl(PR_SET_NAME, "hxt_websocket");
     pthread_detach(pthread_self());
 
+    /* init aliyun env */
+    hxt_init_aliyun_env();
+
     char* hxt_url = get_websocket_url();
     char* token = get_server_token();
     char extra_header[1024] = {0};
@@ -516,6 +514,7 @@ int hxt_websocket_start()
 
     free(hxt_wsc);
     
+    hxt_deinit_aliyun_env();
     g_hxt_wbsc_running = FALSE;
     utils_print("Hxt websocket exit...\n");   
 

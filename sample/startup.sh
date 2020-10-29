@@ -58,7 +58,7 @@ do
     if [ -z "$updatestate" ]; then
         sleep 5
     else
-        echo "File to updat ..."
+        echo "File to update ..."
         cd $UPDATE_DOC
         tar -zxvf $UPDATE_FILE
         if [ $? = 0 ]; then

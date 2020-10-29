@@ -180,23 +180,25 @@ static BOOL begin_recording()
         
         bzero(g_mp4_file, 128);
         bzero(g_snap_file, 128);
-        snprintf(g_mp4_file, 128, "/user/child_%d/video/%04d%02d%02d-%02d%02d%02d.mp4",
+        snprintf(g_mp4_file, 128, "/user/child_%d/video/%04d%02d%02d%02d%02d%02d_%d.mp4",
                             child_unid,
                             _tm->tm_year + 1900,
                             _tm->tm_mon + 1, 
                             _tm->tm_mday,
                             _tm->tm_hour,
                             _tm->tm_min,
-                            _tm->tm_sec);
+                            _tm->tm_sec,
+                            child_unid);
 
-        snprintf(g_snap_file, 128, "/user/child_%d/snap/%04d%02d%02d-%02d%02d%02d.jpg",
+        snprintf(g_snap_file, 128, "/user/child_%d/snap/%04d%02d%02d%02d%02d%02d_%d.jpg",
                                 child_unid,
                                 _tm->tm_year + 1900,
                                 _tm->tm_mon + 1, 
                                 _tm->tm_mday,
                                 _tm->tm_hour,
                                 _tm->tm_min,
-                                _tm->tm_sec);
+                                _tm->tm_sec,
+                                child_unid);
         send_recording_mp4_cmd(g_mp4_file, g_snap_file);
         utils_print("%s -----> Begin record\n", utils_get_current_time());
     }
@@ -399,6 +401,7 @@ static BOOL check_posture_alarm(struct check_status_t *check_status, int check_r
         {
             stop_record();
             check_status->_last_record_time = now;
+
             StudyInfo info;
             memset(&info, 0, sizeof(StudyInfo));
             info.info_type = BAD_POSTURE;

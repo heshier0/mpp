@@ -132,6 +132,7 @@ static void* process_desk_business_thread(void *args)
     prctl(PR_SET_NAME, "process_cmd");
     pthread_detach(pthread_self());
 
+
     while(client_running)
     {
         bzero(&header, len);
@@ -204,16 +205,13 @@ static void* process_desk_business_thread(void *args)
         break;      
         case CMD_START_VIDEO_RECORD:
             {
-                while(saving_video)
-                {
-                    sleep(100);
-                }
                 bzero(&study_video, sizeof(study_video_t));
                 ptr = get_buffer(&g_client_data, sizeof(study_video_t));
                 memcpy(&study_video, ptr, sizeof(study_video_t));
                 release_buffer(&g_client_data, sizeof(study_video_t));
                 utils_print("video is %s, snap is %s\n", study_video.video_name, study_video.snap_name);
                 start_video_recording(study_video.video_name);
+                board_get_snap_from_venc_chn(study_video.snap_name);
             }
         break;
         case CMD_STOP_VIDEO_RECORD:
@@ -224,7 +222,6 @@ static void* process_desk_business_thread(void *args)
                 memcpy(&study_video, ptr, sizeof(study_video_t));
                 release_buffer(&g_client_data, sizeof(study_video_t));
                 stop_video_recording();
-                board_get_snap_from_venc_chn(study_video.snap_name);
                 saving_video = FALSE;
                 utils_print("stop video....\n");
             }
