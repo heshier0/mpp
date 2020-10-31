@@ -30,6 +30,8 @@ volatile BOOL g_hxt_first_login = TRUE;
 volatile BOOL g_device_sleeping = FALSE;
 volatile int g_connect_count = 0;
 
+sem_t g_hxt_run_flag;
+
 DATABUFFER g_msg_buffer;
 static BOOL g_processing = TRUE;
 
@@ -69,7 +71,7 @@ int main(int argc, char **argv)
     
     BOOL server_started = TRUE;
     BOOL first_start = TRUE;
-    
+
 #ifdef DEBUG
     signal(SIGINT, handle_signal);
     signal(SIGTERM, handle_signal);   
@@ -85,6 +87,8 @@ int main(int argc, char **argv)
     utils_send_local_voice(VOICE_DEVICE_OPEN);
     board_set_led_status(NO_BIND);
     
+    sem_init(&g_hxt_run_flag, 0, 0);
+
     while(g_processing)
     {
         //????
@@ -171,6 +175,7 @@ int main(int argc, char **argv)
             if(!g_hxt_wbsc_running)
             {
                 start_hxt_websocket_thread();
+                sem_wait(&g_hxt_run_flag);
             }
             else
             {
@@ -183,9 +188,10 @@ int main(int argc, char **argv)
             }       
         }
 
-        sleep(20);
+        sleep(120);
     }
 
+    sem_destroy(&g_hxt_run_flag);
     board_gpio_uninit();
     destroy_buffer(&g_msg_buffer);
     deinit_posture_model();

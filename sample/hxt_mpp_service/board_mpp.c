@@ -894,7 +894,7 @@ static void* sample_pcm_cb(void *data)
         // int write_count = write(fd, out_buff, size);
         int write_count = sendto(sockfd, out_buff, size, 0, (struct sockaddr*)&addr, sizeof(addr));
         utils_free(out_buff);
-        usleep(50*1000);
+        usleep(100*1000);
     }
 
 ERROR_EXIT:    

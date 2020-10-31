@@ -1126,8 +1126,7 @@ BOOL hxt_get_aliyun_config(void **opts)
     if (status_code == HXT_OK)
     {
         utils_print("Aliyun: %s\n", out);
-        init_upload_options((AliossOptions**)opts, (void*)out);
-       
+        reported = init_upload_options((AliossOptions**)opts, (void*)out);
     } 
     else if(status_code == HXT_NO_REGISTER)
     {
@@ -1147,7 +1146,6 @@ BOOL hxt_get_aliyun_config(void **opts)
         }
     }
     
-
     utils_free(out);
     utils_free(header);
     utils_free(api_url);

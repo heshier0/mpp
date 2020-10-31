@@ -54,8 +54,8 @@ LIBS = -L/mnt/g/workspace/plugins/libev/lib -lev \
        -L/mnt/g/workspace/plugins/sqlite3/lib -lsqlite3 \
        -L/mnt/g/workspace/plugins/alioss/lib -loss_c_sdk_static \
        -L/mnt/g/workspace/plugins/mxml/lib -lmxml \
-       -L/mnt/g/workspace/plugins/apr/lib -lapr-1 \
        -L/mnt/g/workspace/plugins/apr-utils/lib -laprutil-1 \
+       -L/mnt/g/workspace/plugins/apr/lib -lapr-1 \
        -L/mnt/g/workspace/plugins/libcurl/lib -lcurl \
        -L/mnt/g/workspace/plugins/libexpat/lib -lexpat \
        -L/mnt/g/workspace/plugins/openssl/lib -lssl \

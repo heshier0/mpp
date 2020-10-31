@@ -9,25 +9,24 @@
 #include "hxt_defines.h"
 #include "report_info_db.h"
 
-void init_upload_options(void **opts, void *data)
+BOOL init_upload_options(void **opts, void *data)
 {
     if (NULL == data)
     {
-        return;
+        return FALSE;
     }
 
-    *opts = utils_malloc(sizeof(AliossOptions));
-    if (*opts == NULL)
+    AliossOptions *opt = (AliossOptions *)utils_malloc(sizeof(AliossOptions));
+    cJSON* root = cJSON_Parse((char *)data);
+    if(NULL == root)
     {
-        utils_print("malloc AliossOptions failed\n");
-        return;
+        return FALSE;
     }
-    AliossOptions *opt = *opts;
-
-    cJSON* returnObject = cJSON_Parse((char *)data);
-    if(NULL == returnObject)
+    cJSON* returnObject = cJSON_GetObjectItem(root, "returnObject");
+    if (NULL == returnObject)
     {
-        return;
+        cJSON_Delete(root);
+        return FALSE;
     }
 
     cJSON *item = cJSON_GetObjectItem(returnObject, "securityToken");
@@ -37,7 +36,6 @@ void init_upload_options(void **opts, void *data)
         strcpy(opt->sts_token, item->valuestring);
         opt->sts_token[strlen(opt->sts_token)] = '\0';
     }
-
     item = cJSON_GetObjectItem(returnObject, "endpoint");
     if (item != NULL)
     {
@@ -45,7 +43,6 @@ void init_upload_options(void **opts, void *data)
         strcpy(opt->endpoint, item->valuestring);
         opt->endpoint[strlen(opt->endpoint)] = '\0';
     }
-
     item = cJSON_GetObjectItem(returnObject, "accessKeyId");
     if (item != NULL)
     {
@@ -53,7 +50,6 @@ void init_upload_options(void **opts, void *data)
         strcpy(opt->access_key_id, item->valuestring);
         opt->access_key_id[strlen(opt->access_key_id)] = '\0';
     }
-
     item = cJSON_GetObjectItem(returnObject, "accessKeySecret");
     if (item != NULL)
     {
@@ -81,10 +77,14 @@ void init_upload_options(void **opts, void *data)
     item = cJSON_GetObjectItem(returnObject, "timeout");
     if (item != NULL)
     {
-        opt->expired_time = item->valueint;
+        opt->expired_time = item->valueint / 1000;
     }
 
-    return;
+    *opts = opt;
+
+    cJSON_Delete(root);
+
+    return  TRUE;
 }
 
 void deinit_upload_options(void *opts)
@@ -122,6 +122,12 @@ void deinit_upload_options(void *opts)
 
 static void init_aliyun_sts_options(oss_request_options_t *options, AliossOptions *opts)
 {
+    if (NULL == opts || NULL == options)
+    {
+        utils_print("init aliyun options failed\n");
+        return;
+    }
+
     options->config = oss_config_create(options->pool);
     aos_str_set(&options->config->endpoint, opts->endpoint);
     aos_str_set(&options->config->access_key_id, opts->access_key_id);
@@ -134,44 +140,24 @@ static void init_aliyun_sts_options(oss_request_options_t *options, AliossOption
     return;
 }
 
-BOOL hxt_upload_file(const char* path, void *opts)
+char* hxt_upload_file(const char* path, void *opts)
 {
+    char* object_path = NULL;
     if (NULL == path)
     {
         return; 
     }
 
-    // char *object_content = NULL;
-    // unsigned long object_size = utils_get_file_size(path);
-    // object_content = utils_malloc(object_size);
-
-    // int fd = open(path, O_RDONLY);
-    // if (-1 == fd)
-    // {
-    //     return;
-    // }
-    // int size = read(fd, object_content, object_size);
-    // utils_print("file size is %d\n", size);
-    // if (size != object_size)
-    // {
-    //     utils_print("read file error,size not equal\n");
-    //     return;
-    // }
-    // close(fd);
-    BOOL upload_status = FALSE;
-
     aos_pool_t *pool;
     aos_pool_create(&pool, NULL);
     oss_request_options_t *oss_client_options;
     oss_client_options = oss_request_options_create(pool);
-    
     init_aliyun_sts_options(oss_client_options, (AliossOptions*)opts);
+    AliossOptions *opt  = (AliossOptions*)opts;
 
     aos_string_t bucket;
     aos_string_t object;
     aos_string_t local_file;
-    // aos_list_t buffer;
-    // aos_buf_t *content = NULL;
     aos_table_t *headers = NULL;
     aos_table_t *resp_headers = NULL; 
     aos_status_t *resp_status = NULL; 
@@ -189,36 +175,31 @@ BOOL hxt_upload_file(const char* path, void *opts)
     utils_print("%s\n", file);
 
     char object_name[256] = {0};
-    strcpy(object_name, opts->path);
+    strcpy(object_name, opt->path);
     strcat(object_name, time_path);
     strcat(object_name, file);
     utils_print("object_name is %s\n", object_name);
 
     aos_str_set(&object, object_name); //{path}/{年}/{月}/{日}/{时间戳_孩子id.格式}
-    aos_str_set(&bucket, opts->bucket_name);
+    aos_str_set(&bucket, opt->bucket_name);
     aos_str_set(&local_file, path);
     
-    // aos_list_init(&buffer);
-    // content = aos_buf_pack(oss_client_options->pool, object_content, object_size);
-    // aos_list_add_tail(&content->node, &buffer);
-
     resp_status = oss_put_object_from_file(oss_client_options, &bucket, &object, &local_file, headers, &resp_headers);
-    // resp_status = oss_put_object_from_buffer(oss_client_options, &bucket, &object, &buffer, headers, &resp_headers);
     if (aos_status_is_ok(resp_status))
     {
         printf("put object from buffer succeeded\n");
-        upload_status = TRUE;
+        object_path = (char*)utils_malloc(strlen(object_name) + 1);
+        strcpy(object_path, object_name);
+        object_path[strlen(object_path)] = '\0';
     } 
     else 
     {
         printf("put object from buffer failed\n");  
-        upload_status = FALSE;    
     }    
 
     aos_pool_destroy(pool);
-    // utils_free(object_content);
 
-    return upload_status;
+    return object_path;
 }
 
 BOOL hxt_init_aliyun_env()
@@ -235,7 +216,6 @@ void hxt_deinit_aliyun_env()
 {
     aos_http_io_deinitialize();
 }
-
 
 
 BOOL hxt_del_offline_expired_info()

@@ -7,7 +7,8 @@
 
 
 /* http request url */
-#define HXT_SERVER_URL                      "https://www.horxeton.com:7002/api/v1"
+//#define HXT_SERVER_URL                      "https://www.horxeton.com:7002/api/v1"
+#define HXT_SERVER_URL                         "https://dev-api.horxeton.com:7002/api/v1"
 /* POST */
 #define HXT_GET_TOKEN                       "/Authorize/GetDeskToken"
 #define HXT_GET_DESK_CONFIG                 "/Device/GetDeskConfig"

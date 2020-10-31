@@ -94,11 +94,12 @@ static void* thread_read_pcm_cb(void *data)
         int read_count = recvfrom(sockfd, pcm_buf, PCM_LENGTH, 0, (struct sockaddr*)&remote_addr, &addr_len);
         if (read_count <= 0)
         {
+            utils_print("Nothing recv from pcm port\n");
             usleep(500 * 1000);
             continue;
         }
 
-        iflyos_write_audio(pcm_buf, PCM_LENGTH);
+        iflyos_write_audio(pcm_buf, read_count);
     }
 
     close(sockfd);

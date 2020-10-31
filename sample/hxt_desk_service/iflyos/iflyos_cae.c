@@ -31,6 +31,11 @@ static void ivw_fn(short angle, short channel, float power, short CMScore, short
 
 static void ivw_audio_fn(const void* audio_data, unsigned int audio_len, int param1, const void* param2, void *userdata)
 {
+	
+}
+
+static void recog_audio_fn(const void* audio_data, unsigned int audio_len, int param1, const void *param2, void *userdata)
+{
 	struct uwsc_client *cl = (struct uwsc_client *)userdata;
 	if (NULL == cl)
 	{
@@ -57,10 +62,6 @@ static void ivw_audio_fn(const void* audio_data, unsigned int audio_len, int par
 	{
 		cl->send(cl, audio_data, audio_len, UWSC_OP_BINARY);
 	}
-}
-
-static void recog_audio_fn(const void* audio_data, unsigned int audio_len, int param1, const void *param2, void *userdata)
-{
 }
 
 BOOL iflyos_init_cae_lib(void* data)

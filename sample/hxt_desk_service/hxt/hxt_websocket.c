@@ -4,7 +4,7 @@
 #include <sys/ipc.h>
 #include <sys/msg.h>
 #include <sys/prctl.h>
-
+#include <semaphore.h>
 #include <uwsc/uwsc.h>
 
 #include "utils.h"
@@ -28,18 +28,19 @@ extern DATABUFFER g_msg_buffer;
 extern int g_camera_status;
 extern BOOL g_deploying_net;
 extern BOOL g_device_sleeping;
+extern sem_t g_hxt_run_flag;
 
 static struct uwsc_client *hxt_wsc = NULL;
 static struct ev_loop *g_hxt_loop = NULL;
 static BOOL g_recv_running = TRUE;
 
-static BOOL init_study_info(ReportInfo *report_info, StudyInfo *study_info)
+static BOOL init_study_info(ReportInfo *report_info, StudyInfo *study_info, AliossOptions *opts)
 {
-    if(NULL == report_info || NULL == study_info)
+    if(NULL == report_info || NULL == study_info || NULL == opts)
     {
         return FALSE;
     }
-    
+
     if(study_info->info_type < 1 || study_info->info_type > 5)
     {
         utils_print("Study info type ERROR\n");
@@ -54,6 +55,9 @@ static BOOL init_study_info(ReportInfo *report_info, StudyInfo *study_info)
     report_info->study_mode = get_study_mode(report_info->child_unid);
     if (report_info->report_type == BAD_POSTURE)
     {
+        // AliossOptions *opts = NULL;
+        // hxt_get_aliyun_config((void **)&opts);
+
         report_info->duration = 10;
 
         if (utils_get_file_size(study_info->file) < 1024)
@@ -62,12 +66,16 @@ static BOOL init_study_info(ReportInfo *report_info, StudyInfo *study_info)
         }
         else
         {
-            int status = hxt_file_upload_request(study_info->file, report_info->study_date, report_info->video_url);
-            if (status = HXT_OK)
+            // int status = hxt_file_upload_request(study_info->file, report_info->study_date, report_info->video_url);
+            char* object_name = hxt_upload_file(study_info->file, (void*)opts);
+            //if (status = HXT_OK)
+            if (object_name != NULL)
             {
                 utils_print("Upload video %s OK\n", study_info->file);
+                strcpy(report_info->video_url, object_name);
+                utils_free(object_name);
             }
-            else if (status == HXT_UPLOAD_FAIL)
+            else // if (status == HXT_UPLOAD_FAIL)
             {
                 utils_print("Upload video %s Failed\n", study_info->file);
             }
@@ -80,17 +88,26 @@ static BOOL init_study_info(ReportInfo *report_info, StudyInfo *study_info)
         }
         else
         {
-            int status = hxt_file_upload_request(study_info->snap, report_info->study_date, report_info->snap_url);
-            if (status == HXT_OK)
+            // int status = hxt_file_upload_request(study_info->snap, report_info->study_date, report_info->snap_url);
+            // if (status == HXT_OK)
+            char *object_name = hxt_upload_file(study_info->snap, (void*)opts);
+            if (object_name != NULL)
             {
                 utils_print("Upload snap %s OK\n", study_info->snap);
+                strcpy(report_info->snap_url, object_name);
+                utils_free(object_name);
             }
-            else if (status == HXT_UPLOAD_FAIL)
+            else //if (status == HXT_UPLOAD_FAIL)
             {
                 utils_print("Upload snap %s Failed\n", study_info->snap);
             }
         }
         //remove(study_info->snap);
+        // if (opts != NULL)
+        // {
+        //     deinit_upload_options((void*)opts);
+        //     opts = NULL;
+        // }
     }
 
     return TRUE;
@@ -123,7 +140,7 @@ static int hxt_send_desk_status(struct uwsc_client *cl, REPORT_TYPE type, int in
     {
         goto END;
     }
-    utils_print("HXT_DESK_STATUS: %s\n", json_data);
+    utils_print("HXT_DESK_STATUS: %s %s\n", utils_get_current_time(), json_data);
     int send_count = cl->send(cl, json_data, strlen(json_data), info_type);
 
     utils_free(json_data);
@@ -147,6 +164,13 @@ static void* send_study_info_cb(void *params)
 
     struct uwsc_client *cl = (struct uwsc_client *)params;
 
+    /*get alioss token*/
+    AliossOptions *opts = NULL;
+    if (hxt_get_aliyun_config((void **)&opts))
+    {
+        utils_print("get alioss token ok\n");
+    }
+
     while (g_recv_running)
     {
         char* ptr = get_buffer(&g_msg_buffer, sizeof(StudyInfo));
@@ -156,7 +180,19 @@ static void* send_study_info_cb(void *params)
             continue;
         }
         bzero(&report_info, sizeof(report_info));
-        init_study_info(&report_info, (StudyInfo*)ptr);
+
+        if (opts != NULL)
+        {
+            utils_print("alioss expired time is %d\n", opts->expired_time);
+            if (time(NULL) - opts->expired_time > 0)
+            {
+                deinit_upload_options((void*)opts);
+                opts = NULL;
+                hxt_get_aliyun_config((void **)&opts);
+            }
+        }
+
+        init_study_info(&report_info, (StudyInfo*)ptr, opts);
         if (report_info.snap_url == NULL || report_info.video_url == NULL)
         {
             utils_print("upload failed,discard....\n");
@@ -194,7 +230,7 @@ static void* send_study_info_cb(void *params)
             goto CLEAR;
         }
         utils_print("STUDY-INFO: %s\n", json_data);
-        cl->send(cl, json_data, strlen(json_data), UWSC_OP_TEXT);
+        cl->send(cl, json_data, strlen(json_data) + 1, UWSC_OP_TEXT);
 
         utils_free(json_data);
 CLEAR:
@@ -202,6 +238,12 @@ CLEAR:
 DISCARD_EXIT:   
         release_buffer(&g_msg_buffer, sizeof(StudyInfo));
         ptr = NULL;
+    }
+
+    if (opts != NULL)
+    {
+        deinit_upload_options((void*)opts);
+        opts = NULL;
     }
 
     return NULL;
@@ -424,6 +466,8 @@ static void hxt_wsc_onopen(struct uwsc_client *cl)
         g_hxt_first_login = FALSE;
     }
     
+    sem_post(&g_hxt_run_flag);
+
     hxt_send_desk_status(cl, POWER_ON, UWSC_OP_TEXT);
 
     g_recv_running = TRUE;
