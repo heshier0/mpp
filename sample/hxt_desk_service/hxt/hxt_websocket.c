@@ -55,10 +55,16 @@ static BOOL init_study_info(ReportInfo *report_info, StudyInfo *study_info, Alio
     report_info->study_mode = get_study_mode(report_info->child_unid);
     if (report_info->report_type == BAD_POSTURE)
     {
-        // AliossOptions *opts = NULL;
-        // hxt_get_aliyun_config((void **)&opts);
-
         report_info->duration = 10;
+
+        /*query upload sum today*/
+        int count = get_upload_count_of_day();
+        if (count >= 50)
+        {
+            strcpy(report_info->video_url, "");
+            strcpy(report_info->snap_url, "");
+            return FALSE;
+        }
 
         if (utils_get_file_size(study_info->file) < 1024)
         {
@@ -66,16 +72,14 @@ static BOOL init_study_info(ReportInfo *report_info, StudyInfo *study_info, Alio
         }
         else
         {
-            // int status = hxt_file_upload_request(study_info->file, report_info->study_date, report_info->video_url);
             char* object_name = hxt_upload_file(study_info->file, (void*)opts);
-            //if (status = HXT_OK)
             if (object_name != NULL)
             {
                 utils_print("Upload video %s OK\n", study_info->file);
                 strcpy(report_info->video_url, object_name);
                 utils_free(object_name);
             }
-            else // if (status == HXT_UPLOAD_FAIL)
+            else
             {
                 utils_print("Upload video %s Failed\n", study_info->file);
             }
@@ -88,8 +92,6 @@ static BOOL init_study_info(ReportInfo *report_info, StudyInfo *study_info, Alio
         }
         else
         {
-            // int status = hxt_file_upload_request(study_info->snap, report_info->study_date, report_info->snap_url);
-            // if (status == HXT_OK)
             char *object_name = hxt_upload_file(study_info->snap, (void*)opts);
             if (object_name != NULL)
             {
@@ -97,19 +99,16 @@ static BOOL init_study_info(ReportInfo *report_info, StudyInfo *study_info, Alio
                 strcpy(report_info->snap_url, object_name);
                 utils_free(object_name);
             }
-            else //if (status == HXT_UPLOAD_FAIL)
-            {
+            else
+            {            {
                 utils_print("Upload snap %s Failed\n", study_info->snap);
             }
         }
         //remove(study_info->snap);
-        // if (opts != NULL)
-        // {
-        //     deinit_upload_options((void*)opts);
-        //     opts = NULL;
-        // }
-    }
 
+        inc_upload_count();
+    }
+    }
     return TRUE;
 }
 

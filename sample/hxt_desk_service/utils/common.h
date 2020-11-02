@@ -128,6 +128,7 @@ typedef enum
 #define USER_PARAMS_TABLE                   "UserParams"
 #define REPORT_INFOS_TABLE                  "ReportInfos"
 #define VOLUME_INFOS_TABLE                   "VolumeInfos"
+#define UPLOAD_COUNT_TABLE                  "UploadCountParams"
 
 #pragma pack(push, 1)
 

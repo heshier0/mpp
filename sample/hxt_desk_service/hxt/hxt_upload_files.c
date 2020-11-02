@@ -77,7 +77,7 @@ BOOL init_upload_options(void **opts, void *data)
     item = cJSON_GetObjectItem(returnObject, "timeout");
     if (item != NULL)
     {
-        opt->expired_time = item->valueint / 1000;
+        opt->expired_time = item->valuedouble / 1000;
     }
 
     *opts = opt;

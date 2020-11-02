@@ -76,6 +76,13 @@ static void* thread_read_pcm_cb(void *data)
         return NULL;
     }
 
+    // FILE *fp = fopen("/user/test.pcm", "w");
+    // if (fp == NULL)
+    // {
+    //     utils_print("create test pcm failed\n");
+    //     return NULL;
+    // }
+
     while(g_sampling)
     {
         if (g_stop_capture)
@@ -98,11 +105,12 @@ static void* thread_read_pcm_cb(void *data)
             usleep(500 * 1000);
             continue;
         }
-
+        // fwrite(pcm_buf, PCM_LENGTH, 1, fp);
         iflyos_write_audio(pcm_buf, read_count);
     }
 
     close(sockfd);
+    // fclose(fp);
     utils_print("read pcm thread exit...\n");
 
     return NULL;

@@ -88,6 +88,12 @@ BOOL set_mute(BOOL mute);
 int get_volume();
 BOOL set_volume(int vol);
 
+/*upload count*/
+BOOL create_upload_count_info();
+BOOL inc_upload_count();
+int get_upload_count_of_day();
+BOOL init_upload_count();
+BOOL deinit_upload_count_params();
 
 
 #endif //!__DB_H__

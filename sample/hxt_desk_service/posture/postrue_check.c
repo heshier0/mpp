@@ -164,12 +164,19 @@ static void take_rest(int time_ms)
 /* cmd with mpp service, to control record or snap */
 static BOOL begin_recording()
 {
+    bzero(g_mp4_file, 128);
+    bzero(g_snap_file, 128);
     /* if no child bind, no need record */
     int child_unid = get_select_child_id();//hxt_get_child_unid();
     if (child_unid == -1)
     {
-        bzero(g_mp4_file, 128);
-        bzero(g_snap_file, 128);
+        return FALSE;
+    }
+
+    /* if recording count exceeded this day*/
+    int count = get_upload_count_of_day();
+    if (count >= 50)
+    {
         return FALSE;
     }
 
@@ -177,9 +184,7 @@ static BOOL begin_recording()
     {
         time_t now = time(0);
         struct tm *_tm = localtime(&now);
-        
-        bzero(g_mp4_file, 128);
-        bzero(g_snap_file, 128);
+
         snprintf(g_mp4_file, 128, "/user/child_%d/video/%04d%02d%02d%02d%02d%02d_%d.mp4",
                             child_unid,
                             _tm->tm_year + 1900,
@@ -258,7 +263,7 @@ static BOOL send_study_report_type(StudyInfo *info)
         bzero(&report_info, sizeof(ReportInfo));
         report_info.camera_status = 1;
         report_info.parent_unid = get_parent_id(); 
-        report_info.child_unid = get_select_child_id();
+        report_info.child_unid = child_unid;
         report_info.report_type = info->info_type;
         strcpy(report_info.study_date, utils_date_to_string());
         strcpy(report_info.report_time, utils_time_to_string());
@@ -616,6 +621,12 @@ void start_posture_recognize()
         return;
     }
     s_keep_processing = TRUE;
+
+    /* creat upload info table if not created*/
+    if (get_upload_count_of_day < 0)
+    {
+        create_upload_count_info();
+    }
 
     PostureParams *params = utils_malloc(sizeof(PostureParams));
     params->video_duration = get_video_length(); 
