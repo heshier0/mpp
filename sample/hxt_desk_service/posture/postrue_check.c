@@ -164,11 +164,10 @@ static void take_rest(int time_ms)
 /* cmd with mpp service, to control record or snap */
 static BOOL begin_recording()
 {
-    bzero(g_mp4_file, 128);
-    bzero(g_snap_file, 128);
+
     /* if no child bind, no need record */
     int child_unid = get_select_child_id();//hxt_get_child_unid();
-    if (child_unid == -1)
+    if (child_unid <= 0)
     {
         return FALSE;
     }
@@ -182,6 +181,9 @@ static BOOL begin_recording()
 
     if(!g_is_recording)
     {
+        bzero(g_mp4_file, 128);
+        bzero(g_snap_file, 128);
+        
         time_t now = time(0);
         struct tm *_tm = localtime(&now);
 
@@ -217,7 +219,7 @@ static void delete_recorded()
     {
         send_delete_mp4_cmd(g_mp4_file, g_snap_file);
         g_is_recording = FALSE;
-        utils_print("%s -----> Delete record: %s\n", utils_get_current_time(), g_mp4_file);
+        utils_print("%s -----> Delete record: %s\n", utils_get_current_time(), g_snap_file);
     }
 }
 
@@ -235,7 +237,7 @@ static BOOL send_study_report_type(StudyInfo *info)
 {
     /* if no child bind, no need to send message */
     int child_unid = get_select_child_id();
-    if (child_unid == -1)
+    if (child_unid <= 0)
     {
         utils_print("no child binded\n");
         return FALSE;
@@ -271,8 +273,8 @@ static BOOL send_study_report_type(StudyInfo *info)
         if (report_info.report_type == BAD_POSTURE)
         {
             report_info.duration = 10;
-            strcpy(report_info.video_url, info->file);
-            strcpy(report_info.snap_url, info->snap);
+            strcpy(report_info.video_url, g_mp4_file);
+            strcpy(report_info.snap_url, g_snap_file);
         }
         add_report_info((void *)&report_info);
     }
@@ -502,15 +504,15 @@ static void* thread_proc_yuv_data_cb(void *param)
     width = params->height;
     height = params->width;
     utils_print("study mode now is %d\n", study_mode);
-    if (alarm_interval == 0)
+    if (alarm_interval <= 0)
     {
         alarm_interval = 10;
     }
-    if(video_duration == 0)
+    if(video_duration <= 0)
     {
         video_duration = 10;
     }
-    if (study_mode == 0)
+    if (study_mode <= 0)
     {
         study_mode = STRICT;
     }
@@ -543,11 +545,18 @@ static void* thread_proc_yuv_data_cb(void *param)
         }
         g_posture_running =  TRUE;
         /* recog posture */
+        /* -1: error*/
         /* 0 : Normal */
         /* 1 : bad posture */
         /* 2 : away */
         one_check_result = run_sit_posture(g_recog_handle, yuv_buf, width, height, study_mode);
         utils_print("%s -----> %d\n", utils_get_current_time(), one_check_result);
+        if (one_check_result == -1)
+        {
+            utils_free(yuv_buf);
+            yuv_buf = NULL;
+            continue;
+        }
 
         if (init_check_status(&check_status, one_check_result))
         {
@@ -585,10 +594,6 @@ static void* thread_proc_yuv_data_cb(void *param)
 
    /* play voice and change led status */
     utils_send_local_voice(VOICE_CAMERA_SLEEP);
-    // if (!g_device_sleeping)
-    // {
-    //     board_set_led_status(NORMAL);
-    // }
     
     /* send msg to notify ending */
     memset(&info, 0, sizeof(StudyInfo));
@@ -651,7 +656,6 @@ void stop_posture_recognize()
     {
         /* to tell mpp service stop video system */
         s_keep_processing = FALSE;
-        // pthread_join(proc_yuv_tid, NULL);
         utils_print("To stop recognize....\n");
     }
 }

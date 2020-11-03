@@ -33,9 +33,12 @@ extern sem_t g_hxt_run_flag;
 static struct uwsc_client *hxt_wsc = NULL;
 static struct ev_loop *g_hxt_loop = NULL;
 static BOOL g_recv_running = TRUE;
+static BOOL g_sem_posted = FALSE;
 
 static BOOL init_study_info(ReportInfo *report_info, StudyInfo *study_info, AliossOptions *opts)
 {
+    BOOL video_uploaded = FALSE, snap_uploaded = FALSE;
+
     if(NULL == report_info || NULL == study_info || NULL == opts)
     {
         return FALSE;
@@ -46,6 +49,9 @@ static BOOL init_study_info(ReportInfo *report_info, StudyInfo *study_info, Alio
         utils_print("Study info type ERROR\n");
         return FALSE;
     }
+
+    utils_print("type:%d, video:%s, snap:%s\n", study_info->info_type, study_info->file, study_info->snap);
+
     report_info->camera_status = g_camera_status;
     report_info->parent_unid = get_parent_id(); 
     report_info->child_unid = get_select_child_id(); 
@@ -66,49 +72,59 @@ static BOOL init_study_info(ReportInfo *report_info, StudyInfo *study_info, Alio
             return FALSE;
         }
 
-        if (utils_get_file_size(study_info->file) < 1024)
+        /*waiting for mp4 file saved, better way is to recive a signal to notify*/
+        int retry_count = 0;
+        while (utils_get_file_size(study_info->file) < 1024 && retry_count < 3)
         {
-            utils_print("video size is error\n");
+            utils_print("video %s size is error\n", study_info->file);
+            sleep(1);
+            retry_count ++;
+        }
+        retry_count = 0;
+
+        char* mp4_object = hxt_upload_file(study_info->file, (void*)opts);
+        if (mp4_object != NULL)
+        {
+            utils_print("Upload video %s OK\n", study_info->file);
+            strcpy(report_info->video_url, mp4_object);
+            utils_free(mp4_object);
+            video_uploaded = TRUE;
         }
         else
         {
-            char* object_name = hxt_upload_file(study_info->file, (void*)opts);
-            if (object_name != NULL)
-            {
-                utils_print("Upload video %s OK\n", study_info->file);
-                strcpy(report_info->video_url, object_name);
-                utils_free(object_name);
-            }
-            else
-            {
-                utils_print("Upload video %s Failed\n", study_info->file);
-            }
+            utils_print("Upload video %s Failed\n", study_info->file);
         }
+        
         //remove(study_info->file);
 
-        if (utils_get_file_size(study_info->snap) < 1024)
+        while (utils_get_file_size(study_info->snap) < 1024 && retry_count < 3)
         {
-            utils_print("snap size is error\n");
+            utils_print("snap %s size is error\n", study_info->snap);
+            sleep(1);
+            retry_count ++;
+        }
+   
+        char *snap_object = hxt_upload_file(study_info->snap, (void*)opts);
+        if (snap_object != NULL)
+        {
+            utils_print("Upload snap %s OK\n", study_info->snap);
+            strcpy(report_info->snap_url, snap_object);
+            utils_free(snap_object);
+            snap_uploaded = TRUE;
         }
         else
-        {
-            char *object_name = hxt_upload_file(study_info->snap, (void*)opts);
-            if (object_name != NULL)
-            {
-                utils_print("Upload snap %s OK\n", study_info->snap);
-                strcpy(report_info->snap_url, object_name);
-                utils_free(object_name);
-            }
-            else
-            {            {
-                utils_print("Upload snap %s Failed\n", study_info->snap);
-            }
+        {            
+            utils_print("Upload snap %s Failed\n", study_info->snap);
         }
         //remove(study_info->snap);
 
-        inc_upload_count();
+        /*if uploaded, increased in db*/
+        if (video_uploaded && snap_uploaded)
+        {
+            inc_upload_count();
+        }
     }
-    }
+
     return TRUE;
 }
 
@@ -172,6 +188,7 @@ static void* send_study_info_cb(void *params)
 
     while (g_recv_running)
     {
+
         char* ptr = get_buffer(&g_msg_buffer, sizeof(StudyInfo));
         if (NULL == ptr)
         {
@@ -181,7 +198,7 @@ static void* send_study_info_cb(void *params)
         bzero(&report_info, sizeof(report_info));
 
         if (opts != NULL)
-        {
+        {   
             utils_print("alioss expired time is %d\n", opts->expired_time);
             if (time(NULL) - opts->expired_time > 0)
             {
@@ -192,11 +209,15 @@ static void* send_study_info_cb(void *params)
         }
 
         init_study_info(&report_info, (StudyInfo*)ptr, opts);
-        if (report_info.snap_url == NULL || report_info.video_url == NULL)
+        if (report_info.report_type == BAD_POSTURE)
         {
-            utils_print("upload failed,discard....\n");
-            goto DISCARD_EXIT;
+            if (strlen(report_info.snap_url) == 0 || strlen(report_info.video_url) == 0)
+            {
+                utils_print("upload failed,discard....\n");
+                goto DISCARD_EXIT;
+            }
         }
+
         //post json data to server
         cJSON *root = cJSON_CreateObject();    
         if (NULL == root)
@@ -466,6 +487,7 @@ static void hxt_wsc_onopen(struct uwsc_client *cl)
     }
     
     sem_post(&g_hxt_run_flag);
+    g_sem_posted = TRUE;
 
     hxt_send_desk_status(cl, POWER_ON, UWSC_OP_TEXT);
 
@@ -557,8 +579,16 @@ int hxt_websocket_start()
 
     free(hxt_wsc);
     
+    if (!g_sem_posted)
+    {
+        sem_post(&g_hxt_run_flag);
+    }
+    
+    g_recv_running = TRUE;
+    g_sem_posted = FALSE;
     hxt_deinit_aliyun_env();
     g_hxt_wbsc_running = FALSE;
+    board_set_led_status(NET_ERR);
     utils_print("Hxt websocket exit...\n");   
 
     return 0;  

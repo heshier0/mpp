@@ -134,7 +134,7 @@ int main(int argc, char **argv)
             if (!g_deploying_net)
             {
                 utils_print("wifi not link...\n");
-                board_set_led_status(WIFI_ERR);
+                board_set_led_status(NET_ERR);
             }
     
             continue;
@@ -188,6 +188,7 @@ int main(int argc, char **argv)
             }       
         }
 
+        utils_print("Desk process running....\n");
         sleep(120);
     }
 

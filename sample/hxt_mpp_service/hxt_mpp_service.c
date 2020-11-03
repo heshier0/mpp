@@ -129,10 +129,10 @@ static void* process_desk_business_thread(void *args)
     video_ratio_t video_ratio;
     study_video_t study_video;
     BOOL saving_video = FALSE;
+
     prctl(PR_SET_NAME, "process_cmd");
     pthread_detach(pthread_self());
-
-
+    
     while(client_running)
     {
         bzero(&header, len);
@@ -233,7 +233,7 @@ static void* process_desk_business_thread(void *args)
             memcpy(&study_video, ptr, sizeof(study_video_t));
             release_buffer(&g_client_data, sizeof(study_video_t));
             delete_video();
-            unlink(study_video.snap_name);
+            remove(study_video.snap_name);
             utils_print("delete snap %s\n", study_video.snap_name);
         }
         break;    

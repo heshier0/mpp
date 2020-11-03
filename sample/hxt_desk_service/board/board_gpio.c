@@ -736,8 +736,8 @@ static void* check_scan_qrcode_event(void *param)
                 }         
                 else
                 {
-                    utils_send_local_voice(VOICE_QUERY_WIFI_ERROR);
-                    board_set_led_status(WIFI_ERR);
+                    utils_send_local_voice(VOICE_QUERY_NET_ERROR);
+                    board_set_led_status(NET_ERR);
                     sleep(10);
                     break;
                 }
@@ -790,7 +790,9 @@ static void* led_blinking_thread(void* param)
         case CHECKING_EXIT:
             gpio_set_value(led_camera_green, 1);
         break;
-        case WIFI_ERR:
+        case NET_ERR:
+            gpio_set_value(led_wifi_blue, 1);
+            gpio_set_value(led_wifi_green, 1);
             gpio_set_value(led_wifi_red, 0);
             if (!g_posture_running)
             {

@@ -77,7 +77,7 @@ typedef enum
 #define VOICE_DEVICE_OPEN                       "/userdata/media/voice/V001.mp3"
 #define VOICE_CONNECT_ERROR                     "/userdata/media/voice/V002.mp3"  
 #define VOICE_SERVER_CONNECT_OK                 "/userdata/media/voice/V003.mp3"  
-#define VOICE_QUERY_WIFI_ERROR                  "/userdata/media/voice/V004.mp3"
+#define VOICE_QUERY_NET_ERROR                  "/userdata/media/voice/V004.mp3"
 #define VOICE_DEPLOYING_NET                     "/userdata/media/voice/V005.mp3"
 #define VOICE_NORMAL_STATUS                     "/userdata/media/voice/V006.mp3"
 #define VOICE_WAKE_CAMERA                       "/userdata/media/voice/V007.mp3"
@@ -146,7 +146,7 @@ typedef enum
     BINDING = 2,
     NORMAL = 3,
     CHECKING = 4,
-    WIFI_ERR = 5,
+    NET_ERR = 5,
     CAMERA_ERR = 6,
     RESETING = 7,
     SLEEPING = 8,
