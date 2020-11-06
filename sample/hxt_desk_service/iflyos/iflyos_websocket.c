@@ -35,6 +35,10 @@ volatile BOOL g_stop_capture = FALSE;
 
 static struct uwsc_client *iflyos_wsc = NULL;
 static struct ev_loop *g_iflyos_loop = NULL; 
+static ev_async g_async_watcher;
+static pthread_t read_pcm_tid;
+
+
 
 static void* thread_read_pcm_cb(void *data)
 {
@@ -128,7 +132,6 @@ static void iflyos_uwsc_onopen(struct uwsc_client *cl)
     /* send cmd to tell service */
     send_voice_sample_start_cmd();
 
-    pthread_t read_pcm_tid;
     pthread_create(&read_pcm_tid, NULL, thread_read_pcm_cb, (void*)cl);
 
     /* */
@@ -192,6 +195,12 @@ static void iflyos_uwsc_onclose(struct uwsc_client *cl, int code, const char *re
     ev_break(cl->loop, EVBREAK_ALL);
 }
 
+
+static void async_callback(EV_P_ ev_async* w, int revents)
+{
+    ev_break(g_iflyos_loop, EVBREAK_ALL);
+}
+
 void iflyos_websocket_stop()
 {
     if (!g_iflyos_wbsc_running)
@@ -200,15 +209,20 @@ void iflyos_websocket_stop()
         
     }
     send_voice_sample_stop_cmd();
+    
     g_sampling = FALSE; 
+    pthread_cancel(read_pcm_tid);
     
     // char buf[128] = "";
     // iflyos_wsc->send(iflyos_wsc, buf, strlen(buf + 2) + 2, UWSC_OP_CLOSE);   
-    if (g_iflyos_loop)
-    {
-        utils_print("iflyos weboscket break\n");
-        ev_break(g_iflyos_loop, EVBREAK_ALL);
-    }
+    // if (g_iflyos_loop)
+    // {
+    //     utils_print("iflyos weboscket break\n");
+    //     ev_break(g_iflyos_loop, EVBREAK_ALL);
+    // }
+    ev_async_init(&g_async_watcher, async_callback);
+    ev_async_start(g_iflyos_loop, &g_async_watcher);
+    ev_async_send(g_iflyos_loop, &g_async_watcher);
 
     return; 
 }
@@ -255,7 +269,7 @@ int iflyos_websocket_start()
         goto IFLYOS_EXIT;
     }
 
-	utils_print("iflyos connect...\n");
+	printf("iflyos connect...\n");
 
     iflyos_wsc->onopen = iflyos_uwsc_onopen;
     iflyos_wsc->onmessage = iflyos_uwsc_onmessage;
@@ -268,7 +282,7 @@ int iflyos_websocket_start()
     iflyos_deinit_cae_lib();
     utils_free(iflyos_wsc);
     g_iflyos_wbsc_running = FALSE;
-    utils_print("iflyos process exit....\n");
+    printf("iflyos process exit....\n");
 
     return 0;
 }

@@ -273,5 +273,7 @@ int ntp_sync_time()
 
     close(sockfd);
 
+    system("hwclock -s");
+
     return 0;
 }

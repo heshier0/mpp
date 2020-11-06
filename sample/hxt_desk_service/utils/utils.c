@@ -513,9 +513,9 @@ void utils_link_wifi(const char* ssid, const char* pwd)
         return;
     }
     // utils_disconnect_wifi();
-    system("ifconfig wlan0 up");
+    // sleep(10);
 
-    sleep(3);
+    system("ifconfig wlan0 up");
 
     char CMD_SAVE_WIFI_INFO[256] = {0};
     sprintf(CMD_SAVE_WIFI_INFO, "wpa_passphrase %s %s > %s", ssid, pwd, WIFI_CFG);
@@ -534,9 +534,9 @@ void utils_link_wifi(const char* ssid, const char* pwd)
 
 void utils_disconnect_wifi()
 {
-    system("ifconfig wlan0 down");
-    system("kill -9 $(pidof udhcpc)");
     system("kill -9 $(pidof wpa_supplicant)");
+    system("kill -9 $(pidof udhcpc)");
+    system("ifconfig wlan0 down");
 }
 
 BOOL utils_check_wifi_state()

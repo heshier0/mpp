@@ -40,6 +40,9 @@ BOOL deinit_wifi_params();
 
 /*server params*/
 BOOL set_server_params(const char* wscUrl, const char* uploadUrl);
+BOOL set_server_url(const char* url);
+BOOL set_websocket_url(const char* url);
+BOOL set_upload_url(const char* url);
 char* get_server_url();
 char* get_api_version();
 char* get_websocket_url();

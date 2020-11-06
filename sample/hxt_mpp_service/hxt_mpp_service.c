@@ -259,7 +259,7 @@ static void start_process_desk_business()
 
 static void handle_signal(int signo)
 {
-    utils_print("MPP SIGPIPE break!!!!\n");
+    utils_print("MPP SIGNAL break!!!!\n");
     client_running = FALSE;
     if (posturing)
     {
@@ -298,6 +298,7 @@ int main(int argc, char **argv)
     }
 
     signal(SIGPIPE, handle_signal);
+    signal(SIGSEGV, handle_signal);
 
     socklen_t len = sizeof(len);
     int sock = create_local_tcp_server();

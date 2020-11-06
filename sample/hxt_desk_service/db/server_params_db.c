@@ -40,6 +40,81 @@ BOOL set_server_params(const char* wscUrl, const char* uploadUrl)
     return TRUE;
 }
 
+BOOL set_server_url(const char* url)
+{
+    int result;
+    char *err_msg;
+    char *sql = NULL;
+    char *server_url = url;
+    if (NULL == server_url)
+    {
+        server_url = "";
+    }
+    sql = sqlite3_mprintf("update %s set serverUrl='%s'", SERVER_PARAMS_TABLE, server_url);
+    
+    result = sqlite3_exec(g_hxt_service_db, sql, NULL, NULL, &err_msg);
+    if (result != SQLITE_OK)
+    {
+        utils_print("%s:%s\n", sql, err_msg);
+        sqlite3_free(err_msg);
+        sqlite3_free(sql);
+        return FALSE;    
+    }
+    sqlite3_free(sql);
+
+    return TRUE;
+}
+
+BOOL set_websocket_url(const char* url)
+{
+    int result;
+    char *err_msg;
+    char *sql = NULL;
+    char *wsc_url = url;
+    if (NULL == wsc_url)
+    {
+        wsc_url = "";
+    }
+    sql = sqlite3_mprintf("update %s set wscUrl='%s'", SERVER_PARAMS_TABLE, wsc_url);
+    
+    result = sqlite3_exec(g_hxt_service_db, sql, NULL, NULL, &err_msg);
+    if (result != SQLITE_OK)
+    {
+        utils_print("%s:%s\n", sql, err_msg);
+        sqlite3_free(err_msg);
+        sqlite3_free(sql);
+        return FALSE;    
+    }
+    sqlite3_free(sql);
+
+    return TRUE;
+}
+
+BOOL set_upload_url(const char* url)
+{
+    int result;
+    char *err_msg;
+    char *sql = NULL;
+    char *upload_url = url;
+    if (NULL == upload_url)
+    {
+        upload_url = "";
+    }
+    sql = sqlite3_mprintf("update %s set uploadUrl='%s'", SERVER_PARAMS_TABLE, upload_url);
+    
+    result = sqlite3_exec(g_hxt_service_db, sql, NULL, NULL, &err_msg);
+    if (result != SQLITE_OK)
+    {
+        utils_print("%s:%s\n", sql, err_msg);
+        sqlite3_free(err_msg);
+        sqlite3_free(sql);
+        return FALSE;    
+    }
+    sqlite3_free(sql);
+
+    return TRUE;
+}
+
 char* get_server_url()
 {
     return get_string_value_from_table(SERVER_PARAMS_TABLE, "serverUrl");

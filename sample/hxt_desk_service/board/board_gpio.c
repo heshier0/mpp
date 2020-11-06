@@ -85,6 +85,8 @@ static LED_STATUS led_status = BOOTING;
 extern BOOL g_deploying_net;
 extern BOOL g_posture_running;
 extern BOOL g_device_sleeping;
+extern BOOL g_iflyos_first_login;
+extern BOOL g_hxt_first_login;
 extern int g_connect_count;
 volatile BOOL g_hxt_wbsc_running;
 volatile BOOL g_iflyos_wbsc_running;
@@ -176,8 +178,8 @@ void button_mute_callback(void *btn)
         }
         else
         {
-            board_set_led_status(CHECKING_EXIT);
-            stop_posture_recognize();   
+            stop_posture_recognize();
+            board_set_led_status(CHECKING_EXIT);   
         }
     break;
     case DOUBLE_CLICK:
@@ -194,9 +196,10 @@ void button_mute_callback(void *btn)
                 if (g_device_sleeping)      //device sleeping
                 {
                     utils_print("To wake....\n");
+                    g_iflyos_first_login = TRUE;
+                    g_hxt_first_login =  TRUE;
                     g_device_sleeping = FALSE;
-                    start_iflyos_websocket_thread();
-                    board_set_led_status(NORMAL);
+                    board_set_led_status(NET_ERR);
                     utils_print("OK!!\n");
                 }
                 else

@@ -5,7 +5,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+
 #define DEBUG 
+// #undef DEBUG
 
 #ifdef DEBUG
     #define utils_print(format, ...) printf("%s>>>%d: " format "\n", __FUNCTION__, __LINE__, ##__VA_ARGS__)

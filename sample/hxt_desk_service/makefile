@@ -39,7 +39,7 @@ INCS = -I$(ROOT_DIR)/. \
  
 LIBS = -L/mnt/g/workspace/plugins/libev/lib -lev \
        -L/mnt/g/workspace/plugins/cjson/lib -lcjson \
-       -L/mnt/g/workspace/plugins/libuwsc/lib -luwsc_debug \
+       -L/mnt/g/workspace/plugins/libuwsc/lib -luwsc \
        -L/mnt/g/workspace/plugins/libmbedtls/lib -lmbedx509 \
        -L/mnt/g/workspace/plugins/libmbedtls/lib -lmbedtls \
        -L/mnt/g/workspace/plugins/libmbedtls/lib -lmbedcrypto \

@@ -145,7 +145,7 @@ char* hxt_upload_file(const char* path, void *opts)
     char* object_path = NULL;
     if (NULL == path)
     {
-        return; 
+        return NULL; 
     }
 
     aos_pool_t *pool;
@@ -217,7 +217,6 @@ void hxt_deinit_aliyun_env()
     aos_http_io_deinitialize();
 }
 
-
 BOOL hxt_del_offline_expired_info()
 {
     return del_report_info_expired();
@@ -233,4 +232,3 @@ int hxt_stored_offline_study_info(void *data)
     /* */
     
 }
- 

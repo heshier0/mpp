@@ -300,8 +300,11 @@ static void hxt_init_cfg(void* data)
 
     cJSON* item1 = cJSON_GetObjectItem(returnObject, "websocketUrl");
     cJSON* item2 = cJSON_GetObjectItem(returnObject, "uploadHostUrl");
-    set_server_params(item1->valuestring, item2->valuestring);
-
+    if (item1 != NULL && item2 != NULL)
+    {
+        set_server_params(item1->valuestring, item2->valuestring);
+    }
+    
     char *tmp1 = NULL, *tmp2 = NULL;
     item1 = cJSON_GetObjectItem(returnObject, "iflyosToken");
     item2 = cJSON_GetObjectItem(returnObject, "iflyosID");
@@ -593,8 +596,20 @@ BOOL hxt_get_token_request()
         }
         cJSON* token_item = cJSON_GetObjectItem(returnObject, "token");  
         cJSON* time_item = cJSON_GetObjectItem(returnObject, "tokenExpireTime");
-        utils_print("token time is %lld\n", time_item->valuedouble);
+        utils_print("token time is %lf\n", time_item->valuedouble);
         set_connect_params(token_item->valuestring, time_item->valuedouble/1000);
+
+        /*new item added 2020-11-03, websocketUrl and apiUrl*/
+        cJSON* wsc_item = cJSON_GetObjectItem(returnObject, "websocketUrl");
+        cJSON* api_item = cJSON_GetObjectItem(returnObject, "apiUrl");
+        if (wsc_item != NULL)
+        {
+            set_websocket_url(wsc_item->valuestring);
+        }
+        if (api_item != NULL)
+        {
+            set_server_url(api_item->valuestring);
+        }
 
         cJSON_Delete(token_root);
         reported = TRUE;

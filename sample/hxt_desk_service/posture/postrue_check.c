@@ -117,7 +117,7 @@ static void play_random_warn_voice()
     int alarm_type = get_alarm_type(chlid_unid);
     int idx = 0;
     
-    utils_print("select child is %d, alarm type is %d\n", chlid_unid, alarm_type);
+    // utils_print("select child is %d, alarm type is %d\n", chlid_unid, alarm_type);
     switch(alarm_type)
     {
         case 0:
@@ -207,7 +207,7 @@ static BOOL begin_recording()
                                 _tm->tm_sec,
                                 child_unid);
         send_recording_mp4_cmd(g_mp4_file, g_snap_file);
-        utils_print("%s -----> Begin record\n", utils_get_current_time());
+        // utils_print("%s -----> Begin record\n", utils_get_current_time());
     }
     
     return TRUE;
@@ -219,7 +219,7 @@ static void delete_recorded()
     {
         send_delete_mp4_cmd(g_mp4_file, g_snap_file);
         g_is_recording = FALSE;
-        utils_print("%s -----> Delete record: %s\n", utils_get_current_time(), g_snap_file);
+        // utils_print("%s -----> Delete record: %s\n", utils_get_current_time(), g_snap_file);
     }
 }
 
@@ -228,7 +228,7 @@ static void stop_record()
     if(g_is_recording)
     {
         g_is_recording = FALSE;
-        utils_print("%s -----> Stop record\n", utils_get_current_time());
+        // utils_print("%s -----> Stop record\n", utils_get_current_time());
         send_stop_record_mp4_cmd(g_mp4_file, g_snap_file);
     }
 }
@@ -239,7 +239,7 @@ static BOOL send_study_report_type(StudyInfo *info)
     int child_unid = get_select_child_id();
     if (child_unid <= 0)
     {
-        utils_print("no child binded\n");
+        // utils_print("no child binded\n");
         return FALSE;
     }
 
@@ -403,7 +403,7 @@ static BOOL check_posture_alarm(struct check_status_t *check_status, int check_r
     case NORMAL_POSTURE_STATUS:
         break;
     case BAD_POSTURE_STATUS:
-        utils_print("record_interval is %d, video_time_len is %d\n", record_interval, video_time_len);
+        // utils_print("record_interval is %d, video_time_len is %d\n", record_interval, video_time_len);
         if (record_interval >= video_time_len)
         {
             stop_record();
@@ -503,7 +503,6 @@ static void* thread_proc_yuv_data_cb(void *param)
     study_mode = params->study_mode;
     width = params->height;
     height = params->width;
-    utils_print("study mode now is %d\n", study_mode);
     if (alarm_interval <= 0)
     {
         alarm_interval = 10;
@@ -628,7 +627,7 @@ void start_posture_recognize()
     s_keep_processing = TRUE;
 
     /* creat upload info table if not created*/
-    if (get_upload_count_of_day < 0)
+    if (get_upload_count_of_day() < 0)
     {
         create_upload_count_info();
     }

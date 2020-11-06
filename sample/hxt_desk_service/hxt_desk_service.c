@@ -35,6 +35,7 @@ sem_t g_hxt_run_flag;
 DATABUFFER g_msg_buffer;
 static BOOL g_processing = TRUE;
 
+
 static void* hxt_websocket_cb(void* data)
 {
     hxt_websocket_start();
@@ -59,6 +60,12 @@ static void handle_signal(int signo)
         utils_print("HxtDeskService PIPE BREAK!!!\n");
     }
 
+    if (SIGSEGV == signo)
+    {
+        utils_print("Receive SIGSEGV signal\n");
+    }
+
+
     if (SIGINT == signo || SIGTERM == signo)
     {
         g_processing = FALSE;
@@ -72,11 +79,12 @@ int main(int argc, char **argv)
     BOOL server_started = TRUE;
     BOOL first_start = TRUE;
 
-#ifdef DEBUG
+//#ifdef DEBUG
     signal(SIGINT, handle_signal);
     signal(SIGTERM, handle_signal);   
     signal(SIGPIPE, handle_signal);
-#endif
+    signal(SIGSEGV, handle_signal);
+//#endif
     open_hxt_service_db();
 
     create_buffer(&g_msg_buffer, 16*1024);
@@ -95,7 +103,8 @@ int main(int argc, char **argv)
         if (g_device_sleeping)
         {
             utils_print("sleeping...\n");
-            sleep(120);
+            board_set_led_status(SLEEPING);
+            sleep(10);
             continue;
         }
         /*check wifi*/
@@ -125,21 +134,16 @@ int main(int argc, char **argv)
 
         if (!utils_check_wifi_state())
         {
-            if(g_connect_count < 3)
+            utils_disconnect_wifi();
+            sleep(5);
+  
+            if (!g_deploying_net || g_connect_count >= 3)
             {
-                utils_disconnect_wifi();
-                sleep(5);
-                continue;
-            }
-            if (!g_deploying_net)
-            {
-                utils_print("wifi not link...\n");
+                printf("wifi not link...\n");
                 board_set_led_status(NET_ERR);
             }
-    
             continue;
         }
-        g_connect_count = 0; 
         
         if (first_start)
         {
@@ -164,6 +168,7 @@ int main(int argc, char **argv)
             }
         }
 
+        /*connect to server*/
         server_started = hxt_refresh_token_request();       
         if (server_started)
         {
@@ -174,6 +179,7 @@ int main(int argc, char **argv)
 
             if(!g_hxt_wbsc_running)
             {
+                board_set_led_status(NET_ERR);
                 start_hxt_websocket_thread();
                 sem_wait(&g_hxt_run_flag);
             }
@@ -188,7 +194,7 @@ int main(int argc, char **argv)
             }       
         }
 
-        utils_print("Desk process running....\n");
+        printf("Desk process running....\n");
         sleep(120);
     }
 

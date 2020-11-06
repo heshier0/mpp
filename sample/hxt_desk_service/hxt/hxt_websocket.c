@@ -32,8 +32,10 @@ extern sem_t g_hxt_run_flag;
 
 static struct uwsc_client *hxt_wsc = NULL;
 static struct ev_loop *g_hxt_loop = NULL;
+static ev_async g_async_watcher;
 static BOOL g_recv_running = TRUE;
 static BOOL g_sem_posted = FALSE;
+
 
 static BOOL init_study_info(ReportInfo *report_info, StudyInfo *study_info, AliossOptions *opts)
 {
@@ -132,7 +134,7 @@ static int hxt_send_desk_status(struct uwsc_client *cl, REPORT_TYPE type, int in
 {
     if(NULL == cl)
     {
-        return;
+        return -1;
     }
 
     //post json data to server
@@ -188,7 +190,6 @@ static void* send_study_info_cb(void *params)
 
     while (g_recv_running)
     {
-
         char* ptr = get_buffer(&g_msg_buffer, sizeof(StudyInfo));
         if (NULL == ptr)
         {
@@ -209,14 +210,14 @@ static void* send_study_info_cb(void *params)
         }
 
         init_study_info(&report_info, (StudyInfo*)ptr, opts);
-        if (report_info.report_type == BAD_POSTURE)
-        {
-            if (strlen(report_info.snap_url) == 0 || strlen(report_info.video_url) == 0)
-            {
-                utils_print("upload failed,discard....\n");
-                goto DISCARD_EXIT;
-            }
-        }
+        // if (report_info.report_type == BAD_POSTURE)
+        // {
+        //     if (strlen(report_info.snap_url) == 0 || strlen(report_info.video_url) == 0)
+        //     {
+        //         utils_print("upload failed,discard....\n");
+        //         goto DISCARD_EXIT;
+        //     }
+        // }
 
         //post json data to server
         cJSON *root = cJSON_CreateObject();    
@@ -249,13 +250,13 @@ static void* send_study_info_cb(void *params)
         {
             goto CLEAR;
         }
-        utils_print("STUDY-INFO: %s\n", json_data);
+        
         cl->send(cl, json_data, strlen(json_data) + 1, UWSC_OP_TEXT);
+        printf("STUDY-INFO: %s\n", json_data);
 
         utils_free(json_data);
 CLEAR:
         cJSON_Delete(root);
-DISCARD_EXIT:   
         release_buffer(&g_msg_buffer, sizeof(StudyInfo));
         ptr = NULL;
     }
@@ -265,6 +266,8 @@ DISCARD_EXIT:
         deinit_upload_options((void*)opts);
         opts = NULL;
     }
+
+    printf("Hxt send_study_info thread exit ....\n");
 
     return NULL;
 }
@@ -440,8 +443,16 @@ static void parse_server_config_data(void *data)
         if (item != NULL)
         {
             sub_item1 = cJSON_GetObjectItem(item, "websocketUrl");
+            if (sub_item1 != NULL)
+            {
+                set_websocket_url(sub_item1->valuestring);
+            }
             sub_item2 = cJSON_GetObjectItem(item, "uploadHostUrl");
-            set_server_params(sub_item1->valuestring, sub_item2->valuestring);
+            if (sub_item2 != NULL)
+            {
+                set_upload_url(sub_item2->valuestring);
+            }
+            // set_server_params(sub_item1->valuestring, sub_item2->valuestring);
         }
     break;
     case HXT_UPDATE_SELF_ALARM:
@@ -527,14 +538,17 @@ static void hxt_wsc_ping(struct uwsc_client *cl)
     hxt_send_desk_status(cl, HEARTBEAT, UWSC_OP_PING);
 }
 
+static void async_callback(EV_P_ ev_async* w, int revents)
+{
+    ev_break(g_hxt_loop, EVBREAK_ALL);
+}
+
 void hxt_websocket_stop()
 {
     g_recv_running = FALSE;
-    if (g_hxt_loop)
-    {
-        utils_print("To stop HXT websocket\n");
-        ev_break(g_hxt_loop, EVBREAK_ALL);
-    }
+    ev_async_init(&g_async_watcher, async_callback);
+    ev_async_start(g_hxt_loop, &g_async_watcher);
+    ev_async_send(g_hxt_loop, &g_async_watcher);
 }
 
 int hxt_websocket_start()
@@ -567,7 +581,7 @@ int hxt_websocket_start()
          
     utils_free(token);     
     utils_free(hxt_url);     
-	utils_print("%s -- Hxt websocket start ...\n", utils_get_current_time());
+	printf("%s -- Hxt websocket start ...\n", utils_get_current_time());
 
     hxt_wsc->onopen = hxt_wsc_onopen;
     hxt_wsc->onmessage = hxt_wsc_onmessage;
@@ -583,13 +597,16 @@ int hxt_websocket_start()
     {
         sem_post(&g_hxt_run_flag);
     }
-    
-    g_recv_running = TRUE;
+
     g_sem_posted = FALSE;
     hxt_deinit_aliyun_env();
     g_hxt_wbsc_running = FALSE;
-    board_set_led_status(NET_ERR);
-    utils_print("Hxt websocket exit...\n");   
+    if (!g_device_sleeping)
+    {
+        board_set_led_status(NET_ERR);
+    }
+        
+    printf("Hxt websocket exit...\n");   
 
     return 0;  
 }

@@ -20,7 +20,7 @@ BOOL hxt_unbind_child(int child_unid);
 BOOL hxt_get_aliyun_config(void **opt);
 BOOL init_upload_options(void **opts, void *data);
 void deinit_upload_options(void *opts);
-BOOL hxt_upload_file(const char* path, void *opts);
+char* hxt_upload_file(const char* path, void *opts);
 BOOL hxt_init_aliyun_env();
 void hxt_deinit_aliyun_env();
 
