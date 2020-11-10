@@ -45,10 +45,7 @@ static void* hxt_websocket_cb(void* data)
 static void start_hxt_websocket_thread()
 {
     pthread_t hxt_tid;
-    if (hxt_get_desk_cfg_request())
-    {
-        pthread_create(&hxt_tid, NULL, hxt_websocket_cb, NULL);
-    }
+    pthread_create(&hxt_tid, NULL, hxt_websocket_cb, NULL);
     
     return;
 }
@@ -63,6 +60,7 @@ static void handle_signal(int signo)
     if (SIGSEGV == signo)
     {
         utils_print("Receive SIGSEGV signal\n");
+        exit(-1);
     }
 
 
@@ -70,6 +68,7 @@ static void handle_signal(int signo)
     {
         g_processing = FALSE;
     }
+
 }
 
 int main(int argc, char **argv)

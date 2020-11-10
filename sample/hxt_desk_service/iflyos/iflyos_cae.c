@@ -43,6 +43,12 @@ static void recog_audio_fn(const void* audio_data, unsigned int audio_len, int p
 		return;
 	}
 
+	if (NULL == audio_data)
+	{
+		utils_print("recog audio error....\n");
+		return;
+	}
+
 	if (wake_up)
 	{
 		char *req = iflyos_create_audio_in_request();

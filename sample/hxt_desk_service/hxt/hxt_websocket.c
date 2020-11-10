@@ -55,8 +55,18 @@ static BOOL init_study_info(ReportInfo *report_info, StudyInfo *study_info, Alio
     utils_print("type:%d, video:%s, snap:%s\n", study_info->info_type, study_info->file, study_info->snap);
 
     report_info->camera_status = g_camera_status;
-    report_info->parent_unid = get_parent_id(); 
-    report_info->child_unid = get_select_child_id(); 
+    int parent_unid = get_parent_id();
+    if (parent_unid <= 0)
+    {
+        return FALSE;
+    }
+    report_info->parent_unid = parent_unid;
+    int child_unid = get_select_child_id();
+    if (child_unid <= 0)
+    {
+        return FALSE;
+    }
+    report_info->child_unid = child_unid;
     report_info->report_type = study_info->info_type;
     strcpy(report_info->study_date, utils_date_to_string());
     strcpy(report_info->report_time, utils_time_to_string());
@@ -76,7 +86,7 @@ static BOOL init_study_info(ReportInfo *report_info, StudyInfo *study_info, Alio
 
         /*waiting for mp4 file saved, better way is to recive a signal to notify*/
         int retry_count = 0;
-        while (utils_get_file_size(study_info->file) < 1024 && retry_count < 3)
+        while (utils_get_file_size(study_info->file) < 1024 && retry_count < 5)
         {
             utils_print("video %s size is error\n", study_info->file);
             sleep(1);
@@ -96,10 +106,9 @@ static BOOL init_study_info(ReportInfo *report_info, StudyInfo *study_info, Alio
         {
             utils_print("Upload video %s Failed\n", study_info->file);
         }
-        
         //remove(study_info->file);
 
-        while (utils_get_file_size(study_info->snap) < 1024 && retry_count < 3)
+        while (utils_get_file_size(study_info->snap) < 1024 && retry_count < 5)
         {
             utils_print("snap %s size is error\n", study_info->snap);
             sleep(1);
@@ -209,20 +218,17 @@ static void* send_study_info_cb(void *params)
             }
         }
 
-        init_study_info(&report_info, (StudyInfo*)ptr, opts);
-        // if (report_info.report_type == BAD_POSTURE)
-        // {
-        //     if (strlen(report_info.snap_url) == 0 || strlen(report_info.video_url) == 0)
-        //     {
-        //         utils_print("upload failed,discard....\n");
-        //         goto DISCARD_EXIT;
-        //     }
-        // }
+        if (!init_study_info(&report_info, (StudyInfo*)ptr, opts))
+        {
+            continue;
+        }
 
         //post json data to server
         cJSON *root = cJSON_CreateObject();    
         if (NULL == root)
         {
+            release_buffer(&g_msg_buffer, sizeof(StudyInfo));
+            ptr = NULL;
             continue;
         }
 
@@ -533,9 +539,14 @@ static void hxt_wsc_onclose(struct uwsc_client *cl, int code, const char *reason
     ev_break(cl->loop, EVBREAK_ALL);
 }
 
-static void hxt_wsc_ping(struct uwsc_client *cl)
+static void hxt_send_heartbeat(struct ev_loop* loop, ev_timer* timer, int e)
 {
-    hxt_send_desk_status(cl, HEARTBEAT, UWSC_OP_PING);
+    if (NULL == g_hxt_loop)
+    {
+        return;
+    }
+
+    hxt_send_desk_status(hxt_wsc, HEARTBEAT, UWSC_OP_TEXT);
 }
 
 static void async_callback(EV_P_ ev_async* w, int revents)
@@ -555,6 +566,7 @@ int hxt_websocket_start()
 {
 	int ping_interval = 120;	        /* second */
     // struct ev_loop *loop;
+    struct ev_timer heartbeat_timer;
 
     prctl(PR_SET_NAME, "hxt_websocket");
     pthread_detach(pthread_self());
@@ -563,6 +575,12 @@ int hxt_websocket_start()
     hxt_init_aliyun_env();
 
     char* hxt_url = get_websocket_url();
+    if (hxt_url != NULL)
+    {
+        hxt_get_token_request();
+    }
+
+    hxt_url = get_websocket_url();
     char* token = get_server_token();
     char extra_header[1024] = {0};
     strcpy(extra_header, "Sec-WebSocket-Protocol: ");
@@ -572,7 +590,7 @@ int hxt_websocket_start()
 
     g_hxt_loop = ev_loop_new(EVFLAG_AUTO);
 
-    hxt_wsc = uwsc_new(g_hxt_loop, hxt_url, ping_interval, extra_header);
+    hxt_wsc = uwsc_new(g_hxt_loop, hxt_url, -1, extra_header);
     if (!hxt_wsc)
     {
         utils_print("hxt init failed\n");
@@ -587,7 +605,9 @@ int hxt_websocket_start()
     hxt_wsc->onmessage = hxt_wsc_onmessage;
     hxt_wsc->onerror = hxt_wsc_onerror;
     hxt_wsc->onclose = hxt_wsc_onclose;
-    hxt_wsc->ping = hxt_wsc_ping;
+
+    ev_timer_init(&heartbeat_timer, hxt_send_heartbeat, 0.0, ping_interval);
+    ev_timer_start(g_hxt_loop, &heartbeat_timer);
 
     ev_run(g_hxt_loop, 0);
 

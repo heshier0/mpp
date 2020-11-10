@@ -136,7 +136,7 @@ int get_select_child_id()
     int value = 0;
 
     sql = sqlite3_mprintf("select childID from %s where isSelect=1", USER_PARAMS_TABLE);
-    utils_print("%s\n", sql);
+    // utils_print("%s\n", sql);
     result = sqlite3_get_table(g_hxt_service_db, sql, &db_result, &row_count, &col_count, &err_msg);
     if (result != SQLITE_OK)
     {

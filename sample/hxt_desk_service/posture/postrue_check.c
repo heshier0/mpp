@@ -215,6 +215,18 @@ static BOOL begin_recording()
 
 static void delete_recorded()
 {
+    int child_unid = get_select_child_id();
+    if (child_unid <= 0)
+    {
+        return;
+    }
+
+    int count = get_upload_count_of_day();
+    if (count >= 50)
+    {
+        return;
+    }
+
     if(g_is_recording)
     {
         send_delete_mp4_cmd(g_mp4_file, g_snap_file);
@@ -225,6 +237,18 @@ static void delete_recorded()
 
 static void stop_record()
 {
+    int child_unid = get_select_child_id();
+    if (child_unid <= 0)
+    {
+        return;
+    }
+
+    int count = get_upload_count_of_day();
+    if (count >= 50)
+    {
+        return;
+    }
+
     if(g_is_recording)
     {
         g_is_recording = FALSE;
@@ -549,7 +573,7 @@ static void* thread_proc_yuv_data_cb(void *param)
         /* 1 : bad posture */
         /* 2 : away */
         one_check_result = run_sit_posture(g_recog_handle, yuv_buf, width, height, study_mode);
-        utils_print("%s -----> %d\n", utils_get_current_time(), one_check_result);
+        // utils_print("%s -----> %d\n", utils_get_current_time(), one_check_result);
         if (one_check_result == -1)
         {
             utils_free(yuv_buf);

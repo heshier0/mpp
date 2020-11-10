@@ -149,7 +149,7 @@ int get_number_value_from_table(const char* table_name, const char* col_name)
     int value = 0;
 
     char* sql = sqlite3_mprintf("select %s from %s", col_name, table_name);
-    utils_print("%s\n", sql);
+    //utils_print("%s\n", sql);
     result = sqlite3_get_table(g_hxt_service_db, sql, &db_result, &row_count, &col_count, &err_msg);
     if (result != SQLITE_OK)
     {
@@ -187,7 +187,7 @@ char* get_string_value_from_table(const char* table_name, const char* col_name)
     }
 
     char* sql = sqlite3_mprintf("select %s from %s", col_name, table_name);
-    utils_print("%s\n", sql);
+    //utils_print("%s\n", sql);
     result = sqlite3_get_table(g_hxt_service_db, sql, &db_result, &row_count, &col_count, &err_msg);
     if (result != SQLITE_OK)
     {

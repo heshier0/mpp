@@ -1140,7 +1140,7 @@ BOOL hxt_get_aliyun_config(void **opts)
     int status_code = hxt_get_reponse_status_code((void *)out);
     if (status_code == HXT_OK)
     {
-        utils_print("Aliyun: %s\n", out);
+        // utils_print("Aliyun: %s\n", out);
         reported = init_upload_options((AliossOptions**)opts, (void*)out);
     } 
     else if(status_code == HXT_NO_REGISTER)

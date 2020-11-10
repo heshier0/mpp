@@ -22,18 +22,15 @@
 #define utils_malloc(size) ({ \
 	void *__ptr__ = malloc(size); \
 	memset(__ptr__,0,size); \
-    malloc_print(__ptr__,size); \
 	__ptr__; \
 	})
 
 #define utils_calloc(size) ({ \
 	void *__ptr__ = calloc(size, 1); \
-    malloc_print(__ptr__,size); \
 	__ptr__; \
 	})
 
 #define utils_free(ptr) ({ \
-    free_print(ptr); \
 	free(ptr); \
 	})
 
