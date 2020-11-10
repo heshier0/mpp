@@ -81,7 +81,7 @@ static BOOL init_study_info(ReportInfo *report_info, StudyInfo *study_info, Alio
         {
             strcpy(report_info->video_url, "");
             strcpy(report_info->snap_url, "");
-            return FALSE;
+            return TRUE;
         }
 
         /*waiting for mp4 file saved, better way is to recive a signal to notify*/
@@ -220,6 +220,8 @@ static void* send_study_info_cb(void *params)
 
         if (!init_study_info(&report_info, (StudyInfo*)ptr, opts))
         {
+            release_buffer(&g_msg_buffer, sizeof(StudyInfo));
+            ptr = NULL;
             continue;
         }
 
@@ -263,6 +265,7 @@ static void* send_study_info_cb(void *params)
         utils_free(json_data);
 CLEAR:
         cJSON_Delete(root);
+        
         release_buffer(&g_msg_buffer, sizeof(StudyInfo));
         ptr = NULL;
     }
