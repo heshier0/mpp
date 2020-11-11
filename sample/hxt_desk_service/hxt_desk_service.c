@@ -81,8 +81,9 @@ int main(int argc, char **argv)
 //#ifdef DEBUG
     signal(SIGINT, handle_signal);
     signal(SIGTERM, handle_signal);   
-    signal(SIGPIPE, handle_signal);
-    signal(SIGSEGV, handle_signal);
+    signal(SIGPIPE, handle_signal);  
+    //FIXME: add by huang  @2020-11-10  不能生成 core 先注释掉  19941608848
+    //signal(SIGSEGV, handle_signal);
 //#endif
     open_hxt_service_db();
 

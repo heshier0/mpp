@@ -15,9 +15,10 @@
 #define PARAM_PATH  "/userdata/config/iflyos/hlw.param"
 
 extern BOOL g_stop_capture;
-CAE_HANDLE g_cae_handle = NULL;
 
+static CAE_HANDLE s_cae_handle = NULL;
 static BOOL wake_up = FALSE;
+static BOOL voice_end = FALSE;
 
 static void ivw_fn(short angle, short channel, float power, short CMScore, short beam, char *param1, void *param2, void *userdata)
 {
@@ -27,11 +28,11 @@ static void ivw_fn(short angle, short channel, float power, short CMScore, short
 	utils_send_local_voice(VOICE_IFLYOS_ECHO);
 	
 	wake_up = TRUE;
+	voice_end = FALSE;
 }
 
 static void ivw_audio_fn(const void* audio_data, unsigned int audio_len, int param1, const void* param2, void *userdata)
 {
-	
 }
 
 static void recog_audio_fn(const void* audio_data, unsigned int audio_len, int param1, const void *param2, void *userdata)
@@ -51,6 +52,10 @@ static void recog_audio_fn(const void* audio_data, unsigned int audio_len, int p
 
 	if (wake_up)
 	{
+		utils_print("To send CANCEL flag...\n");
+		cl->send(cl, "__CANCEL__", strlen("__CANCEL__"), UWSC_OP_BINARY);
+		utils_print("OK!!!\n");
+		/*send text request to iflyos when waked by voice*/
 		char *req = iflyos_create_audio_in_request();
 		if (req == NULL)
 		{
@@ -61,19 +66,31 @@ static void recog_audio_fn(const void* audio_data, unsigned int audio_len, int p
 		cl->send(cl, req, strlen(req), UWSC_OP_TEXT);
 		utils_free(req);
 		wake_up = FALSE;
-		utils_print("to send voice...\n");
 	}
-	
-	if(!g_stop_capture)
+
+	/*send pcm data to iflyos*/
+	if (!voice_end)
 	{
 		cl->send(cl, audio_data, audio_len, UWSC_OP_BINARY);
+	}
+
+	if (g_stop_capture)
+	{
+		utils_print("To send END flag...\n");
+		if (cl != NULL)
+		{
+			cl->send(cl, "__END__", strlen("__END__"), UWSC_OP_BINARY);
+		}
+		utils_print("OK!!!\n");
+		g_stop_capture = FALSE;
+		voice_end = TRUE;
 	}
 }
 
 BOOL iflyos_init_cae_lib(void* data)
 {
-    int rv, i;
-    char buffer[1024] = {0};
+	
+    int rv;
     int flag = 2;
 
     utils_print("version: %s\n", CAEGetVersion());
@@ -81,13 +98,13 @@ BOOL iflyos_init_cae_lib(void* data)
     CAESetShowLog(flag);
 #endif
 
-	// if(g_cae_handle != NULL)
+	// if(s_cae_handle != NULL)
 	// {
 	// 	utils_print("iflyos cae handle is still valid\n");
 	// 	return FALSE;
 	// }
 
-    rv = CAENew(&g_cae_handle, CONF_PATH, ivw_fn, ivw_audio_fn, recog_audio_fn, PARAM_PATH, data);
+    rv = CAENew(&s_cae_handle, CONF_PATH, ivw_fn, ivw_audio_fn, recog_audio_fn, PARAM_PATH, data);
     if (rv != 0)
     {
 		utils_print("CAENEW error\n");
@@ -115,10 +132,10 @@ BOOL iflyos_init_cae_lib(void* data)
 
 void iflyos_deinit_cae_lib()
 {
-    if (g_cae_handle != NULL)
+    if (s_cae_handle != NULL)
     {
-        CAEDestroy(g_cae_handle);
-		g_cae_handle = NULL;
+        CAEDestroy(s_cae_handle);
+		s_cae_handle = NULL;
 		utils_print("destroy cae lib OK\n");
     }
 }
@@ -131,9 +148,9 @@ int iflyos_write_audio(void* buffer, int buf_length)
 		return -1;
 	}
 
-	if (g_cae_handle)
+	if (s_cae_handle)
 	{
-		rv = CAEAudioWrite(g_cae_handle, buffer, buf_length);
+		rv = CAEAudioWrite(s_cae_handle, buffer, buf_length);
 	}
     
     if(rv != 0)

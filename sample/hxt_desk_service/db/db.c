@@ -23,7 +23,7 @@ static BOOL create_params_tables()
         "create table if not exists UserParams(id integer primary key asc not null,childID integer,studyMode integer,alarmType integer,isSelect integer)",
         "create table if not exists ReportInfos(id integer primary key asc not null,parentID integer not null, childID integer not null,type integer not null,reportTime text,mode integer,camera integer,duration integer,videoUrl text,snapUrl text)",
         "create table if not exists VolumeInfos(id integer primary key asc not null,vol integer not null,isMute integer not null)",
-        "create table if not exists UploadCountParams(id integer primary key asc not null,upload_day text,upload_count integer)",
+        "create table if not exists UploadCountParams(id integer primary key asc not null,childID integer not null, upload_day text,upload_count integer)",
         /* new sql should add here*/
         "insert into VolumeInfos values(1,-20,0)",
         "insert into DeskParams values(1,\"\",0,-1)", 

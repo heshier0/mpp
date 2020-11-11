@@ -57,7 +57,7 @@
 #define HXT_VARY_CHILD_ID       8
 #define HXT_GET_IFLYOS_TOKEN    10
 #define HXT_STOP_STUDY          14
-#define HXT_DISCONNECT          15
+#define HXT_UNBIND_DESK         15
 #define HXT_POWEROFF            16
 #define HXT_RESTART             17
 #define HXT_UPDATE_URL          18

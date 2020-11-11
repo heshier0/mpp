@@ -381,8 +381,9 @@ static void parse_server_config_data(void *data)
         item = cJSON_GetObjectItem(root, "data");   
         if (item != NULL)
         {
-            sub_item = cJSON_GetObjectItem(item, "studyMode");
-            update_study_mode(get_select_child_id(), sub_item->valueint);   
+            sub_item1 = cJSON_GetObjectItem(item, "childrenUnid");
+            sub_item2 = cJSON_GetObjectItem(item, "studyMode");
+            update_study_mode(sub_item1->valueint, sub_item2->valueint);   
         }                            
     break;
     case HXT_BIND_CHILD_ID:
@@ -430,7 +431,7 @@ static void parse_server_config_data(void *data)
         utils_print("To stop study...\n");
         stop_posture_recognize();
     break;
-    case HXT_DISCONNECT:
+    case HXT_UNBIND_DESK:
         /* device deregister */
         utils_print("To disconnect...\n");
         utils_system_reset();

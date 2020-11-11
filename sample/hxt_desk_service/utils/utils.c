@@ -179,6 +179,7 @@ BOOL utils_send_local_voice(const char *path)
         }
         if(FD_ISSET(fd, &write_fds))
         {
+            memset(buff, 1024, 0);
             read_length = fread(buff, 1024, 1, fp);
             if(read_length <= 0)
             {

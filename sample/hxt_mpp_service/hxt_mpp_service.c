@@ -298,7 +298,8 @@ int main(int argc, char **argv)
     }
 
     signal(SIGPIPE, handle_signal);
-    signal(SIGSEGV, handle_signal);
+    //FIXME: add by huang  @2020-11-10  不能生成 core 先注释掉  19941608848
+	//signal(SIGSEGV, handle_signal);
 
     socklen_t len = sizeof(len);
     int sock = create_local_tcp_server();
