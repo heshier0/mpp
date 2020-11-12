@@ -310,7 +310,6 @@ int main(int argc, char **argv)
    
     create_buffer(&g_client_data, BUFFER_SIZE);
 
-    create_pcm_fifo();
     create_mp3_fifo();
 
     if(!init_mpp())
@@ -353,7 +352,6 @@ int main(int argc, char **argv)
 ERR_INIT_VIDEO_SYS:
     deinit_mpp();
 ERR_INIT_MPP:    
-    delete_pcm_fifo();
     delete_mp3_fifo();
     destroy_buffer(&g_client_data);
 

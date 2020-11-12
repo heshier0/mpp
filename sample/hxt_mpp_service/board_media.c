@@ -79,6 +79,11 @@ static BOOL add_sps_pps(unsigned char* buf, unsigned int size, int width, int he
 {
 	int ret = 0;
 
+	if (NULL == buf)
+	{
+		return FALSE;
+	}
+
 	if(!init_video_codec_params(width, height))
 	{
 		utils_print("Muxing: init video codec params failed\n");

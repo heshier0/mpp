@@ -72,21 +72,6 @@ static void delete_fifo(const char* name)
     unlink(name);
 }
 
-static int open_pcm_fifo()
-{
-    return open(PCM_FIFO, O_WRONLY);
-}
-
-BOOL create_pcm_fifo()
-{
-    return create_fifo(PCM_FIFO);
-}
-
-void delete_pcm_fifo()
-{
-    delete_fifo(PCM_FIFO);
-}
-
 static int open_mp3_fifo()
 {
     return open(MP3_FIFO, O_RDONLY);
@@ -969,7 +954,7 @@ static void* sample_video_cb(void* data)
         return NULL;
     }
     prctl(PR_SET_NAME, "sample_video_thread");
-    
+    utils_print("width is %d, height is %d\n", ptmp->width, ptmp->height);
     board_get_stream_from_venc_chn(ptmp->width, ptmp->height);
     return NULL;
 }

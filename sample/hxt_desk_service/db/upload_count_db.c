@@ -10,7 +10,7 @@ BOOL create_upload_count_info()
     char *err_msg;
     char *sql = NULL;
 
-    sql = sqlite3_mprintf("insert into %s (id,childID, upload_day,upload_count) values (NULL,0,'%s',0)", UPLOAD_COUNT_TABLE, utils_date_to_string());
+    sql = sqlite3_mprintf("insert into %s (id,upload_day,upload_count) values (NULL,'%s',0)", UPLOAD_COUNT_TABLE, utils_date_to_string());
     utils_print("%s\n", sql);
     result = sqlite3_exec(g_hxt_service_db, sql, NULL, NULL, &err_msg);
     if (result != SQLITE_OK)
@@ -30,7 +30,7 @@ BOOL init_upload_count()
     char *err_msg;
     char *sql = NULL;
    
-    sql = sqlite3_mprintf("update %s set childID=0 upload_day=\"\" update_count=0", UPLOAD_COUNT_TABLE);
+    sql = sqlite3_mprintf("update %s set upload_day=\"\" update_count=0", UPLOAD_COUNT_TABLE);
     result = sqlite3_exec(g_hxt_service_db, sql, NULL, NULL, &err_msg);
     if (result != SQLITE_OK)
     {

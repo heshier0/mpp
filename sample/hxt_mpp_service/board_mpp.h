@@ -8,12 +8,9 @@ extern "C" {
 #endif
 
 #define MP3_FIFO                "/tmp/mp3_fifo"
-#define PCM_FIFO                "/tmp/pcm_fifo"
 #define MPP_DATA_PORT           10099
 #define PCM_DATA_PORT           10098
 
-BOOL create_pcm_fifo();
-void delete_pcm_fifo();
 BOOL create_mp3_fifo();
 void delete_mp3_fifo();
 

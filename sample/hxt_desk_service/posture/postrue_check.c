@@ -173,11 +173,12 @@ static BOOL begin_recording()
     }
 
     /* if recording count exceeded this day*/
-    int count = get_upload_count_of_day();
-    if (count >= 50)
-    {
-        return FALSE;
-    }
+    /*NOTICE: mark for debug */
+    // int count = get_upload_count_of_day();
+    // if (count >= 50)
+    // {
+    //     return FALSE;
+    // }
 
     if(!g_is_recording)
     {
@@ -221,11 +222,12 @@ static void delete_recorded()
         return;
     }
 
-    int count = get_upload_count_of_day();
-    if (count >= 50)
-    {
-        return;
-    }
+    /*NOTICE:mark for debug 2020-11-12*/
+    // int count = get_upload_count_of_day();
+    // if (count >= 50)
+    // {
+    //     return;
+    // }
 
     if(g_is_recording)
     {
@@ -243,11 +245,12 @@ static void stop_record()
         return;
     }
 
-    int count = get_upload_count_of_day();
-    if (count >= 50)
-    {
-        return;
-    }
+    /*NOTICE: mark for debug, 2020112*/
+    // int count = get_upload_count_of_day();
+    // if (count >= 50)
+    // {
+    //     return;
+    // }
 
     if(g_is_recording)
     {
