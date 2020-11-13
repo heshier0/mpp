@@ -128,7 +128,6 @@ static void* process_desk_business_thread(void *args)
     int len = sizeof(cmd_header_t);
     video_ratio_t video_ratio;
     study_video_t study_video;
-    BOOL saving_video = FALSE;
 
     prctl(PR_SET_NAME, "process_cmd");
     pthread_detach(pthread_self());
@@ -216,13 +215,11 @@ static void* process_desk_business_thread(void *args)
         break;
         case CMD_STOP_VIDEO_RECORD:
             {
-                saving_video = TRUE;
                 bzero(&study_video, sizeof(study_video_t));
                 ptr = get_buffer(&g_client_data, sizeof(study_video_t));
                 memcpy(&study_video, ptr, sizeof(study_video_t));
                 release_buffer(&g_client_data, sizeof(study_video_t));
                 stop_video_recording();
-                saving_video = FALSE;
                 utils_print("stop video....\n");
             }
         break;

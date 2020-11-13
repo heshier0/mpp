@@ -954,8 +954,13 @@ static void* sample_video_cb(void* data)
         return NULL;
     }
     prctl(PR_SET_NAME, "sample_video_thread");
-    utils_print("width is %d, height is %d\n", ptmp->width, ptmp->height);
-    board_get_stream_from_venc_chn(ptmp->width, ptmp->height);
+    pthread_detach(pthread_self());
+
+    int width = ptmp->width;
+    int height = ptmp->height;
+    utils_free(ptmp);
+
+    board_get_stream_from_venc_chn(width, height);
     return NULL;
 }
 
@@ -1078,8 +1083,8 @@ void board_get_stream_from_venc_chn(int width, int height)
     fd_set read_fds;
     struct timeval timout_val; 
 
-    prctl(PR_SET_NAME, "board_get_stream_from_venc_chn");
-    pthread_detach(pthread_self());
+    // prctl(PR_SET_NAME, "board_get_stream_from_venc_chn");
+    // pthread_detach(pthread_self());
 
     g_enc_stream_status = TRUE;
     ret_val = HI_MPI_VENC_GetChnAttr(venc_chn, &venc_chn_attrs);
@@ -1338,7 +1343,15 @@ void start_sample_video_thread(void* data)
 {
     pthread_t video_tid;
 
-    pthread_create(&video_tid, NULL, sample_video_cb, data);
+    if (NULL == data)
+    {
+        return;
+    }
+
+    video_ratio_t *video_ratio = (video_ratio_t *)utils_malloc(sizeof(video_ratio_t));
+    memcpy(video_ratio, data, sizeof(video_ratio_t));
+
+    pthread_create(&video_tid, NULL, sample_video_cb, (void*)video_ratio);
    
     return;
 }
