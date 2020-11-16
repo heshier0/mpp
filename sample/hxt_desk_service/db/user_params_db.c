@@ -178,12 +178,12 @@ int get_study_mode(int child_unid)
         sqlite3_free(err_msg);
         sqlite3_free(sql);
         sqlite3_free_table(db_result);
-        return 3;        
+        return 1;        
     }
     
     if (row_count < 1)
     {
-        return 3;
+        return 1;
     }
 
     value = atoi(db_result[col_count]);

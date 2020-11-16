@@ -13,6 +13,12 @@ BOOL add_report_info(void* data);
 BOOL del_report_info(int id);
 BOOL del_report_info_expired();
 
+/*
+@params: pointer of struct ReportInfo
+@return: id
+*/
+int get_report_info(void *data);
+
 int get_report_info_count();
 int get_amount_records_of_day();
 

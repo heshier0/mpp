@@ -42,26 +42,26 @@ BOOL add_report_info(void* data)
 
 BOOL del_report_info(int id)
 {
-    char *err_msg;
-    char sql[1024] = {0};
     int result;
+    char *err_msg;
+    char *sql = NULL;
 
     if (id < 0)
     {
         return FALSE;
     }
-    const char *del_sql = "DELETE FROM report_table WHERE id=%d"; 
-    sprintf(sql, del_sql, id);
-    utils_print("sql:[%s]\n", sql);
+
+    sql = sqlite3_mprintf("DELETE FROM %s WHERE id=%d", REPORT_INFOS_TABLE, id);
     result = sqlite3_exec(g_hxt_service_db, sql, NULL, NULL, &err_msg);
     if (result != SQLITE_OK)
     {
-        utils_print("delete data failed:%s\n", err_msg);
+        utils_print("%s:%s\n", sql, err_msg);
         sqlite3_free(err_msg);
-
+        sqlite3_free(sql);
         return FALSE;
     }
 
+    sqlite3_free(sql);
     return TRUE;
 }
 
@@ -84,6 +84,58 @@ BOOL del_report_info_expired()
 
     sqlite3_free(sql);
     return TRUE;
+}
+
+
+int get_report_info(void *data)
+{
+    char *err_msg;
+    char **db_result;
+    char* sql = NULL;
+    int result;
+    int row_count, col_count;
+    int id = -1;
+    
+
+    if (NULL == data)
+    {
+        return -1;
+    }
+
+    sql = sqlite3_mprintf("select * from %s order by reportTime asc limit 0 ,1", REPORT_INFOS_TABLE);
+    result = sqlite3_get_table(g_hxt_service_db, sql, &db_result, &row_count, &col_count, &err_msg);
+    if (result != SQLITE_OK)
+    {
+        utils_print("select data failed:%s\n", err_msg);
+        sqlite3_free(err_msg);
+        sqlite3_free(sql);
+        sqlite3_free_table(db_result);
+        return -1;        
+    }
+
+    if (row_count < 1)
+    {
+        return -1;
+    }
+
+    ReportInfo* tmp = (ReportInfo *)data;
+    int index = col_count;
+    tmp->id = atoi(db_result[index++]);
+    id = tmp->id;
+    tmp->parent_unid = atoi(db_result[index++]);
+    tmp->child_unid = atoi(db_result[index++]);
+    tmp->report_type = atoi(db_result[index++]);
+    strcpy(tmp->report_time, db_result[index++]);
+    tmp->study_mode = atoi(db_result[index++]);
+    tmp->camera_status = atoi(db_result[index++]);
+    tmp->camera_status = atoi(db_result[index++]);
+    strcpy(tmp->video_url, db_result[index++]);
+    strcpy(tmp->snap_url, db_result[index++]);
+
+    sqlite3_free(sql);
+    sqlite3_free_table(db_result);
+
+    return id;
 }
 
 int get_report_info_count()

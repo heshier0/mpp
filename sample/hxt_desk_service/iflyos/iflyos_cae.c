@@ -52,9 +52,9 @@ static void recog_audio_fn(const void* audio_data, unsigned int audio_len, int p
 
 	if (wake_up)
 	{
-		utils_print("To send CANCEL flag...\n");
-		cl->send(cl, "__CANCEL__", strlen("__CANCEL__"), UWSC_OP_BINARY);
-		utils_print("OK!!!\n");
+		// utils_print("To send CANCEL flag...\n");
+		// cl->send(cl, "__CANCEL__", strlen("__CANCEL__"), UWSC_OP_BINARY);
+		// utils_print("OK!!!\n");
 		/*send text request to iflyos when waked by voice*/
 		char *req = iflyos_create_audio_in_request();
 		if (req == NULL)
@@ -68,12 +68,6 @@ static void recog_audio_fn(const void* audio_data, unsigned int audio_len, int p
 		wake_up = FALSE;
 	}
 
-	/*send pcm data to iflyos*/
-	if (!voice_end)
-	{
-		cl->send(cl, audio_data, audio_len, UWSC_OP_BINARY);
-	}
-
 	if (g_stop_capture)
 	{
 		utils_print("To send END flag...\n");
@@ -84,6 +78,12 @@ static void recog_audio_fn(const void* audio_data, unsigned int audio_len, int p
 		utils_print("OK!!!\n");
 		g_stop_capture = FALSE;
 		voice_end = TRUE;
+	}
+
+	/*send pcm data to iflyos*/
+	if (!voice_end)
+	{
+		cl->send(cl, audio_data, audio_len, UWSC_OP_BINARY);
 	}
 }
 
