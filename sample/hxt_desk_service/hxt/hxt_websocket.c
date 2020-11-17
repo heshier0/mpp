@@ -641,13 +641,3 @@ static void* hxt_websocket_cb(void* data)
     return NULL;
 }
 
-void start_hxt_websocket_thread()
-{
-    pthread_t hxt_tid;
-    if (hxt_get_desk_cfg_request())
-    {
-        pthread_create(&hxt_tid, NULL, hxt_websocket_cb, NULL);
-    }
-    
-    return;
-}

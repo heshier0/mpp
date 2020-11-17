@@ -102,6 +102,11 @@ static int hxt_get_reponse_status_code(void* data)
     utils_print("Respnse:[%s]\n", (char*)data);
 
     cJSON* root = cJSON_Parse(data);
+    if (NULL == root)
+    {
+        return NULL;
+    }
+    
     cJSON *item = cJSON_GetObjectItem(root, "statusCode");
     if (item == NULL)
     {

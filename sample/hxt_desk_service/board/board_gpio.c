@@ -777,6 +777,7 @@ static void* led_blinking_thread(void* param)
         case NO_BIND:
             set_camera_led_off();
             gpio_set_value(led_wifi_blue, 0);
+            sleep(1);
         break;
         case BINDING:
             set_wifi_led_off();
@@ -789,9 +790,11 @@ static void* led_blinking_thread(void* param)
         break;
         case CHECKING:
             gpio_set_value(led_camera_green, 0);
+            sleep(1);
         break;
         case CHECKING_EXIT:
             gpio_set_value(led_camera_green, 1);
+            sleep(1);
         break;
         case NET_ERR:
             gpio_set_value(led_wifi_blue, 1);
@@ -802,10 +805,12 @@ static void* led_blinking_thread(void* param)
                 set_camera_led_off();
             }
             changed_to_normal = FALSE;
+            sleep(1);
         break;
         case CAMERA_ERR:
             set_camera_led_off();
             gpio_set_value(led_camera_red, 0);
+            sleep(1);
         break;
         case RESETING:
             board_led_all_off();
@@ -819,9 +824,11 @@ static void* led_blinking_thread(void* param)
                 usleep(100 * 1000);
             }
             board_led_all_off();
+            sleep(1);
         break;
         case SLEEPING:
             board_led_all_off();
+            sleep(1);
         break;
         case NORMAL:
         default:   
@@ -835,6 +842,7 @@ static void* led_blinking_thread(void* param)
                 changed_to_normal = TRUE;
             }
             gpio_set_value(led_wifi_green, 0);
+            sleep(1);
         break;
         }
     }
