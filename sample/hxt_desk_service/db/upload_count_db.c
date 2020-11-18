@@ -4,13 +4,16 @@
 
 extern sqlite3 *g_hxt_service_db;
 
-BOOL create_upload_count_info()
+BOOL create_upload_count_info(int child_unid)
 {
     int result;
     char *err_msg;
     char *sql = NULL;
 
-    sql = sqlite3_mprintf("insert into %s (id,upload_day,upload_count) values (NULL,'%s',0)", UPLOAD_COUNT_TABLE, utils_date_to_string());
+    sql = sqlite3_mprintf("insert into %s (id,child_unid,upload_day,upload_count) values (NULL,%d,'%s',0)",
+                             UPLOAD_COUNT_TABLE, 
+                             child_unid,
+                             utils_date_to_string());
     utils_print("%s\n", sql);
     result = sqlite3_exec(g_hxt_service_db, sql, NULL, NULL, &err_msg);
     if (result != SQLITE_OK)
@@ -24,13 +27,13 @@ BOOL create_upload_count_info()
     return TRUE;
 }
 
-BOOL init_upload_count()
+BOOL init_upload_count(int child_unid)
 {
     int result;
     char *err_msg;
     char *sql = NULL;
    
-    sql = sqlite3_mprintf("update %s set upload_day=\"\" update_count=0", UPLOAD_COUNT_TABLE);
+    sql = sqlite3_mprintf("update %s set upload_day=\"\",upload_count=0 where child_unid=%d", UPLOAD_COUNT_TABLE, child_unid);
     result = sqlite3_exec(g_hxt_service_db, sql, NULL, NULL, &err_msg);
     if (result != SQLITE_OK)
     {
@@ -44,13 +47,16 @@ BOOL init_upload_count()
     return TRUE;
 }
 
-BOOL inc_upload_count()
+BOOL inc_upload_count(int child_unid)
 {
     int result;
     char *err_msg;
     char *sql = NULL;
     
-    sql = sqlite3_mprintf("update %s set upload_count=upload_count+1 where upload_day='%s'", UPLOAD_COUNT_TABLE, utils_date_to_string());
+    sql = sqlite3_mprintf("update %s set upload_count=upload_count+1 where upload_day='%s' and child_unid=%d", 
+                            UPLOAD_COUNT_TABLE, 
+                            utils_date_to_string(),
+                            child_unid);
     utils_print("%s\n", sql);
     result = sqlite3_exec(g_hxt_service_db, sql, NULL, NULL, &err_msg);
     if (result != SQLITE_OK)
@@ -65,7 +71,7 @@ BOOL inc_upload_count()
     return TRUE;
 }
 
-int get_upload_count_of_day()
+int get_upload_count_of_day(int child_unid)
 {
     int result;
     char *err_msg;
@@ -73,7 +79,10 @@ int get_upload_count_of_day()
     int row_count, col_count;
     int value = 0;
 
-    char* sql = sqlite3_mprintf("select upload_count from %s where upload_day='%s'", UPLOAD_COUNT_TABLE, utils_date_to_string());
+    char* sql = sqlite3_mprintf("select upload_count from %s where upload_day='%s' and child_unid=%d", 
+                                UPLOAD_COUNT_TABLE, 
+                                utils_date_to_string(),
+                                child_unid);
     utils_print("%s\n", sql);
     result = sqlite3_get_table(g_hxt_service_db, sql, &db_result, &row_count, &col_count, &err_msg);
     if (result != SQLITE_OK)

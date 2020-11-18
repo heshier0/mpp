@@ -102,7 +102,7 @@ int get_report_info(void *data)
         return -1;
     }
 
-    sql = sqlite3_mprintf("select * from %s order by reportTime asc limit 0 ,1", REPORT_INFOS_TABLE);
+    sql = sqlite3_mprintf("select * from %s order by reportTime asc limit 0,1", REPORT_INFOS_TABLE);
     result = sqlite3_get_table(g_hxt_service_db, sql, &db_result, &row_count, &col_count, &err_msg);
     if (result != SQLITE_OK)
     {
@@ -120,8 +120,7 @@ int get_report_info(void *data)
 
     ReportInfo* tmp = (ReportInfo *)data;
     int index = col_count;
-    tmp->id = atoi(db_result[index++]);
-    id = tmp->id;
+    id = atoi(db_result[index++]);
     tmp->parent_unid = atoi(db_result[index++]);
     tmp->child_unid = atoi(db_result[index++]);
     tmp->report_type = atoi(db_result[index++]);

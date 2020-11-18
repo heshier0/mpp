@@ -76,7 +76,7 @@ static BOOL init_study_info(ReportInfo *report_info, StudyInfo *study_info, Alio
         report_info->duration = 10;
 
         /*query upload sum today*/
-        int count = get_upload_count_of_day();
+        int count = get_upload_count_of_day(child_unid);
         if (count >= 50)
         {
             strcpy(report_info->video_url, "");
@@ -132,7 +132,7 @@ static BOOL init_study_info(ReportInfo *report_info, StudyInfo *study_info, Alio
         /*if uploaded, increased in db*/
         if (video_uploaded && snap_uploaded)
         {
-            inc_upload_count();
+            inc_upload_count(child_unid);
         }
     }
 
@@ -396,8 +396,8 @@ static void parse_server_config_data(void *data)
         //
         utils_print("To varry child id...\n");
         item = cJSON_GetObjectItem(root, "data");
-        sub_item = cJSON_GetObjectItem(item, "childrenUnid");               //设置/变更上报数据的孩子ID
-        // stop_posture_recognize();
+        sub_item = cJSON_GetObjectItem(item, "childrenUnid"); 
+        stop_posture_recognize();              //设置/变更上报数据的孩子ID
         if (sub_item != NULL)
         {
             if (sub_item->valueint > 0)
@@ -406,7 +406,7 @@ static void parse_server_config_data(void *data)
             }
         }
         sleep(1);
-        // start_posture_recognize();
+        start_posture_recognize();
     break;
     case HXT_GET_IFLYOS_TOKEN:
         utils_print("To update iflyos token or sn...\n");

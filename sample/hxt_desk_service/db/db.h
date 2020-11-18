@@ -92,10 +92,10 @@ int get_volume();
 BOOL set_volume(int vol);
 
 /*upload count*/
-BOOL create_upload_count_info();
-BOOL inc_upload_count();
-int get_upload_count_of_day();
-BOOL init_upload_count();
+BOOL create_upload_count_info(int child_unid);
+BOOL inc_upload_count(int child_unid);
+int get_upload_count_of_day(int child_unid);
+BOOL init_upload_count(int child_unid);
 BOOL deinit_upload_count_params();
 
 

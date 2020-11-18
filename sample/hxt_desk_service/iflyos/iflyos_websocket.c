@@ -203,14 +203,7 @@ void iflyos_websocket_stop()
     
     s_sampling = FALSE; 
     pthread_cancel(s_read_pcm_tid);
-    
-    // char buf[128] = "";
-    // iflyos_wsc->send(iflyos_wsc, buf, strlen(buf + 2) + 2, UWSC_OP_CLOSE);   
-    // if (s_iflyos_loop)
-    // {
-    //     utils_print("iflyos weboscket break\n");
-    //     ev_break(s_iflyos_loop, EVBREAK_ALL);
-    // }
+
     ev_async_init(&s_async_watcher, async_callback);
     ev_async_start(s_iflyos_loop, &s_async_watcher);
     ev_async_send(s_iflyos_loop, &s_async_watcher);

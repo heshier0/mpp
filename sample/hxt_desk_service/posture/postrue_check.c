@@ -653,11 +653,16 @@ void start_posture_recognize()
     }
     s_keep_processing = TRUE;
 
-    /* creat upload info table if not created*/
-    if (get_upload_count_of_day() < 0)
+    /* creat upload info table if not created when child id is valid*/
+    int child_unid = get_select_child_id();
+    if (child_unid > 0) 
     {
-        create_upload_count_info();
+        if (get_upload_count_of_day(child_unid) < 0)
+        {
+            create_upload_count_info(child_unid);
+        }
     }
+
 
     PostureParams *params = utils_malloc(sizeof(PostureParams));
     params->video_duration = get_video_length(); 
