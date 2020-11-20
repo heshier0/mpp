@@ -97,14 +97,14 @@ static int hxt_get_reponse_status_code(void* data)
     int status_code = -1;
     if(NULL == data || strlen(data) == 0)
     {
-        return NULL;
+        return -1;
     }
     utils_print("Respnse:[%s]\n", (char*)data);
 
     cJSON* root = cJSON_Parse(data);
     if (NULL == root)
     {
-        return NULL;
+        return -1;
     }
     
     cJSON *item = cJSON_GetObjectItem(root, "statusCode");
@@ -152,6 +152,11 @@ static char* hxt_get_response_description(void *data)
     }
 
     cJSON* root = cJSON_Parse(data);
+    if (NULL == root)
+    {
+        return NULL;
+    }
+
     cJSON *item = cJSON_GetObjectItem(root, "desc");
     desc = (char*)utils_malloc(strlen(item->valuestring) + 1);
     strcpy(desc, item->valuestring);
@@ -174,6 +179,11 @@ static BOOL hxt_get_response_pass_status(void *data)
     }
 
     cJSON* root = cJSON_Parse(data);
+    if (NULL == root)
+    {
+        return FALSE;
+    }
+
     cJSON *item = cJSON_GetObjectItem(root, "isPass");
     if(strcmp(item->valuestring, "true") == 0)
     {
@@ -201,7 +211,11 @@ static void hxt_get_token_response(void* data)
     }
 
     cJSON* root = cJSON_Parse(data);
-    
+    if (NULL == root)
+    {
+        return;
+    }
+
     //check return status,if not OK, get error msg
     cJSON *item1 = cJSON_GetObjectItem(root, "status");
     if (!item1)
@@ -443,8 +457,10 @@ BOOL hxt_bind_desk_with_wifi_request()
     }
     utils_print("%s\n", json_data);
     //save response data
-    char* out = (char*)utils_malloc(2048);
-    if(!utils_post_json_data(api_url, "", json_data, out, 2048))
+    //char* out = (char*)utils_malloc(2048);
+    char *out = NULL;
+    //if(!utils_post_json_data(api_url, "", json_data, out, 2048))
+    if (!utils_post_json_data(api_url, "", json_data, &out))
     {
         utils_print("post data send failed\n");
         goto CLEANUP1;
@@ -520,8 +536,10 @@ BOOL hxt_confirm_desk_bind_request()
     }
     utils_print("%s\n", json_data);
     //save response data
-    char* out = (char*)utils_malloc(2048);
-    if(!utils_post_json_data(api_url, "", json_data, out, 2048))
+    //char* out = (char*)utils_malloc(2048);
+    //if(!utils_post_json_data(api_url, "", json_data, out, 2048))
+    char *out = NULL;
+    if (!utils_post_json_data(api_url, "", json_data, &out))
     {
         utils_print("post data send failed\n");
         goto CLEANUP1;
@@ -534,7 +552,11 @@ BOOL hxt_confirm_desk_bind_request()
     } 
 
 CLEANUP1:  
-    utils_free(out);
+    if (out != NULL)
+    {
+        utils_free(out);
+    }
+    
     utils_free(json_data);
 CLEANUP2:   
     cJSON_Delete(root);
@@ -576,8 +598,10 @@ BOOL hxt_get_token_request()
     }
 
     //save response data
-    char *out = (char*)utils_malloc(2048);
-    if(!utils_post_json_data(api_url, NULL, json_data, out, 2048))
+    // char *out = (char*)utils_malloc(2048);
+    // if(!utils_post_json_data(api_url, NULL, json_data, out, 2048))
+    char *out = NULL;
+    if(!utils_post_json_data(api_url, "", json_data, &out))
     {
         utils_print("post data send failed\n");
         goto CLEANUP1;
@@ -627,8 +651,12 @@ BOOL hxt_get_token_request()
         utils_system_reboot();
     } 
 
-CLEANUP1:    
-    utils_free(out);
+CLEANUP1:   
+    if (out != NULL)
+    {
+        utils_free(out);
+    }
+    
     utils_free(json_data);
 CLEANUP2:    
     cJSON_Delete(root);
@@ -682,9 +710,11 @@ BOOL hxt_get_desk_cfg_request()
     }
 
     //save response data
-    char *out = (char*)utils_malloc(1024*2);
+    // char *out = (char*)utils_malloc(1024*2);
+    char *out = NULL;
  RETRY_GET:   
-    if(!utils_post_json_data(api_url, header, NULL, out, 1024*2))
+    // if(!utils_post_json_data(api_url, header, NULL, out, 1024*2))
+    if(!utils_post_json_data(api_url, header, NULL, &out))
     {
         utils_print("post data send failed\n");
         utils_free(out);
@@ -719,8 +749,11 @@ BOOL hxt_get_desk_cfg_request()
         }
     }
     
-
-    utils_free(out);
+    if (out != NULL)
+    {
+        utils_free(out);
+    }
+    
     utils_free(header);
     utils_free(api_url);
     
@@ -774,8 +807,8 @@ int hxt_file_upload_request(const char* filename, const char* study_date, char* 
             utils_free(out);
             out = NULL;
         }
-        out = (char*)utils_malloc(2048);
-        utils_upload_file(upload_url, header, filename, out, 2048);
+        // out = (char*)utils_malloc(2048);
+        utils_upload_file(upload_url, header, filename, &out);
         if (strlen(out) == 0)
         {
             retry_count ++;
@@ -848,9 +881,8 @@ BOOL hxt_sample_snap_upload_request(const char* filename, const char* study_date
         header = hxt_get_header_with_token();
         utils_print("[%s]\n", header);
 
-        out = (char*)utils_malloc(2048);
-        utils_upload_file(upload_url, header, filename, out, 2048);
-        utils_print("[%s]\n", out);
+        //out = (char*)utils_malloc(2048);
+        utils_upload_file(upload_url, header, filename, &out);
 
         int status_code = hxt_get_reponse_status_code((void*)out);
         if (status_code == HXT_OK)
@@ -1114,7 +1146,7 @@ BOOL hxt_unbind_child(int child_unid)
 
 BOOL hxt_get_aliyun_config(void **opts)
 {
-    int retry_count = 0;
+    int retry_count = 1;
     BOOL reported = FALSE;
     char* api_url = hxt_get_api_url(HXT_GET_ALIYUN_CFG);
     if(NULL == api_url)
@@ -1130,22 +1162,22 @@ BOOL hxt_get_aliyun_config(void **opts)
     }
 
     //save response data
-    char *out = (char*)utils_malloc(1024*2);
+    // char *out = (char*)utils_malloc(1024*2);
+    char *out = NULL;
  RETRY_GET:   
-    if(!utils_send_get_request(api_url, header, out, 1024*2))
+    //if(!utils_send_get_request(api_url, header, out, 1024*2))
+    utils_send_get_request(api_url, header, &out);
+    if (NULL == out)
     {
         utils_print("post data send failed\n");
-        utils_free(out);
         utils_free(header);
         utils_free(api_url);
         return FALSE;
     } 
-    //utils_print("response is [%s]\n", out);
 
     int status_code = hxt_get_reponse_status_code((void *)out);
     if (status_code == HXT_OK)
     {
-        // utils_print("Aliyun: %s\n", out);
         reported = init_upload_options((AliossOptions**)opts, (void*)out);
     } 
     else if(status_code == HXT_NO_REGISTER)
@@ -1161,11 +1193,15 @@ BOOL hxt_get_aliyun_config(void **opts)
         if (retry_count < 3)
         {
             retry_count ++;
-            bzero((void*)out, 1024*2);
+            if (out != NULL)
+            {
+                utils_free(out);
+                out = NULL;
+            }
             goto RETRY_GET;
         }
     }
-    
+
     utils_free(out);
     utils_free(header);
     utils_free(api_url);

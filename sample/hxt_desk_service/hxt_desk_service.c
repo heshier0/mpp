@@ -85,8 +85,11 @@ int main(int argc, char **argv)
     //FIXME: add by huang  @2020-11-10  不能生成 core 先注释掉  19941608848
     //signal(SIGSEGV, handle_signal);
 //#endif
-    open_hxt_service_db();
 
+    utils_download_file("www.baid.com", "/user/1.html");
+
+#if 0
+    open_hxt_service_db();
     create_buffer(&g_msg_buffer, 16*1024);
     
     /* init gpio */
@@ -203,6 +206,7 @@ int main(int argc, char **argv)
     destroy_buffer(&g_msg_buffer);
     deinit_posture_model();
     close_hxt_service_db();
+#endif
 
     utils_print("~~~~EXIT~~~~\n");
 

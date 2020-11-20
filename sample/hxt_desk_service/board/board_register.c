@@ -59,7 +59,8 @@ static void* mem_map(unsigned long phy_addr, unsigned long size)
             pTmp->refcount ++;
             return (void*)(pTmp->Start_V + phy_addr - pTmp->Start_P);
         }  
-        pTmp->next;
+        utils_print("aaaa\n");
+        pTmp = pTmp->next;
     }
 
     if (fd < 0)
@@ -94,6 +95,7 @@ static void* mem_map(unsigned long phy_addr, unsigned long size)
         printf("mem_map():malloc new node failed! \n");
         return NULL;
     }
+
     pNew->Start_P = phy_addr_in_page;
     pNew->Start_V = (unsigned long)addr;
     pNew->length = size_in_page;
@@ -111,7 +113,7 @@ static void* mem_map(unsigned long phy_addr, unsigned long size)
         {
             pTmp = pTmp->next;
         }
-        pTmp->next = pTmp;
+        pTmp->next = pNew;
     }
     
     return (void*)(addr + page_diff);
@@ -134,35 +136,37 @@ static int mem_unmap(void* addr_mapped)
 
     do
     {
-       if( ((unsigned long)addr_mapped >= pTmp->Start_V) && 
-            ((unsigned long)addr_mapped <= (pTmp->Start_V + pTmp->length)) )
-        {
-            pTmp->refcount --;
-            if (0 == pTmp->refcount)
+        if( ((unsigned long)addr_mapped >= pTmp->Start_V) && 
+                ((unsigned long)addr_mapped <= (pTmp->Start_V + pTmp->length)) )
             {
-                printf("mem_unmap():map node will be remove!\n");
+                pTmp->refcount --;
+                if (0 == pTmp->refcount)
+                {
+                    printf("mem_unmap():map node will be remove!\n");
 
-                if(pTmp == pTMMAPNode)
-                {
-                    pTMMAPNode = NULL;
-                }
-                else
-                {
-                    pPre->next = pTmp->next;
-                }
-                
-                /* munmap */
-                if(munmap((void*)pTmp->Start_V, pTmp->length) != 0)
-                {
-                    printf("mem_unmap(): munmap failed\n");
-                }
+                    if(pTmp == pTMMAPNode)
+                    {
+                        pTMMAPNode = NULL;
+                    }
+                    else
+                    {
+                        pPre->next = pTmp->next;
+                    }
+                    
+                    /* munmap */
+                    if(munmap((void*)pTmp->Start_V, pTmp->length) != 0)
+                    {
+                        printf("mem_unmap(): munmap failed\n");
+                    }
 
-                utils_free(pTmp);
+                    free_print(pTmp);
+                    utils_free(pTmp);
+                }
+                return 0;
             }
-            return 0;
-        }
-        pPre = pTmp;
-        pTmp = pTmp->next;
+            pPre = pTmp;
+            pTmp = pTmp->next;
+
     } while (pTmp != NULL);
     
     return -1;
@@ -195,13 +199,13 @@ char* board_get_sn()
 
     sprintf(sn, "%x-%x-%x-%x-%x-%x", code1, code2, code3, code4, code5, code6);
     utils_print("board sn is %s\n", sn);
-
+    
     mem_unmap(DIE_ID0);
-    mem_unmap(DIE_ID1);
-    mem_unmap(DIE_ID2);
-    mem_unmap(DIE_ID3);
-    mem_unmap(DIE_ID4);
+    mem_unmap(DIE_ID1);   
+    mem_unmap(DIE_ID2);  
+    mem_unmap(DIE_ID3);       
+    mem_unmap(DIE_ID4);    
     mem_unmap(DIE_ID5);
-
+    
     return sn;
 }

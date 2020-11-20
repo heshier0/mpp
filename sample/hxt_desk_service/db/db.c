@@ -209,7 +209,7 @@ char* get_string_value_from_table(const char* table_name, const char* col_name)
     {
         out_value = utils_malloc(strlen(item)+1);
         strcpy(out_value, item);
-        utils_print("%s\n", out_value);
+        //utils_print("%s\n", out_value);
     }
 
     sqlite3_free_table(db_result);

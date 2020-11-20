@@ -11,9 +11,12 @@ BOOL utils_send_mp3_voice(const char *url);
 BOOL utils_send_local_voice(const char *path);
 
 BOOL utils_download_file(const char *url, const char* save_file_path);
-BOOL utils_upload_file(const char* url, const char* header, const char* local_file_path, char* out_buffer, int buffer_length);
-BOOL utils_post_json_data(const char *url, const char* header_content, const char* json_data, char* out, int out_length);
-BOOL utils_send_get_request(const char* url, const char* header_content, char* out, int out_length);
+// BOOL utils_upload_file(const char* url, const char* header, const char* local_file_path, char* out_buffer, int buffer_length);
+BOOL utils_upload_file(const char* url, const char* header, const char* local_file_path, char **out);
+//BOOL utils_post_json_data(const char *url, const char* header_content, const char* json_data, char* out, int out_length);
+BOOL utils_post_json_data(const char* url, const char* header_content, const char* json_data, char **out);
+// BOOL utils_send_get_request(const char* url, const char* header_content, char* out, int out_length);
+BOOL utils_send_get_request(const char* url, const char* header_content, char** out);
 
 int utils_open_fifo(const char* name, int mode);
 /*use linux shell cmd and linux pipe to achieve*/

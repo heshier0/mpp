@@ -23,11 +23,10 @@ INCS = -I$(ROOT_DIR)/. \
        -I/mnt/g/workspace/plugins/libev/include \
        -I/mnt/g/workspace/plugins/cjson/include    \
        -I/mnt/g/workspace/plugins/libuwsc/include \
-       -I/mnt/g/workspace/plugins/libmbedtls/include \
        -I/mnt/g/workspace/plugins/libqrcode/include \
        -I/mnt/g/workspace/plugins/ffmpeg/include \
+       -I/mnt/g/workspace/plugins/opencv/include \
        -I/mnt/g/workspace/plugins/libgpiod/include \
-       -I/mnt/g/workspace/plugins/opencv4/include/opencv4 \
        -I/mnt/g/workspace/plugins/libsitposture/include \
        -I/mnt/g/workspace/plugins/iflyos/include \
        -I/mnt/g/workspace/plugins/sqlite3/include \
@@ -40,9 +39,6 @@ INCS = -I$(ROOT_DIR)/. \
 LIBS = -L/mnt/g/workspace/plugins/libev/lib -lev \
        -L/mnt/g/workspace/plugins/cjson/lib -lcjson \
        -L/mnt/g/workspace/plugins/libuwsc/lib -luwsc \
-       -L/mnt/g/workspace/plugins/libmbedtls/lib -lmbedx509 \
-       -L/mnt/g/workspace/plugins/libmbedtls/lib -lmbedtls \
-       -L/mnt/g/workspace/plugins/libmbedtls/lib -lmbedcrypto \
        -L/mnt/g/workspace/plugins/libqrcode/lib -lqrcode \
        -L/mnt/g/workspace/plugins/libqrcode/lib -lzbar \
        -L/mnt/g/workspace/plugins/ffmpeg/lib -lavformat -lavcodec -lavutil -lswresample -lswscale \
@@ -62,8 +58,10 @@ LIBS = -L/mnt/g/workspace/plugins/libev/lib -lev \
        -L/mnt/g/workspace/plugins/openssl/lib -lcrypto
 
 LIBS +=  -L$(REL_LIB) -lsecurec -lnnie
-LIBS += -L/mnt/g/workspace/plugins/opencv4/lib -lopencv_core -lopencv_calib3d -lopencv_dnn -lopencv_features2d -lopencv_flann -lopencv_highgui -lopencv_imgcodecs -lopencv_imgproc -lopencv_ml -lopencv_objdetect
+#LIBS += /mnt/g/workspace/plugins/opencv4/lib -lopencv_core -lopencv_calib3d -lopencv_dnn -lopencv_features2d -lopencv_flann -lopencv_highgui -lopencv_imgcodecs -lopencv_imgproc -lopencv_ml -lopencv_objdetect
 
+LDFLAGS += -Wl,-rpath,/mnt/g/workspace/plugins/opencv4/lib 
+LDFLAGS += -lopencv_core -lopencv_calib3d -lopencv_dnn -lopencv_features2d -lopencv_flann -lopencv_highgui -lopencv_imgcodecs -lopencv_imgproc -lopencv_ml -lopencv_objdetect
 
 CFLAGS += $(INCS) 
 
@@ -100,7 +98,7 @@ MPI_LIBS += $(REL_LIB)/libhdmi.a
 all: $(TARGET)
 
 $(TARGET):$(COMM_OBJ) $(OBJS)
-	@$(CC) $(CFLAGS) -DEBUG -o $(TARGET_PATH)/$@ $^ -Wl,--start-group $(MPI_LIBS) $(SENSOR_LIBS) $(AUDIO_LIBA) $(REL_LIB)/libsecurec.a $(REL_LIB)/libsns_imx335.a -Wl,--end-group $(LIBS)
+	@$(CC) $(CFLAGS) -DEBUG -o $(TARGET_PATH)/$@ $^ -Wl,--start-group $(MPI_LIBS) $(SENSOR_LIBS) $(AUDIO_LIBA) $(REL_LIB)/libsecurec.a $(REL_LIB)/libsns_imx335.a -Wl,--end-group $(LIBS) $(LDFLAGS)
 
 clean:
 	@rm -f $(TARGET_PATH)/$(TARGET)

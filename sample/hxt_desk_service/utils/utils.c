@@ -14,6 +14,7 @@
 #include <dirent.h>
 #include <unistd.h>
 
+#include <curl/curl.h>
 #include <cJSON.h>
 
 #include "common.h"
@@ -205,6 +206,18 @@ BOOL utils_send_mp3_voice(const char *url)
     return check_system_cmd_result(status);
 }
 
+static size_t save_download_data(void *ptr, size_t size, size_t nmemb, void *data)
+{
+    FILE* fp = (FILE*)data;
+    if (fwrite(ptr, size, nmemb, fp) != size * nmemb)
+    {
+        utils_print("fwrite download file error\n");
+    }
+    
+    return (size * nmemb);
+}
+
+#if 0
 BOOL utils_download_file(const char *url, const char* save_file_path)
 {
     if (NULL == url || NULL == save_file_path)
@@ -235,7 +248,68 @@ BOOL utils_download_file(const char *url, const char* save_file_path)
 
     return TRUE;
 }
+#endif
 
+BOOL utils_download_file(const char* url, const char* save_file_path)
+{
+    BOOL ret = TRUE;
+    if (NULL == url || NULL == save_file_path)
+    {
+        return FALSE;
+    }
+
+    FILE *fd = fopen(save_file_path, "w+");
+    if (NULL == fd)
+    {
+        return FALSE;
+    }
+
+    CURLcode res;
+    CURL* handle = curl_easy_init();
+    if (handle)
+    {
+        struct curl_slist *header_list = NULL;
+        curl_easy_setopt(handle, CURLOPT_URL, url);
+        curl_easy_setopt(handle, CURLOPT_SSL_VERIFYPEER, 0);
+        curl_easy_setopt(handle, CURLOPT_SSL_VERIFYHOST, 0);
+        curl_easy_setopt(handle, CURLOPT_VERBOSE, 1L);
+        curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, save_download_data);
+        curl_easy_setopt(handle, CURLOPT_WRITEDATA, (void*)fd);
+
+        res = curl_easy_perform(handle);
+        if (res != CURLE_OK)
+        {
+            utils_print("curl_easy_perform failed:%s\n", 
+                curl_easy_strerror(res));
+            ret = FALSE;
+        }
+        curl_easy_cleanup(handle);
+    }
+
+    fclose(fd);
+    return ret;
+}
+
+static size_t get_response_data(void *ptr, size_t size, size_t nmemb, void *data)
+{
+    size_t written = size * nmemb;
+    char *p = *(char**)data;
+    *(char**)data = realloc(p, written + 1);
+    p = *(char **)data;
+
+    if (NULL == p)
+    {
+        utils_print("not enough memory\n");
+        return -1;
+    }
+
+    strncpy(p, ptr, written);
+    p[written] = '\0';
+
+    return written;
+}
+
+#if 0
 BOOL utils_upload_file(const char* url, const char* header, const char* local_file_path,
                         char* out_buffer, int buffer_length)
 {
@@ -265,7 +339,68 @@ BOOL utils_upload_file(const char* url, const char* header, const char* local_fi
         
     return TRUE;
 }
+#endif 
 
+BOOL utils_upload_file(const char* url, const char* header, const char* local_file_path, char **out)
+{
+    BOOL ret = TRUE;
+    
+    if(NULL == url || NULL == local_file_path)
+    {
+        return FALSE;
+    }
+
+    char* extra_header = (char *)header;
+    if (NULL == extra_header)
+    {
+        extra_header = "";
+    }
+
+    FILE *fd = fopen(local_file_path, "rb");
+    if (NULL == fd)
+    {
+        return FALSE;
+    }
+
+    struct stat file_info;
+    if(fstat(fileno(fd), &file_info) != 0)
+    {
+        fclose(fd);
+        return FALSE;
+    }
+
+    CURLcode res;
+    CURL* handle = curl_easy_init();
+    if (handle)
+    {
+        struct curl_slist *header_list = NULL;
+        header_list = curl_slist_append(header_list, extra_header);
+        curl_easy_setopt(handle, CURLOPT_HTTPHEADER, header_list);
+        curl_easy_setopt(handle, CURLOPT_URL, url);
+        curl_easy_setopt(handle, CURLOPT_SSL_VERIFYPEER, 0);
+        curl_easy_setopt(handle, CURLOPT_SSL_VERIFYHOST, 0);
+        curl_easy_setopt(handle, CURLOPT_UPLOAD, 1L);
+        curl_easy_setopt(handle, CURLOPT_READDATA, fd);
+        curl_easy_setopt(handle, CURLOPT_INFILESIZE_LARGE,(curl_off_t)file_info.st_size);
+        curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, get_response_data);
+        curl_easy_setopt(handle, CURLOPT_WRITEDATA, (void*)out);
+
+        res = curl_easy_perform(handle);
+        if (res != CURLE_OK)
+        {
+            utils_print("curl_easy_perform failed:%s\n", 
+                curl_easy_strerror(res));
+            ret = FALSE;
+        }
+
+        curl_easy_cleanup(handle);
+        curl_slist_free_all(header_list);
+    }
+
+    return ret;
+}
+
+#if 0
 BOOL utils_post_json_data(const char *url, const char* header_content, const char* json_data, char* out, int out_length)
 {
 
@@ -303,7 +438,61 @@ BOOL utils_post_json_data(const char *url, const char* header_content, const cha
 
     return TRUE;
 }
+#endif 
 
+BOOL utils_post_json_data(const char* url, const char* header_content, const char* json_data, char **out)
+{
+    BOOL ret = TRUE;
+    if (NULL == url)
+    {
+        return FALSE;
+    }
+
+    char* extra_header = (char *)header_content;
+    if( NULL == extra_header)
+    {
+        extra_header = "";
+    }
+
+    char* data = (char*)json_data;
+    if(NULL == data)
+    {
+        data = "";
+    }
+
+    CURLcode res;
+    CURL* handle = curl_easy_init();
+    if (handle)
+    {
+        struct curl_slist *header_list = NULL;
+        header_list = curl_slist_append(header_list, "Content-Type:application/json;charset=UTF-8");
+        header_list = curl_slist_append(header_list, extra_header);
+        curl_easy_setopt(handle, CURLOPT_HTTPHEADER, header_list);
+        curl_easy_setopt(handle, CURLOPT_URL, url);
+        curl_easy_setopt(handle, CURLOPT_SSL_VERIFYPEER, 0);
+        curl_easy_setopt(handle, CURLOPT_SSL_VERIFYHOST, 0);
+        curl_easy_setopt(handle, CURLOPT_POST, 1);
+        curl_easy_setopt(handle, CURLOPT_POSTFIELDS, json_data);
+        curl_easy_setopt(handle, CURLOPT_POSTFIELDSIZE, strlen(json_data));
+        curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, get_response_data);
+        curl_easy_setopt(handle, CURLOPT_WRITEDATA, (void*)out);
+
+        res = curl_easy_perform(handle);
+        if (res != CURLE_OK)
+        {
+            utils_print("curl_easy_perform failed:%s\n", 
+                curl_easy_strerror(res));
+            ret = FALSE;
+        }
+
+        curl_easy_cleanup(handle);
+        curl_slist_free_all(header_list);
+    }
+
+    return ret;
+}
+
+#if 0
 BOOL utils_send_get_request(const char* url, const char* header_content, char* out, int out_length)
 {
     if (NULL == url || NULL == out)
@@ -334,6 +523,69 @@ BOOL utils_send_get_request(const char* url, const char* header_content, char* o
     pclose(fp);
 
     return TRUE;
+}
+#endif 
+
+// static size_t get_alioss_response_data(void *ptr, size_t size, size_t nmemb, char *data)
+// {
+//     size_t written = size * nmemb;
+//     char *p = *(char**)data;
+//     *(char**)data = realloc(p, written + 1);
+//     p = *(char **)data;
+
+//     if (NULL == p)
+//     {
+//         utils_print("not enough memory\n");
+//         return -1;
+//     }
+
+//     strncpy(p, ptr, written);
+//     p[written] = '\0';
+
+//     return written;
+// }
+
+BOOL utils_send_get_request(const char* url, const char* header_content, char** out)
+{
+    BOOL ret = TRUE;
+    if (NULL == url)
+    {
+        return FALSE;
+    }
+
+    char* extra_header = (char *)header_content;
+    if( NULL == extra_header)
+    {
+        extra_header = "";
+    }
+
+    CURLcode res;
+    CURL* handle = curl_easy_init();
+    if (handle)
+    {
+        struct curl_slist *header_list = NULL;
+        header_list = curl_slist_append(header_list, "Content-Type:application/json;charset=UTF-8");
+        header_list = curl_slist_append(header_list, extra_header);
+        curl_easy_setopt(handle, CURLOPT_HTTPHEADER, header_list);
+        curl_easy_setopt(handle, CURLOPT_URL, url);
+        curl_easy_setopt(handle, CURLOPT_SSL_VERIFYPEER, 0);
+        curl_easy_setopt(handle, CURLOPT_SSL_VERIFYHOST, 0);
+        curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, get_response_data);
+        curl_easy_setopt(handle, CURLOPT_WRITEDATA, (void*)out);
+
+        res = curl_easy_perform(handle);
+        if (res != CURLE_OK)
+        {
+            utils_print("curl_easy_perform failed:%s\n", 
+                curl_easy_strerror(res));
+            ret = FALSE;
+        }
+
+        curl_easy_cleanup(handle);
+        curl_slist_free_all(header_list);
+    }
+
+    return ret;
 }
 
 char* utils_date_to_string()
